@@ -1,0 +1,132 @@
+diff --git a/src/xenia/gpu/command_processor.cc b/src/xenia/gpu/command_processor.cc
+index edd3e582e..e39bbc37a 100644
+--- a/src/xenia/gpu/command_processor.cc
++++ b/src/xenia/gpu/command_processor.cc
+@@ -1080,6 +1080,30 @@ void CommandProcessor::PrepareZPDForWait() {
+   PumpPendingRetire();
+ }
+ 
++void CommandProcessor::DrainZPDReportsForTrace() {
++  // Close the open interval as a frame end does, then retire the queue in
++  // order: a report still measuring waits for its last segment's submission.
++  EndZPDFrame();
++  PumpQueryResolves();
++  PumpPendingRetire();
++  size_t guard = 0;
++  while (!zpd_reports_.empty() && guard++ < (size_t(1) << 20)) {
++    ZPDReport& front = zpd_reports_.front();
++    if (front.pending_segments &&
++        (!front.last_segment_end_submission ||
++         !AwaitQueryResolve(front.handle, front.last_segment_end_submission))) {
++      break;
++    }
++    const size_t before = zpd_reports_.size();
++    PumpPendingRetire();
++    if (zpd_reports_.size() == before) {
++      break;
++    }
++  }
++  XELOGI("SR_ZPD_DRAIN left={} mode={}", zpd_reports_.size(),
++         zpd_mode_ == ZPDMode::kStrict ? "strict" : "other");
++}
++
+ void CommandProcessor::PumpPendingRetire() {
+   bool rebase_needed = false;
+   while (!zpd_reports_.empty()) {
+@@ -1102,6 +1126,10 @@ void CommandProcessor::PumpPendingRetire() {
+     }
+     zpd_pending_retire_start_ms_ = 0;
+ 
++    // superman-recomp p2.zpd oracle: every retired report in stream order, with
++    // the samples its draws passed (the guest's END - BEGIN for an END record).
++    XELOGI("SR_ZPD_REPORT addr={:08X} zpass={} zfail={} spec={}", front.address,
++           front.delta.z_pass, front.delta.z_fail, front.speculative ? 1 : 0);
+     zpd_sample_counter_ += front.delta;
+     if (front.speculative) {
+       if (fast_zpd_report_cached_deltas_.size() >= kFastZPDCacheMaxEntries &&
+diff --git a/src/xenia/gpu/command_processor.h b/src/xenia/gpu/command_processor.h
+index a5b02189e..3ac9cb13b 100644
+--- a/src/xenia/gpu/command_processor.h
++++ b/src/xenia/gpu/command_processor.h
+@@ -136,6 +136,11 @@ class CommandProcessor {
+ 
+   void CallInThread(std::function<void()> fn);
+ 
++  // superman-recomp p2.zpd oracle (trace-dump): retire every queued occlusion
++  // report, waiting for its host queries, so each one's SR_ZPD_REPORT line is
++  // logged before the dump exits. Command processor thread only.
++  void DrainZPDReportsForTrace();
++
+   virtual void ClearCaches();
+ 
+   // "Desired" is for the external thread managing the post-processing effect.
+diff --git a/src/xenia/gpu/trace_dump.cc b/src/xenia/gpu/trace_dump.cc
+index 6009ee806..f642bbd8b 100644
+--- a/src/xenia/gpu/trace_dump.cc
++++ b/src/xenia/gpu/trace_dump.cc
+@@ -128,10 +128,27 @@ bool TraceDump::Load(const std::filesystem::path& trace_file_path) {
+ 
+ int TraceDump::Run() {
+   BeginHostCapture();
+-  player_->SeekFrame(0);
+-  player_->SeekCommand(
+-      static_cast<int>(player_->current_frame()->commands.size() - 1));
++  if (player_->frame_count() > 1) {
++    // superman-recomp p2.zpd oracle: a multi-frame live trace
++    // (SR_PM4_TRACE_FRAMES) plays every frame, in one pass.
++    player_->PlayAll();
++  } else {
++    player_->SeekFrame(0);
++    player_->SeekCommand(
++        static_cast<int>(player_->current_frame()->commands.size() - 1));
++  }
+   player_->WaitOnPlayback();
++  // superman-recomp p2.zpd oracle: every occlusion report the trace issued is
++  // retired (and logged, SR_ZPD_REPORT) before the dump exits.
++  {
++    CommandProcessor* command_processor = graphics_system_->command_processor();
++    xe::threading::Fence zpd_fence;
++    command_processor->CallInThread([command_processor, &zpd_fence]() {
++      command_processor->DrainZPDReportsForTrace();
++      zpd_fence.Signal();
++    });
++    zpd_fence.Wait();
++  }
+   EndHostCapture();
+ 
+   // Capture.
+diff --git a/src/xenia/gpu/trace_player.cc b/src/xenia/gpu/trace_player.cc
+index 303e4d598..22c8d176a 100644
+--- a/src/xenia/gpu/trace_player.cc
++++ b/src/xenia/gpu/trace_player.cc
+@@ -79,6 +79,15 @@ void TracePlayer::SeekCommand(int target_command) {
+   }
+ }
+ 
++void TracePlayer::PlayAll() {
++  current_frame_index_ = frame_count() - 1;
++  current_command_index_ =
++      int(frames_[current_frame_index_].commands.size()) - 1;
++  PlayTrace(trace_data_ + sizeof(TraceHeader),
++            trace_size_ - sizeof(TraceHeader), TracePlaybackMode::kUntilEnd,
++            true);
++}
++
+ void TracePlayer::WaitOnPlayback() {
+   xe::threading::Wait(playback_event_.get(), true);
+ }
+diff --git a/src/xenia/gpu/trace_player.h b/src/xenia/gpu/trace_player.h
+index 9117e88a4..f5067d60b 100644
+--- a/src/xenia/gpu/trace_player.h
++++ b/src/xenia/gpu/trace_player.h
+@@ -43,6 +43,10 @@ class TracePlayer : public TraceReader {
+ 
+   void SeekFrame(int target_frame);
+   void SeekCommand(int target_command);
++  // superman-recomp p2.zpd oracle: the whole trace, every frame in order, in
++  // one pass (no break at a swap; SeekFrame drops the packet a frame boundary
++  // falls after).
++  void PlayAll();
+ 
+   void WaitOnPlayback();
+ 

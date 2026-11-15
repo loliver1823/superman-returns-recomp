@@ -1,0 +1,49 @@
+{
+  "name": "frontend-long-observe",
+  "purpose": "Same path as title_to_frontend, but presses A with hold-until-confirmed and then watches the front-end load for five more minutes. Answers the question both 186 s runs were cut off before: does the post-START load ever finish, and what does the game do next?",
+  "gates": "SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1",
+  "steps": [
+    {
+      "name": "fe-alive",
+      "purpose": "Front-end master tick running.",
+      "await": "\\[NAT_FE\\] #1 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "settle-title",
+      "purpose": "Title era composed; guarded on FE ticks, not a wall clock.",
+      "await": "\\[NAT_FE\\] #256 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "press-start",
+      "purpose": "PRESS START until the guest itself loads the front-end movie.",
+      "key": "ENTER",
+      "holdMs": 250,
+      "maxPulses": 4,
+      "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)",
+      "expectMs": 90000
+    },
+    {
+      "name": "first-screen",
+      "purpose": "FE flow FSM latched its first screen id.",
+      "expect": "\\[FE_SETSCREEN\\] #1 ",
+      "expectMs": 60000
+    },
+    {
+      "name": "clear-dialog",
+      "purpose": "Accept the storage dialog with A. Held until the guest is observed sampling it, because the front end polls XamInputGetState at ~1 Hz during this load and a short press is a coin flip (iter-450V: 1 of 5 short presses landed, twice running).",
+      "key": "A",
+      "holdMs": 4000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 8,
+      "gapMs": 6000
+    },
+    {
+      "name": "observe-long",
+      "purpose": "THE MEASUREMENT. Five minutes of unattended observation. The resource-request ordinal keeps counting even with the per-request log arm gated, so load progress is readable from the log afterwards whether or not it completes.",
+      "dwellMs": 300000
+    }
+  ]
+}

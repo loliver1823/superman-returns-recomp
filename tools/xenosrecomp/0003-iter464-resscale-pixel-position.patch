@@ -1,0 +1,39 @@
+diff --git a/XenosRecomp/shader_common.h b/XenosRecomp/shader_common.h
+--- a/XenosRecomp/shader_common.h
++++ b/XenosRecomp/shader_common.h
+@@ -30,6 +30,7 @@
+ #define g_SwappedTexcoords         vk::RawBufferLoad<uint>(g_PushConstants.SharedConstants + 260)
+ #define g_HalfPixelOffset          vk::RawBufferLoad<float2>(g_PushConstants.SharedConstants + 264)
+ #define g_AlphaThreshold           vk::RawBufferLoad<float>(g_PushConstants.SharedConstants + 272)
++#define g_PixelPosScaleBias        vk::RawBufferLoad<float2>(g_PushConstants.SharedConstants + 276)
+ #define g_NdcScaleOffset           vk::RawBufferLoad<float4>(g_PushConstants.SharedConstants + 288)
+ 
+ [[vk::constant_id(0)]] const uint g_SpecConstants = 0;
+@@ -48,6 +49,12 @@
+ // Superman Returns: spec-constant DXIL linking unused — everything compiles as
+ // plain vs_6_0/ps_6_0 with all spec-gated behaviors (alpha test etc.) disabled.
+ static uint g_SpecConstants() { return 0; }
++
++// superman (iter-464 resscale): the Xenos param-gen pixel position in GUEST pixels -
++// floor(SV_Position) * (1 + bias), bias = 1/scale - 1 per axis (0 at 1x). Its own
++// cbuffer (host root constants at b6 space4) so the SharedConstants layout, and the
++// DXIL of every shader that does not read the pixel position, stay unchanged.
++cbuffer PixelPosScale : register(b6, space4) { float2 g_PixelPosScaleBias; };
+ 
+ #endif
+ 
+diff --git a/XenosRecomp/shader_recompiler.cpp b/XenosRecomp/shader_recompiler.cpp
+--- a/XenosRecomp/shader_recompiler.cpp
++++ b/XenosRecomp/shader_recompiler.cpp
+@@ -1845,7 +1845,10 @@
+             print("\tfloat4 r{} = ", i);
+             if (isPixelShader && i == ((shader->fieldC >> 8) & 0xFF))
+             {
+-                out += "float4((iPos.xy - 0.5) * float2(iFace ? 1.0 : -1.0, 1.0), 0.0, 0.0);\n";
++                // superman (iter-464 resscale): Xenia dxbc_shader_translator.cc:720-734 -
++                // floor(SV_Position) in GUEST pixels: * 1/scale (host bias = 1/scale - 1, 0 at
++                // 1x, where this equals the old iPos.xy - 0.5 exactly at pixel centres).
++                out += "float4(floor(iPos.xy) * (1.0 + g_PixelPosScaleBias) * float2(iFace ? 1.0 : -1.0, 1.0), 0.0, 0.0);\n";
+             }
+         #ifdef UNLEASHED_RECOMP
+             else if (!isPixelShader && hasIndexCount && i == 0)

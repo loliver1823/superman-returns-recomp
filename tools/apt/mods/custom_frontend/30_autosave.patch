@@ -1,0 +1,62 @@
+# iter-464 custom_frontend: "Autosave without asking" (docs/CUSTOM_FRONTEND.md 5.6). A player
+# setting, DEFAULT ON (settings/mod_options.ini autosave_without_asking; the SETTINGS panel and
+# the pause menu's MORE OPTIONS toggle it). The game's own save popup is answered with the
+# game's own button (Save Game -> the current slot -> Yes / OK), so the game's own save code
+# runs; the popups are never shown. With the setting OFF the game asks, as on a console.
+#
+# MAIN_HUD is loaded for the whole time the in-game save flow can run (the PromptInGameSave
+# answer opens ITS save-slot picker, Main_Hud.ShowSaveSlots). Its class block (sprite 65)
+# already uses 243 of 256 one-byte ConstantPool slots, so the code lives in the small
+# BistroBaseScreen InitAction (sprite 64, runs first) and the Main_Hud functions only call
+# _global.SRAutoSave.Hud(ev, this, arg) / Teardown (3 new pool names).
+movie MAIN_HUD
+append-to action initaction:BistroBaseScreen file=srautosave.aptasm
+# HudLoaded: the HUD is ready (RegisterHudInstance); reg1 = this, reg2 = _global (0x129)
+append-to function HudLoaded in Main_Hud
+    op_76
+    Push [reg1]
+    EA_PushOne
+    EA_PushByte 3
+    Push [reg2]
+    EA_GetNamedMember 'SRAutoSave'
+    EA_CallNamedMethodPop 'Hud'
+end
+# ShowSaveSlots: a log line only. The hidden picker is prepared by the popup hook BEFORE the game
+# calls ShowSaveSlots (PrepSlots, iter-465). In a Main_Hud function the C++ calls, a call into
+# SRAutoSave (Hud) never ran (archive/v1_save/rolls/p1, p2) although _global.SRAutoSave and the
+# disc's own pool names resolve there (probe, rolls/p3); inline GetURL works. So the C++-called
+# Main_Hud functions only use inline strings.
+prepend-to function ShowSaveSlots in Main_Hud
+    GetURL 'FSCommand:SR_Log', 'hud ShowSaveSlots'
+end
+# SaveComplete(success r3) / LoadComplete(success r3): the host's current-slot tracker, with
+# inline strings only (no pool lookup, see ShowSaveSlots). The autosave itself ends in the popup
+# hook (SAVE SUCCESSFUL, k 3).
+prepend-to function SaveComplete in Main_Hud
+    Push [reg3]
+    Not
+    If hsc_done
+    GetURL 'FSCommand:SR_SaveEvent', 'save'
+hsc_done:
+end
+prepend-to function LoadComplete in Main_Hud
+    Push [reg3]
+    Not
+    If hlc_done
+    GetURL 'FSCommand:SR_SaveEvent', 'load'
+hlc_done:
+end
+# ExitScreen: restore + delete the methods (Teardown deletes all but itself; it goes here,
+# after it returned) - the lifetime rule of 10_menu.patch
+prepend-to function ExitScreen in Main_Hud file=hud_exitscreen_head.aptasm
+
+# The in-game SAVE/LOAD screen (pause menu): the same tracker events (no reply needed).
+# ScrSaveLoad.SaveComplete is flags 0x12A: reg1 = _global, reg2 = successful.
+movie SCRSAVELOAD
+prepend-to function SaveComplete in ScrSaveLoad
+    Push [reg2]
+    Not
+    If ssv_done
+    GetURL 'FSCommand:SR_SaveEvent', 'save'
+ssv_done:
+end

@@ -1,0 +1,17 @@
+# Lane E (RELEASE_PLAN step 5, E5; coordinator F2: Apt-side): a hint's button is readable. ButtonIcon.SetIcon(icon)
+# hands '../common/ButtonHints/' + platform + '/Hint' + icon + '.swf' straight to mIconHolder.loadMovie and stores
+# nothing (dump: SetIcon 0x0322-0x037C), so a hint bar's entries could be named by their labels only. This keeps
+# the icon name on the ButtonIcon itself, read by kernel/mouse_ui.cpp (a click on a hint presses that button) and
+# the menu census. Part of the custom_frontend port feature (on for players, off on natural rolls).
+# Patched in MAIN, not in BUTTONICON (E3-E6 r3, the Ally roll of 2026-10-23): MAIN (_level0, loaded first) exports
+# __Packages.ButtonIcon and registers its copy first, so BUTTONICON's own copy never runs (patch_movie.py, THE
+# FIRST-REGISTRAR RULE). MAIN's SetIcon is the same code (reg1 this, reg2 icon).
+movie MAIN
+# SetIcon(icon) (reg1 this, reg2 icon):
+#   this.srIcon = icon;
+prepend-to function SetIcon in ButtonIcon
+    Push [reg1]
+    EA_PushConstByte 'srIcon'
+    Push [reg2]
+    SetMember
+end

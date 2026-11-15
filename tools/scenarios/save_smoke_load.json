@@ -1,0 +1,109 @@
+{
+ "name": "save-smoke-load",
+ "purpose": "iter-465 playthrough: load the seeded save (SR_CONTENT_DIR) through the custom front end, enter Metropolis, hold 40 s.",
+ "gates": "SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=60,SR_PRESENT_DUMP_SPARSE_CAP=400",
+ "steps": [
+  {
+   "name": "fe-alive",
+   "await": "\\[NAT_FE\\] #1 natural FE master tick",
+   "timeoutMs": 240000
+  },
+  {
+   "name": "settle-title",
+   "await": "\\[NAT_FE\\] #256 natural FE master tick",
+   "timeoutMs": 240000
+  },
+  {
+   "name": "press-start",
+   "key": "ENTER",
+   "holdMs": 2000,
+   "holdUntilConfirmed": true,
+   "maxPulses": 4,
+   "gapMs": 12000,
+   "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\\\"main\\\"\\)",
+   "expectMs": 90000
+  },
+  {
+   "name": "title-ui-tail",
+   "await": "\\[APT_REQ\\] #\\d+ path='\\.\\./common/ButtonHints/XBox360/HintB'",
+   "timeoutMs": 240000
+  },
+  {
+   "name": "title-visible",
+   "requireVisibleMs": 6000,
+   "visibleTimeoutMs": 200000,
+   "dwellMs": 4000
+  },
+  {
+   "name": "start-bootflow",
+   "key": "ENTER",
+   "holdMs": 2000,
+   "holdUntilConfirmed": true,
+   "maxPulses": 3,
+   "gapMs": 10000,
+   "expect": "\\[SR_FSCMD\\].*claim LoadCreate",
+   "expectMs": 30000
+  },
+  {
+   "name": "menu-visible",
+   "dwellMs": 4000
+  },
+  {
+   "name": "down-to-load",
+   "key": "DOWN",
+   "holdMs": 250,
+   "maxPulses": 1,
+   "dwellMs": 1500
+  },
+  {
+   "name": "load-game",
+   "key": "A",
+   "holdMs": 1000,
+   "holdUntilConfirmed": true,
+   "maxPulses": 1,
+   "expect": "\\[SR_FSCMD\\].*answer cppId=\\S+ button=1",
+   "expectMs": 15000
+  },
+  {
+   "name": "slots-filled",
+   "purpose": "the slot list fills (the save lane's FillSlotInfo log needs its own gate)",
+   "dwellMs": 8000
+  },
+  {
+   "name": "load-slot",
+   "key": "A",
+   "holdMs": 1000,
+   "holdUntilConfirmed": true,
+   "maxPulses": 1,
+   "expect": "\\[SR_FSCMD\\].*SR_SaveEvent 'load' saveFlow\\+0x54=\\d -> slot \\d",
+   "expectMs": 30000
+  },
+  {
+   "name": "hub",
+   "expect": "\\[APT_SCREEN\\] path='screens/(hud/main_hud|frontend/ScrMainMenu)'",
+   "expectMs": 180000,
+   "dwellMs": 8000
+  },
+  {
+   "name": "metropolis",
+   "key": "A",
+   "holdMs": 1000,
+   "maxPulses": 3,
+   "gapMs": 15000,
+   "expect": "\\[APT_REQ\\] #\\d+ path='screens/hud/main_hud'|\\[APT_SCREEN\\] path='screens/hud/main_hud'",
+   "expectFresh": true,
+   "expectMs": 240000,
+   "optional": true
+  },
+  {
+   "name": "hud",
+   "expect": "\\[APT_REQ\\] #\\d+ path='screens/hud/main_hud'|\\[APT_SCREEN\\] path='screens/hud/main_hud'",
+   "expectMs": 120000,
+   "optional": true
+  },
+  {
+   "name": "play",
+   "dwellMs": 40000
+  }
+ ]
+}

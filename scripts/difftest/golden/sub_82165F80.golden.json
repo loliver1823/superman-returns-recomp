@@ -1,0 +1,50 @@
+[
+  {
+    "guest_va": "0x82165f80",
+    "fn": "sub_82165F80",
+    "case_id": "sub_basic",
+    "inputs": {
+      "regs": {
+        "r3": "0x82f00000",
+        "r4": "0x00000010"
+      },
+      "mem": {
+        "0x82F005C8": "00000064"
+      }
+    },
+    "oracle": "ghidra-emulate",
+    "status": "ok",
+    "deltas": {
+      "regs": {
+        "r3": "0x82f00000"
+      },
+      "mem": {
+        "0x82f005cb": "54"
+      }
+    }
+  },
+  {
+    "guest_va": "0x82165f80",
+    "fn": "sub_82165F80",
+    "case_id": "sub_underflow",
+    "inputs": {
+      "regs": {
+        "r3": "0x82f00000",
+        "r4": "0x0000000a"
+      },
+      "mem": {
+        "0x82F005C8": "00000005"
+      }
+    },
+    "oracle": "ghidra-emulate",
+    "status": "ok",
+    "deltas": {
+      "regs": {
+        "r3": "0x82f00000"
+      },
+      "mem": {
+        "0x82f005c8": "fffffffb"
+      }
+    }
+  }
+]

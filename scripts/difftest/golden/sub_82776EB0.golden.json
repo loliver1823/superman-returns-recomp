@@ -1,0 +1,25 @@
+[
+  {
+    "guest_va": "0x82776eb0",
+    "fn": "sub_82776EB0",
+    "case_id": "one_slot_null_resource",
+    "inputs": {
+      "regs": {
+        "r3": "0x82f00000"
+      },
+      "mem": {
+        "0x82F00050": "00000000",
+        "0x82F00130": "00000000",
+        "0x82F0013C": "00000001"
+      }
+    },
+    "oracle": "ghidra-emulate",
+    "status": "ok",
+    "deltas": {
+      "regs": {
+        "r3": "0x0"
+      },
+      "mem": {}
+    }
+  }
+]

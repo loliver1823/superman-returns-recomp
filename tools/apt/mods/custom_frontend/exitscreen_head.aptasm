@@ -1,0 +1,175 @@
+; Prepended to ScrPressStart.ExitScreen. reg2 = _global. Stack-only.
+;   _global.SRFrontEnd.Uninstall();   // restore FlowMgr.CppShowPopup and ScrGenPop input
+;   delete _global.SRFrontEnd.Install; ... (every FUNCTION member srfrontend.aptasm binds)
+;
+; Lifetime rule (10_menu.patch): no function object created by SCRPRESSSTART's bytecode may
+; outlive the loaded movie. Uninstall already restores the FlowMgr / ScrGenPop members it
+; replaced and deletes FlowMgr.SR_OnHostSettings; the SRFrontEnd methods themselves are
+; deleted here, after Uninstall has returned (not inside it: it would delete itself while
+; running). Only plain state stays in _global.SRFrontEnd (fetched, inSettings, pendingId,
+; lastAnswer, ...); the class InitAction binds the methods again on the next load.
+; Why: rolls quit_on1 / quit_v3_iaonly (signature A) showed NO ScrPressStart load request
+; after QUIT GAME -> YES while these functions survived; quit_on2 (the whole object
+; deleted) removed signature A, and failed only on the .const walk-order defect that
+; apt_graph.renumber_walk_order now fixes (docs/CUSTOM_FRONTEND.md 5.4, item 4).
+; build_custom_frontend.py checks that this list equals the methods srfrontend.aptasm binds.
+; iter-464: the Dev Tools renderer (devtools_ui.aptasm) first: Teardown deletes its other
+; methods, then Teardown itself goes.
+    EA_PushZero
+    Push [reg2]
+    EA_GetNamedMember 'SRDevTools'
+    EA_CallNamedMethodPop 'Teardown'
+    Push [reg2]
+    EA_GetNamedMember 'SRDevTools'
+    EA_PushConstByte 'Teardown'
+    Delete
+    Pop
+    EA_PushZero
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_CallNamedMethodPop 'Uninstall'
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'Install'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'Uninstall'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'CppShowPopupHook'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'IsLoadCreate'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'ShowMenu'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'OnReady'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'GenPopInputHook'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'OnMenu'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'ShowExitConfirm'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'OnExit'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'Defer'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'RunDeferred'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'ApplyStore'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'ShowSettings'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'OnSettings'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'GoSettings'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'OpenDevTools'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'OpenMods'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'OpenDisplay'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'ShowMore'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'OnMore'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'AutosaveOn'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'AutosaveLabel'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'OnModOptions'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'FetchModOptions'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'ToggleAutosave'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'OpenOptions'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'SR_GameOptions'
+    Delete
+    Pop
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'SR_OptionsClosed'
+    Delete
+    Pop

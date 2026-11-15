@@ -1,0 +1,9 @@
+# Experiment E1 (docs/CUSTOM_FRONTEND.md 7.2): the smallest visible Apt edit.
+# ScrPressStart's LOCALIZED_PRESS_START constant names the text id it shows
+# (ScrPressStart.as 0x4954). Pointing it at the game's own Generic_QUITGAME makes
+# the title screen read QUIT GAME instead of PRESS START - proof that an edited
+# movie delivered through the mods/ overlay runs in the game.
+#   form A: python tools/apt/build_custom_frontend.py --mod e1_quit_text
+#   form B: python tools/apt/build_custom_frontend.py --mod e1_quit_text_b --patches tools/apt/mods/e1_quit_text --form b
+movie SCRPRESSSTART
+replace-const 'SUP_PRESS_START' -> 'Generic_QUITGAME' count=1

@@ -1,0 +1,110 @@
+{
+  "name": "save-autosave-chapter",
+  "purpose": "iter-465 save lane: the reported bug, PORT FEATURES ON (-Gates SR_PORT_FEATURES=1: custom front end + 'Autosave without asking'). Custom MAIN MENU -> NEW GAME -> the level-skip dev tool (plan data/devtools/plans/chapter_advance_warobj02.txt) passes MSTobj01..03 (the MSTobj03 prompt is answered Continue Without Saving while the plan runs: bit 10), WARobj01 and WARobj02 -> the chapter advance -> the autosave option's BaseWorldFlow 105 PromptUserSaveGame -> the autosave answers Save Game -> the HUD slot picker runs hidden -> the first empty slot -> SaveTask -> the game writes the package -> SAVE SUCCESSFUL answered OK -> SaveComplete(true) -> the chapter load finishes. Gates: SR_PORT_FEATURES=1,SR_DEVTOOLS=levelskip,SR_DEVTOOLS_CMDS=<plan>,SR_DEVTOOLS_OUT=<dir>. Tag: PORT FEATURE roll (natural=false), dev-tool assisted. -TimeoutSeconds 1500.",
+  "gates": "SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=30,SR_PRESENT_DUMP_SPARSE_CAP=1500",
+  "steps": [
+    {
+      "name": "fe-alive",
+      "await": "\\[NAT_FE\\] #1 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "settle-title",
+      "await": "\\[NAT_FE\\] #256 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "press-start",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 4,
+      "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)",
+      "expectMs": 90000
+    },
+    {
+      "name": "title-ui-tail",
+      "await": "\\[APT_REQ\\] #15 path='\\.\\./common/ButtonHints/XBox360/HintB'",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "title-visible",
+      "requireVisibleMs": 8000,
+      "visibleTimeoutMs": 200000,
+      "dwellMs": 6000
+    },
+    {
+      "name": "start-bootflow",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 10000,
+      "expect": "\\[SR_FSCMD\\].*claim LoadCreate",
+      "expectMs": 30000
+    },
+    {
+      "name": "menu-visible",
+      "dwellMs": 4000
+    },
+    {
+      "name": "new-game",
+      "key": "A",
+      "holdMs": 1000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*answer cppId=\\S+ button=0",
+      "expectMs": 15000
+    },
+    {
+      "name": "hud-installs",
+      "expect": "\\[SR_FSCMD\\].*SR_Log 'autosave install'",
+      "expectMs": 240000
+    },
+    {
+      "name": "plan-done",
+      "purpose": "the dev tool passed MSTobj01..03, WARobj01, WARobj02 and stopped",
+      "await": "\\[DEVTOOL\\] levelskip done",
+      "timeoutMs": 1200000
+    },
+    {
+      "name": "chapter-prompt",
+      "purpose": "the chapter advance raised the save prompt (the autosave option's Lua): k 1",
+      "expect": "\\[SR_FSCMD\\].*save popup k=1 ",
+      "expectMs": 300000,
+      "expectFresh": true
+    },
+    {
+      "name": "answered-save",
+      "expect": "\\[SR_FSCMD\\].*autosave answer cppId=\\S+ button=0",
+      "expectMs": 10000
+    },
+    {
+      "name": "slots-hidden",
+      "expect": "\\[SR_FSCMD\\].*autosave slots \\(hidden\\)",
+      "expectMs": 20000
+    },
+    {
+      "name": "slot-picked",
+      "expect": "\\[SR_FSCMD\\].*autosave pick slot=0 ",
+      "expectMs": 30000
+    },
+    {
+      "name": "saved",
+      "purpose": "SAVE SUCCESSFUL (k 3) answered OK by the popup hook; the slot tracker learns slot 0",
+      "expect": "\\[SR_FSCMD\\].*autosave saved \\(SAVE SUCCESSFUL answered OK\\)",
+      "expectMs": 90000
+    },
+    {
+      "name": "slot-tracked",
+      "expect": "\\[SR_FSCMD\\].*SR_SaveEvent 'save' saveFlow\\+0x54=0 -> slot 0",
+      "expectMs": 10000
+    },
+    {
+      "name": "observe-after",
+      "purpose": "the chapter load finishes and the game goes on",
+      "dwellMs": 90000
+    }
+  ]
+}

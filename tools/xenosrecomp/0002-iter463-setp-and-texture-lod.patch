@@ -1,0 +1,360 @@
+diff --git a/XenosRecomp/main.cpp b/XenosRecomp/main.cpp
+index fcb4103..5e0eebd 100644
+--- a/XenosRecomp/main.cpp
++++ b/XenosRecomp/main.cpp
+@@ -164,6 +164,9 @@ int main(int argc, char** argv)
+                 recompiler = {};
+                 if (!sehRecompile(recompiler, shader.data, include))
+                     throw std::runtime_error("recompiler crashed (garbage container)");
++                // superman (iter-463): a known translation gap is a named SKIP.
++                if (!recompiler.unsupported.empty())
++                    throw std::runtime_error(recompiler.unsupported);
+ 
+                 shader.specConstantsMask = recompiler.specConstantsMask;
+ 
+diff --git a/XenosRecomp/shader_common.h b/XenosRecomp/shader_common.h
+index 7a78822..6fa4187 100644
+--- a/XenosRecomp/shader_common.h
++++ b/XenosRecomp/shader_common.h
+@@ -206,6 +206,59 @@ float4 tfetchCube(uint resourceDescriptorIndex, uint samplerDescriptorIndex, flo
+     return g_TextureCubeDescriptorHeap[resourceDescriptorIndex].Sample(g_SamplerDescriptorHeap[samplerDescriptorIndex], cubeMapData.cubeMapDirections[texCoord.z]);
+ }
+ 
++// superman (iter-463): explicit-LOD (SampleLevel) and biased (SampleBias)
++// forms of tfetch2D / tfetch3D / tfetchCube for setTexLOD, UseRegisterLOD,
++// UseComputedLOD=false and LOD-bias fetches (Xenia
++// dxbc_shader_translator_fetch.cc: sample_l for an explicit LOD, sample_d
++// with exp2(bias)-scaled gradients for a computed one). Resource selection
++// is the same as in the implicit-LOD forms.
++#define XE_TFETCH_LOD_VARIANTS(SUFFIX, SAMPLE, LODARG) \
++float4 tfetch2D##SUFFIX(uint resourceDescriptorIndex, uint samplerDescriptorIndex, float2 texCoord, float2 offset, float LODARG) \
++{ \
++    Texture2D<float4> texture = g_Texture2DDescriptorHeap[resourceDescriptorIndex]; \
++    return texture.SAMPLE(g_SamplerDescriptorHeap[samplerDescriptorIndex], texCoord + offset / getTexture2DDimensions(texture), LODARG); \
++} \
++float4 tfetch3D##SUFFIX(uint resourceDescriptorIndex, uint samplerDescriptorIndex, float3 texCoord, float3 offset, float LODARG) \
++{ \
++    if (resourceDescriptorIndex & 0x80000000u) \
++    { \
++        const uint index = resourceDescriptorIndex & 0x1FFFFFFFu; \
++        if (resourceDescriptorIndex & 0x20000000u) \
++        { \
++            Texture3D<float4> volume = g_Texture3DBandDescriptorHeap[index]; \
++            uint3 vd; \
++            volume.GetDimensions(vd.x, vd.y, vd.z); \
++            return volume.SAMPLE(g_SamplerDescriptorHeap[samplerDescriptorIndex], texCoord + offset / float3(vd), LODARG); \
++        } \
++        if (resourceDescriptorIndex & 0x40000000u) \
++        { \
++            Texture2DArray<float4> array = g_Texture2DArrayDescriptorHeap[index]; \
++            uint3 d; \
++            array.GetDimensions(d.x, d.y, d.z); \
++            return array.SAMPLE(g_SamplerDescriptorHeap[samplerDescriptorIndex], \
++                                float3(texCoord.xy + offset.xy / float2(d.xy), floor(texCoord.z * d.z + offset.z)), LODARG); \
++        } \
++        Texture2D<float4> texture2D = g_Texture2DDescriptorHeap[index]; \
++        return texture2D.SAMPLE(g_SamplerDescriptorHeap[samplerDescriptorIndex], \
++                                texCoord.xy + offset.xy / getTexture2DDimensions(texture2D), LODARG); \
++    } \
++    Texture3D<float4> texture = g_Texture3DDescriptorHeap[resourceDescriptorIndex]; \
++    uint3 dimensions; \
++    texture.GetDimensions(dimensions.x, dimensions.y, dimensions.z); \
++    return texture.SAMPLE(g_SamplerDescriptorHeap[samplerDescriptorIndex], texCoord + offset / float3(dimensions), LODARG); \
++} \
++float4 tfetchCube##SUFFIX(uint resourceDescriptorIndex, uint samplerDescriptorIndex, float3 texCoord, inout CubeMapData cubeMapData, float LODARG) \
++{ \
++    if (resourceDescriptorIndex & 0x80000000u) \
++        return g_TextureCubeBandDescriptorHeap[resourceDescriptorIndex & 0x1FFFFFFFu].SAMPLE( \
++            g_SamplerDescriptorHeap[samplerDescriptorIndex], cubeMapData.cubeMapDirections[texCoord.z], LODARG); \
++    return g_TextureCubeDescriptorHeap[resourceDescriptorIndex].SAMPLE(g_SamplerDescriptorHeap[samplerDescriptorIndex], \
++        cubeMapData.cubeMapDirections[texCoord.z], LODARG); \
++}
++
++XE_TFETCH_LOD_VARIANTS(Level, SampleLevel, lod)
++XE_TFETCH_LOD_VARIANTS(Bias, SampleBias, bias)
++
+ float4 tfetchR11G11B10(uint4 value)
+ {
+     if (g_SpecConstants() & SPEC_CONSTANT_R11G11B10_NORMAL)
+diff --git a/XenosRecomp/shader_recompiler.cpp b/XenosRecomp/shader_recompiler.cpp
+index 8701ed8..f4203e1 100644
+--- a/XenosRecomp/shader_recompiler.cpp
++++ b/XenosRecomp/shader_recompiler.cpp
+@@ -277,7 +277,20 @@ void ShaderRecompiler::recompile(const VertexFetchInstruction& instr, uint32_t a
+ 
+ void ShaderRecompiler::recompile(const TextureFetchInstruction& instr, bool bicubic)
+ {
+-    if (instr.opcode != FetchOpcode::TextureFetch && instr.opcode != FetchOpcode::GetTextureWeights)
++    // superman (iter-463): the fetch opcodes upstream silently dropped are a
++    // named SKIP now, so a shader that needs them never ships with a wrong
++    // result (Xenia implements getCompTexLOD, getGradients and setGradientH/V
++    // in dxbc_shader_translator_fetch.cc). None occurs in the iter-463 corpus.
++    if (instr.opcode == FetchOpcode::GetTextureComputedLod || instr.opcode == FetchOpcode::GetTextureGradients ||
++        instr.opcode == FetchOpcode::SetTextureGradientsHorz || instr.opcode == FetchOpcode::SetTextureGradientsVert)
++    {
++        if (unsupported.empty())
++            unsupported = fmt::format("unsupported texture fetch opcode {}", uint32_t(instr.opcode));
++        return;
++    }
++
++    if (instr.opcode != FetchOpcode::TextureFetch && instr.opcode != FetchOpcode::GetTextureWeights &&
++        instr.opcode != FetchOpcode::SetTextureLod && instr.opcode != FetchOpcode::GetTextureBorderColorFrac)
+         return;
+ 
+     if (instr.isPredicated)
+@@ -290,6 +303,99 @@ void ShaderRecompiler::recompile(const TextureFetchInstruction& instr, bool bicu
+         ++indentation;
+     }
+ 
++    if (instr.opcode == FetchOpcode::SetTextureLod)
++    {
++        // superman (iter-463): setTexLOD stores the register LOD that later
++        // UseRegisterLOD fetches read (Xenia dxbc_shader_translator_fetch.cc
++        // ProcessTextureFetchInstruction kSetTextureLod: component 0 of the
++        // source). Upstream dropped the instruction.
++        usesTexLod = true;
++        indent();
++        println("texLod = r{}.{};", instr.srcRegister, SWIZZLES[instr.srcSwizzle & 0x3]);
++
++        if (instr.isPredicated)
++        {
++            --indentation;
++            indent();
++            out += "}\n";
++        }
++        return;
++    }
++
++    if (instr.opcode == FetchOpcode::GetTextureBorderColorFrac)
++    {
++        // superman (iter-463): Xenia dxbc_shader_translator_fetch.cc
++        // kGetTextureBorderColorFrac: getBCF is unimplemented there too and
++        // stores 0.0 to the result (StoreResult(instr.result, LF(0.0f))) -
++        // match it instead of dropping the write.
++        for (uint32_t i = 0; i < 4; i++)
++        {
++            const auto swizzle = getDestSwizzle(instr.dstSwizzle, i);
++            if (swizzle >= FetchDestinationSwizzle::X && swizzle <= FetchDestinationSwizzle::W)
++            {
++                indent();
++                println("r{}.{} = 0.0;", instr.dstRegister, SWIZZLES[i]);
++            }
++        }
++        printDstSwizzle01(instr.dstRegister, instr.dstSwizzle);
++
++        if (instr.isPredicated)
++        {
++            --indentation;
++            indent();
++            out += "}\n";
++        }
++        return;
++    }
++
++    // superman (iter-463): the LOD a tfetch samples at (Xenia
++    // dxbc_shader_translator_fetch.cc, "Accumulate the explicit LOD sources").
++    // Computed LOD (implicit derivatives) exists only in pixel shaders unless
++    // register gradients are used. The LOD sources are the fetch-constant bias
++    // (dword 4 bits 12-21 / 32), the register LOD (UseRegisterLOD) and the
++    // instruction bias. Explicit LOD -> SampleLevel(sum); computed LOD ->
++    // Sample, biased by the sum (Xenia scales the gradients by exp2(sum)).
++    // A basemap mip filter samples level 0.
++    // NOT DONE: the fetch-constant bias - the host passes no fetch constant to
++    // a pixel shader (b5 space5 is vertex-only), so that term is 0 here.
++    // NOT DONE: register gradients (setGradientH/V; Xenia sample_d, fetch.cc
++    // 1526-1571) - absent from the corpus, so such a fetch is a named SKIP
++    // rather than an implicit-derivative Sample (which a VS cannot even use).
++    enum class LodMode { Computed, Bias, Level };
++    LodMode lodMode = LodMode::Computed;
++    std::string lodExpr;
++    if (instr.opcode == FetchOpcode::TextureFetch)
++    {
++        const bool computedLod = instr.useCompLod && (isPixelShader || instr.useRegGradients);
++        if (computedLod && instr.useRegGradients && instr.mipFilter != 2 && unsupported.empty())
++            unsupported = "tfetch with UseRegisterGradients (setGradientH/V) is not translated";
++        if (instr.mipFilter == 2) // TextureFilter::kBaseMap
++        {
++            lodMode = LodMode::Level;
++            lodExpr = "0.0";
++        }
++        else
++        {
++            if (instr.useRegLod)
++            {
++                usesTexLod = true;
++                lodExpr = "texLod";
++            }
++            if (instr.lodBias != 0)
++            {
++                if (!lodExpr.empty())
++                    lodExpr += " + ";
++                lodExpr += fmt::format("{}", instr.lodBias / 16.0f);
++            }
++            if (!computedLod)
++                lodMode = LodMode::Level;
++            else if (!lodExpr.empty())
++                lodMode = LodMode::Bias;
++            if (lodExpr.empty())
++                lodExpr = "0.0";
++        }
++    }
++
+     auto printSrcRegister = [&](size_t componentCount)
+         {
+             print("r{}.", instr.srcRegister);
+@@ -378,6 +484,11 @@ void ShaderRecompiler::recompile(const TextureFetchInstruction& instr, bool bicu
+ 
+     out += dimension;
+ 
++    if (lodMode == LodMode::Level)
++        out += "Level";
++    else if (lodMode == LodMode::Bias)
++        out += "Bias";
++
+ #ifdef UNLEASHED_RECOMP
+     if (bicubic)
+         out += "Bicubic";
+@@ -402,6 +513,9 @@ void ShaderRecompiler::recompile(const TextureFetchInstruction& instr, bool bicu
+         break;
+     }
+ 
++    if (lodMode != LodMode::Computed)
++        print(", {}", lodExpr);
++
+     out += ").";
+ 
+     printDstSwizzle(instr.dstSwizzle, true);
+@@ -441,7 +555,9 @@ void ShaderRecompiler::recompile(const AluInstruction& instr)
+         SCALAR_CONSTANT_1
+     };
+ 
+-    auto op = [&](size_t operand)
++    // forceMask (vector operands only): print exactly these source components
++    // instead of the ones the write mask selects (setp_*_push reads .x and .w).
++    auto op = [&](size_t operand, uint32_t forceMask = 0)
+         {
+             size_t reg = 0;
+             size_t swizzle = 0;
+@@ -574,7 +690,9 @@ void ShaderRecompiler::recompile(const AluInstruction& instr)
+             {
+                 uint32_t mask;
+ 
+-                switch (instr.vectorOpcode)
++                if (forceMask != 0)
++                    mask = forceMask;
++                else switch (instr.vectorOpcode)
+                 {
+                 case AluVectorOpcode::Dp2Add:
+                     mask = (operand == VECTOR_2) ? 0b1 : 0b11;
+@@ -717,28 +835,36 @@ void ShaderRecompiler::recompile(const AluInstruction& instr)
+         }
+     }
+ 
++    // superman (iter-463): setp_*_push takes the PREDICATE from the .w
++    // components and the RESULT from the .x components (Xenia
++    // shader_interpreter.cc kSetpEqPush..kSetpGePush); upstream used the
++    // write-mask components for both. When .x and .w select the same source
++    // component in both operands the two tests are one, and the result keeps
++    // the p0 form below.
++    const char* setpPushCompare = nullptr;
++    bool setpPushSplit = false;
+     if (instr.vectorOpcode >= AluVectorOpcode::SetpEqPush && instr.vectorOpcode <= AluVectorOpcode::SetpGePush)
+     {
+-        indent();
+-        print("p0 = {} == 0.0 && {} ", op(VECTOR_0), op(VECTOR_1));
+-
+         switch (instr.vectorOpcode)
+         {
+         case AluVectorOpcode::SetpEqPush:
+-            out += "==";
++            setpPushCompare = "==";
+             break;
+         case AluVectorOpcode::SetpNePush:
+-            out += "!=";
++            setpPushCompare = "!=";
+             break;
+         case AluVectorOpcode::SetpGtPush:
+-            out += ">";
++            setpPushCompare = ">";
+             break;
+         case AluVectorOpcode::SetpGePush:
+-            out += ">=";
++            setpPushCompare = ">=";
+             break;
+         }
+ 
+-        out += " 0.0;\n";
++        setpPushSplit = op(VECTOR_0, 0b0001) != op(VECTOR_0, 0b1000) || op(VECTOR_1, 0b0001) != op(VECTOR_1, 0b1000);
++
++        indent();
++        println("p0 = {} == 0.0 && {} {} 0.0;", op(VECTOR_0, 0b1000), op(VECTOR_1, 0b1000), setpPushCompare);
+     }
+     else if (instr.vectorOpcode >= AluVectorOpcode::MaxA)
+     {
+@@ -873,7 +999,11 @@ void ShaderRecompiler::recompile(const AluInstruction& instr)
+         case AluVectorOpcode::SetpNePush:
+         case AluVectorOpcode::SetpGtPush:
+         case AluVectorOpcode::SetpGePush:
+-            print("p0 ? 0.0 : {} + 1.0", op(VECTOR_0));
++            // The .x result is replicated to every written component (Xenia).
++            if (setpPushSplit)
++                print("({0} == 0.0 && {1} {2} 0.0) ? 0.0 : {0} + 1.0", op(VECTOR_0, 0b0001), op(VECTOR_1, 0b0001), setpPushCompare);
++            else
++                print("p0 ? 0.0 : {} + 1.0", op(VECTOR_0, 0b0001));
+             break;
+ 
+         case AluVectorOpcode::KillEq:
+@@ -1047,7 +1177,11 @@ void ShaderRecompiler::recompile(const AluInstruction& instr)
+             break;
+ 
+         case AluScalarOpcode::SetpInv:
+-            print("{0} == 0.0 ? 1.0 : {0}", op(SCALAR_0));
++            // superman (iter-463): Xenia shader_interpreter.cc kSetpInv /
++            // dxbc_shader_translator_alu.cc - the counter is 0 when the predicate
++            // (src == 1, set above) is taken. Upstream left it at 1, so every
++            // nested predicated block under the else branch stayed dead.
++            print("p0 ? 0.0 : ({0} == 0.0 ? 1.0 : {0})", op(SCALAR_0));
+             break;
+ 
+         case AluScalarOpcode::SetpPop:
+@@ -1740,6 +1874,7 @@ float4 XeVfLoad(uint slot, uint addr, int offsetDwords, uint fmt, bool isSigned,
+     out += "\tint aL = 0;\n";
+     out += "\tbool p0 = false;\n";
+     out += "\tfloat ps = 0.0;\n";
++    texLodDeclPos = out.size();
+     if (isPixelShader)
+     {
+ #ifdef UNLEASHED_RECOMP
+@@ -2148,4 +2283,10 @@ float4 XeVfLoad(uint slot, uint addr, int offsetDwords, uint fmt, bool isSigned,
+ #endif
+ 
+     out += "}";
++
++    // superman (iter-463): the register LOD starts at 0 (Xenia zeroes
++    // system_temp_grad_h_lod_). Declared only when used, so shaders without
++    // LOD fetches translate to the same text as before.
++    if (usesTexLod)
++        out.insert(texLodDeclPos, "\tfloat texLod = 0.0;\n");
+ }
+diff --git a/XenosRecomp/shader_recompiler.h b/XenosRecomp/shader_recompiler.h
+index d6d3b9d..7599e44 100644
+--- a/XenosRecomp/shader_recompiler.h
++++ b/XenosRecomp/shader_recompiler.h
+@@ -47,6 +47,17 @@ struct ShaderRecompiler : StringBuffer
+     // host-pre-decoded input attribute. Emitted as <hash>.vsf.dxil.
+     bool fetchMode = false;
+ 
++    // superman (iter-463): a setTexLOD / UseRegisterLOD fetch needs the
++    // register-LOD local; declared after translation at texLodDeclPos.
++    bool usesTexLod = false;
++    size_t texLodDeclPos = 0;
++
++    // superman (iter-463): a fetch the translator cannot express yet (register
++    // gradients, getCompTexLOD, ...). Set instead of throwing, because the
++    // recompile runs under an SEH __try that would turn a C++ throw into an
++    // anonymous "recompiler crashed"; main.cpp turns it into a named SKIP.
++    std::string unsupported;
++
+ #ifdef UNLEASHED_RECOMP
+     bool hasMtxProjection = false;
+     bool hasMtxPrevInvViewProjection = false;

@@ -1,0 +1,72 @@
+# iter-465 player lane: the gameplay half of tools/scenarios/player_wholerun.json, driven through
+# the harness channel with the PLAYER keymap and the mouse block (tools/controls/harness_play.py;
+# docs/PC_CONTROLS.md 1 = the default layout). Start it beside the sr_drive roll with
+#   python tools/controls/harness_play.py --instance player --log superman_returns_player_r1.log
+#          --script tools/player/gameplay_play.txt --out <attempt>/play.jsonl
+# Every step records the game's read-back pad report (context, buttons, sticks, mouse-look polls),
+# which is the receipt that the PC input reached the game's pad.
+# (no '#' inside a command: harness_play.py strips everything after one as a comment)
+await \[APT_REQ\] .*path='screens/hud/main_hud' 1500
+wait 20000
+keymap player
+sample hud
+# walk forward (W = left stick up) while the mouse turns the camera (mouse-look = right stick)
+down W
+watch 1500 walk
+mouse 900 0 1500
+watch 1500 look-right
+up W
+sample walk-done
+mouse -900 0 1500
+mouse 0 -250 800
+watch 1500 look-back
+# sprint (Left Shift = RB) a little
+down W
+down Left Shift
+wait 2500
+up Left Shift
+up W
+sample sprint-done
+# take off (Space = Y), fly forward with W, turn with the mouse, then land (Space again)
+tap Space 200
+wait 3000
+sample takeoff
+down W
+watch 2000 fly
+mouse 1200 0 2500
+wait 2000
+up W
+sample fly-done
+mouse 0 300 1000
+wait 3000
+# hover (Left Ctrl = LB) and punch (left mouse = X) for the read-back
+down Left Ctrl
+wait 1000
+up Left Ctrl
+click left 150
+wait 800
+click left 150
+sample actions
+tap Space 1500
+wait 5000
+# a pause round trip (Esc = START in gameplay), then back to the game. The resume press waits for the pause
+# screen to exist first: in a slow roll (check modes, ~27 fps) a fixed 4 s wait let the resume Escape land
+# while the menu was still opening, and the game stayed paused (check roll cr3, 2026-10-07).
+# iter-467: each Escape is HELD until the read-back context changes (2 -> 1 opens, 1 -> 2 resumes), pressed
+# again if it did not, and the script dies if it never does. A fixed 150 ms tap inside a flicker-gate freeze
+# (SR_DIAG_SIM_FREEZE holds the sim 2 s; the pad is not polled) never reached the game: the resume tap of
+# postmerge_sj / postmerge_hooks gate2 / flicker_stale / flicker_wave2 was lost and the menu stayed up for
+# the rest of the roll ("menu over world 10"). The flicker gate itself no longer pauses (tools/perf/flicker_play.txt).
+hold_ctx Escape 1
+await \[APT_SCREEN\] path='screens/misc/ScrPauseMenu' 120
+wait 4000
+sample paused
+hold_ctx Escape 2
+wait 4000
+sample resumed
+down W
+mouse -600 0 3000
+wait 2000
+up W
+sample end
+releaseall

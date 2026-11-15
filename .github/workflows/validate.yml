@@ -1,0 +1,103 @@
+# Build validation, modelled on UnleashedRecomp's validate.yml. Called by validate-internal.yml
+# (pushes and same-repo pull requests) and validate-external.yml (forks, after an approval).
+#
+# The game's own files never live in this repository. CI checks out a PRIVATE repository named by
+# the ASSET_REPO secret (read with ASSET_REPO_TOKEN) that holds the owner's own copy of the files the
+# build needs (default.xex). Without those secrets the build job is skipped (not failed); the checks
+# job needs no game files and runs on every call. The build's artifact contains recompiled game code:
+# on a public repository, anyone signed in to GitHub can download it.
+name: validate
+on:
+  workflow_call:
+    secrets:
+      ASSET_REPO:
+        required: false
+      ASSET_REPO_TOKEN:
+        required: false
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Repository checks (no game files)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Credits and licences cover every dependency
+        run: python scripts/check_credits.py
+
+      - name: No ungated forcing (docs/NATURAL_PATH_CHARTER.md)
+        run: python scripts/audit_forcing.py
+
+  assets:
+    name: Game files available?
+    runs-on: ubuntu-24.04
+    outputs:
+      present: ${{ steps.probe.outputs.present }}
+    steps:
+      - id: probe
+        env:
+          ASSET_REPO: ${{ secrets.ASSET_REPO }}
+        run: echo "present=${{ env.ASSET_REPO != '' }}" >> "$GITHUB_OUTPUT"
+
+  build-windows:
+    name: Build Windows (x64, clang, Release)
+    needs: [checks, assets]
+    if: needs.assets.outputs.present == 'true'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Checkout private game files
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ secrets.ASSET_REPO }}
+          token: ${{ secrets.ASSET_REPO_TOKEN }}
+          path: .\private
+
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: |
+            ./third_party/vcpkg/downloads
+            ./third_party/vcpkg/packages
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: choco install ninja
+
+      - name: Configure Developer Command Prompt
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Prepare game files
+        run: |
+          New-Item -ItemType Directory -Force "Superman Returns (USA)" | Out-Null
+          Copy-Item -Recurse -Force .\private\* "Superman Returns (USA)\"
+
+      # The configure regenerates guest/ppc from default.xex (tools/regen/regen.py), prepares the
+      # XenosRecomp translator from its submodule and downloads DXC (docs/BUILDING.md step 4).
+      - name: Configure project
+        run: cmake --preset default -DSCCACHE=OFF
+
+      - name: Build project
+        run: cmake --build build --target SupermanReturns
+
+      - name: Pack release
+        run: |
+          New-Item -ItemType Directory -Path .\release | Out-Null
+          Copy-Item build\SupermanReturns.exe, build\*.dll, build\LICENSE-*, THIRD_PARTY_LICENSES.md, LICENSE .\release\
+          python tools/player/release_lint.py .\release --disc "Superman Returns (USA)"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SupermanReturnsRecomp-Windows-Release
+          path: .\release

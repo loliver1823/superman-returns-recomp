@@ -1,0 +1,84 @@
+# iter-467 setjmp option A: one synthetic case per setjmp user (IDA: the eight `bl Crt_Setjmp_sub_827A45E0`
+# sites; luaD_rawrunprotected is covered by lua_push.script). Every case reaches the function's error path,
+# so its error routine calls Crt_Longjmp_sub_827A4270 on the function's own buffer and the setjmp call
+# returns a second time. The return value is reachable only through that second return. Guest data and the
+# guest stack are in the 0x70000000 scratch window; HEAP gives the allocators a bump arena (the golden dump
+# has no process heap).
+
+# LoadJPEGImage_sub_8239A988(out, data, size): setjmp(r1+720). Data without an SOI marker: libjpeg's
+# error_exit sub_82398A80 longjmps; the function returns E_FAIL.
+CASE jpeg_no_soi
+HEAP 70800000 70A00000
+W 70042000 0011223344556677
+CALL 8239A988 r3=70040000 r4=70042000 r5=8
+PR r3
+D 70040000 40
+END
+
+# ImageLoadPng_sub_8239B700(out, data, size): setjmp(png_ptr). A PNG signature and an IHDR with a bad
+# CRC: png_error (sub_823EEB90) longjmps; the function returns E_FAIL.
+CASE png_load_bad_ihdr_crc
+HEAP 70800000 70A00000
+W 70042000 89504E470D0A1A0A0000000D494844520000000100000001080200000000000000
+CALL 8239B700 r3=70040000 r4=70042000 r5=21
+PR r3
+D 70040000 40
+END
+
+# png_create_read_struct sub_823F20F8(user_png_ver, ...): setjmp(png_ptr). Version "0.0.0": the version
+# check calls png_error, which longjmps; the function frees the struct and returns NULL.
+CASE png_create_bad_version
+HEAP 70800000 70A00000
+W 70042000 302E302E3000
+CALL 823F20F8 r3=70042000 r4=0 r5=0 r6=0
+PR r3
+END
+
+# NewBackendCompile_sub_827C1170: setjmp(ctx+1040). No entry point: NewBackendCompilerLogError_sub_827C0420
+# stores E_FAIL in ctx+1360 and longjmps; the function returns it.
+CASE hlsl_newbe_no_entrypoint
+HEAP 70800000 70A00000
+CALL 827C1170 r3=70042000 r4=0 r5=0 r6=0 r7=0 r8=0 r9=0 r10=0
+PR r3
+END
+
+# sub_827C1438(ir, microcode buffer, flags, a4, cb ctx, cb, out): setjmp(ctx+1040). r4 is a D3DX buffer
+# (vtable 0x82036C80: +12 GetBufferPointer = `lwz r3,12(r3)`) whose data does not start with the microcode
+# magic 0x102A11xx: sub_828439F0 logs error 4801 through r8 (a trap VA), NewBackendCompilerLogError stores
+# E_FAIL and longjmps; the function returns ctx+1360.
+CASE hlsl_sibling_bad_microcode_header
+HEAP 70800000 70A00000
+W 70043100 82036C80000000010000001070043200
+W 70043200 DEADBEEF000000000000000000000000
+CALL 827C1438 r3=70042000 r4=70043100 r5=0 r6=0 r7=0 r8=8290F504 r9=0
+PR r3
+D 70043100 10
+END
+
+# sub_82858C90 (the XGraphics microcode compiler, ucode\compiler\compiler.cpp): setjmp(state+16).
+# a4 = 0: the function itself stores 21 in state+340 and longjmps to its own buffer; it returns
+# state+340. state+360 is the SSM registry; state+412 the free callback, +416 the alloc callback
+# (trap VAs; 0x8290F50C returns NULL), +424 the arena.
+CASE ucode_vs_null_a4
+W 70040168 70044000
+W 7004019C 8290F5048290F50C000000007004100000000000
+W 70041008 700500000000000070060000
+CALL 82858C90 r3=70040000 r4=70042000 r5=70043000 r6=0 r7=0 r8=0
+PR r3
+D 70040010 20
+D 70040154 4
+END
+
+# sub_82859260 (the compiler's other entry): setjmp(state+16). A full arena (sub_8287AE58) calls its
+# grow callback 0x82857C78, the checked alloc: state+416 (a trap VA) returns NULL, so it stores 16 in
+# state+340 and longjmps; the function returns state+340.
+CASE ucode_ps_arena_oom
+W 70040168 70044000
+W 7004019C 8290F5048290F50C000000007004100000000000
+W 70041000 700450000000000070050000000000007005201C
+W 700451A0 82857C7870040000
+CALL 82859260 r3=70040000 r4=70042000 r5=70043000 r6=0
+PR r3
+D 70040154 4
+D 70041008 C
+END

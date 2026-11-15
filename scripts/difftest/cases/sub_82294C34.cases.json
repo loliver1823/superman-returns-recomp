@@ -1,0 +1,8 @@
+[
+  { "case_id": "eq",        "va": "0x82294C34", "regs": { "r4": "0x5", "r5": "0x5" },               "expect": { "r3": "0x1" } },
+  { "case_id": "r4_gt",     "va": "0x82294C34", "regs": { "r4": "0x7", "r5": "0x5" },               "expect": { "r3": "0x1" } },
+  { "case_id": "r4_lt",     "va": "0x82294C34", "regs": { "r4": "0x5", "r5": "0x7" },               "expect": { "r3": "0x0" } },
+  { "case_id": "zero_zero", "va": "0x82294C34", "regs": { "r4": "0x0", "r5": "0x0" },               "expect": { "r3": "0x1" } },
+  { "case_id": "max_vs_0",  "va": "0x82294C34", "regs": { "r4": "0xffffffff", "r5": "0x0" },        "expect": { "r3": "0x1" } },
+  { "case_id": "zero_vs_max","va": "0x82294C34","regs": { "r4": "0x0", "r5": "0xffffffff" },        "expect": { "r3": "0x0" } }
+]

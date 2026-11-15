@@ -1,0 +1,195 @@
+{
+  "name": "femenu-settings-reboot",
+  "purpose": "lane E L-b (was iter-463, second process): run with -Gates \"SR_MODS=custom_frontend,SR_CONTENT_DIR=<content dir of a femenu_settings roll>\" (a read-only seed). Boot -> SR_GetSettings fetches the store -> START -> the claim's ApplyStore why=0 -> MAIN MENU > OPTIONS: the GAME tab's live report has the stored values -> B -> OPTIONS > CONTROLS > VIEW PAD LAYOUT -> the game's own CONTROLLER OPTIONS -> B (capture: the same values) -> EXIT -> YES -> exit code 0. -TimeoutSeconds 420.",
+  "gates": "SR_MENU_CENSUS=1,SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=10,SR_PRESENT_DUMP_SPARSE_CAP=900",
+  "steps": [
+    {
+      "name": "fe-alive",
+      "await": "\\[NAT_FE\\] #1 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "settle-title",
+      "await": "\\[NAT_FE\\] #256 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "press-start",
+      "key": "ENTER",
+      "holdMs": 250,
+      "maxPulses": 4,
+      "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)",
+      "expectMs": 90000
+    },
+    {
+      "name": "store-fetched",
+      "purpose": "VALUE check: the seed (a femenu_settings roll's store: Y inversion on from the menu, auto-center off from the pause menu) is read at the first ScrPressStart load.",
+      "expect": "\\[SR_FSCMD\\].*SR_GetSettings -> \\d+ \\(.* invY=1 autoCenter=0 ",
+      "expectMs": 120000
+    },
+    {
+      "name": "title-ui-tail",
+      "await": "\\[APT_REQ\\] #15 path='\\.\\./common/ButtonHints/XBox360/HintB'",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "title-visible",
+      "requireVisibleMs": 8000,
+      "visibleTimeoutMs": 200000,
+      "dwellMs": 6000
+    },
+    {
+      "name": "start-bootflow",
+      "key": "ENTER",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "purpose": "VALUE check: after the sign-in applyOptions reset them, ApplyStore made the live options equal the store (match=true).",
+      "expect": "\\[SR_FSCMD\\].*apply why=0 store=\\d+ now=\\d+ match=true",
+      "expectMs": 30000
+    },
+    {
+      "name": "menu-visible",
+      "dwellMs": 4000
+    },
+    {
+      "name": "fe-down-to-options",
+      "key": "DOWN",
+      "holdMs": 250,
+      "maxPulses": 2,
+      "gapMs": 1500,
+      "dwellMs": 1500
+    },
+    {
+      "name": "fe-open-options",
+      "key": "A",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "dwellMs": 3000,
+      "expect": "\\[SR_FSCMD\\].*menu button=2",
+      "expectMs": 10000,
+      "purpose": "lane E L-b: MAIN MENU > OPTIONS opens the OPTIONS screen directly (its GAME tab first)"
+    },
+    {
+      "name": "fe-options-shown",
+      "expect": "\\[PC_SETTINGS\\] shown \\(FE",
+      "expectSince": "fe-open-options",
+      "expectMs": 15000,
+      "dwellMs": 2000
+    },
+    {
+      "name": "live-report",
+      "purpose": "the game's own getters after the claim's ApplyStore: the seeded store",
+      "expect": "\\[SR_FSCMD\\].*SR_GameOptionsLive 'FE \\d+' -> noted \\(.* invY=1 autoCenter=0 ",
+      "expectSince": "fe-open-options",
+      "expectMs": 10000,
+      "dwellMs": 6000
+    },
+    {
+      "name": "close",
+      "key": "B",
+      "holdMs": 160,
+      "maxPulses": 1,
+      "dwellMs": 3000,
+      "expect": "\\[PC_SETTINGS\\] close",
+      "expectMs": 8000
+    },
+    {
+      "name": "fe-open-options-ctrl",
+      "key": "A",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "dwellMs": 3000,
+      "expect": "\\[SR_FSCMD\\].*menu button=2",
+      "expectMs": 10000,
+      "purpose": "the menu came back with OPTIONS focused (row 2): A opens it again"
+    },
+    {
+      "name": "fe-options-shown-ctrl",
+      "expect": "\\[PC_SETTINGS\\] shown \\(FE",
+      "expectSince": "fe-open-options-ctrl",
+      "expectMs": 15000,
+      "dwellMs": 2000
+    },
+    {
+      "name": "tab-controls-ctrl",
+      "key": "RB",
+      "holdMs": 160,
+      "maxPulses": 1,
+      "dwellMs": 1500,
+      "expect": "\\[PC_SETTINGS\\] tab CONTROLS",
+      "expectMs": 8000
+    },
+    {
+      "name": "view-pad-layout-ctrl",
+      "key": "A",
+      "holdMs": 160,
+      "maxPulses": 1,
+      "dwellMs": 6000,
+      "expect": "\\[GAME_OPTIONS\\] _global\\.SRFrontEnd\\.SR_OptionsClosed\\(1: VIEW PAD LAYOUT\\) called",
+      "expectMs": 15000,
+      "purpose": "the first CONTROLS row; once the screen is gone the opener opens the game's own CONTROLLER OPTIONS"
+    },
+    {
+      "name": "controller-open-ctrl",
+      "expect": "\\[SR_FSCMD\\].*SR_Log 'settings open ",
+      "expectSince": "view-pad-layout-ctrl",
+      "expectMs": 15000,
+      "dwellMs": 5000
+    },
+    {
+      "name": "back-from-controller-ctrl",
+      "key": "B",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "dwellMs": 5000,
+      "expect": "\\[SR_FSCMD\\].*SR_SetSettings 'ScrControllerOpt FE \\d+' -> stored \\(.* invY=1 autoCenter=0 ",
+      "expectMs": 15000
+    },
+    {
+      "name": "menu-back-ctrl",
+      "expect": "\\[MENU_CENSUS\\].*page='MAIN MENU'.* sel=2 ",
+      "expectSince": "back-from-controller-ctrl",
+      "expectMs": 15000,
+      "dwellMs": 2000
+    },
+    {
+      "name": "down-to-exit",
+      "purpose": "SETTINGS -> MODS -> EXIT (MODS added by the modmenu lane)",
+      "key": "DOWN",
+      "holdMs": 250,
+      "maxPulses": 2,
+      "gapMs": 1500,
+      "dwellMs": 2000
+    },
+    {
+      "name": "exit",
+      "key": "A",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*menu button=4",
+      "expectMs": 10000,
+      "dwellMs": 4000
+    },
+    {
+      "name": "down-to-yes",
+      "key": "DOWN",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "dwellMs": 2000
+    },
+    {
+      "name": "yes-quit",
+      "key": "A",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*SR_Quit",
+      "expectMs": 10000
+    },
+    {
+      "name": "exit-clean",
+      "expectExitCode": 0,
+      "exitTimeoutMs": 2000
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+R1 core.script - L6 golden_call notes for the Crt_Longjmp cases (the other cases are described in
+docs/SPLICE_CONVERSION.md and docs/FORCING_RETIREMENT.md, rows 9 and batch Lua)
+=====================================================================================================
+Crt_Longjmp_sub_827A4270 (IDA): val 0 becomes 1; if jmp_buf+0x138 != 0 (the SEH form) it calls
+_NLG_Notify(jmp_buf[1], jmp_buf[0]) and RtlUnwind(jmp_buf[0], jmp_buf[1]); otherwise _NLG_Notify(LR +0x134,
+SP +0x90, 0) and restores f14-f31, r13-r31, CR, LR and SP from the buffer so the setjmp returns val.
+
+longjmp_bad_r1_unwindflag0  +0x138 = 0, saved r1 0x70100000: the register-restore form. Identical before and
+                            after the 0x827A429C hook's deletion (the hook never fired with +0x138 = 0).
+longjmp_bad_r1_unwindflag1  +0x138 = 1 (val 0 -> 1): the SEH form. Before RELEASE_PLAN phase 4 the hook at
+                            0x827A429C dropped `bne cr1,0x827A435C`, so the case took the register-restore form
+                            (r1 = 0x70100000, r3 = 1). The hook is deleted (docs/FORCING_RETIREMENT.md): the
+                            generated body calls _NLG_Notify and the RtlUnwind import; the harness's RtlUnwind
+                            returns, so the body's epilogue returns r3 = 0 with r1 back at the stack top (l6/final).
+longjmp_good_r1             +0x138 = 1, val 9: the same change (before: restored r1 0x82100000, r3 = 9).
+  Why no reachable state is affected: Crt_Setjmp_sub_827A45E0, the title's only setjmp, stores 0 at +0x138; its
+  alternative path (a tail jump through the setjmp hook pointer dword_829B2FA8) is never taken - that pointer has
+  no writer in default.xex (one xref, the read at 0x827A45E4) and reads 0 in the nosound, sound_menu and
+  sound_gameplay golden dumps. So no jmp_buf of this title takes the SEH form on the console either; the two
+  +0x138 = 1 fixtures are kept as the generated body's SEH-form cases (they terminate).

@@ -1,0 +1,107 @@
+{
+  "name": "res-boss-fight",
+  "purpose": "iter-466 res4k: a fight at the draw resolution scale under test. Seed: a boss save (archive/player/boss_saves/<boss>/content as SR_CONTENT_DIR), LOAD -> slot 0 -> METROPOLIS (the first choice) -> the boss chapter's intro and the fight area; watch with sparse present dumps. Port features; -TimeoutSeconds 600.",
+  "gates": "SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=60,SR_PRESENT_DUMP_SPARSE_CAP=800",
+  "requires": {
+    "contentSeed": true
+  },
+  "steps": [
+    {
+      "name": "fe-alive",
+      "await": "\\[NAT_FE\\] #1 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "settle-title",
+      "await": "\\[NAT_FE\\] #256 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "press-start",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 4,
+      "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)",
+      "expectMs": 90000
+    },
+    {
+      "name": "title-ui-tail",
+      "await": "\\[APT_REQ\\] #15 path='\\.\\./common/ButtonHints/XBox360/HintB'",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "title-visible",
+      "requireVisibleMs": 8000,
+      "visibleTimeoutMs": 200000,
+      "dwellMs": 6000
+    },
+    {
+      "name": "start-bootflow",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 10000,
+      "expect": "\\[SR_FSCMD\\].*claim LoadCreate",
+      "expectMs": 30000
+    },
+    {
+      "name": "menu-visible",
+      "dwellMs": 4000
+    },
+    {
+      "name": "down-to-load",
+      "key": "DOWN",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "dwellMs": 1500
+    },
+    {
+      "name": "load-game",
+      "key": "A",
+      "holdMs": 1000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*answer cppId=\\S+ button=1",
+      "expectMs": 15000
+    },
+    {
+      "name": "slots-filled",
+      "purpose": "the LOAD A GAME list (a dwell: the old [PATH_RESOLVE] FillSlotInfo marker cannot fire since iter-464's skip_lr; its stand-in is [APT_REQ] artassets/SaveImages/SaveImage_N, tools/scenarios/natural_load.json)",
+      "dwellMs": 6000
+    },
+    {
+      "name": "load-slot",
+      "key": "A",
+      "holdMs": 1000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*SR_SaveEvent 'load' saveFlow\\+0x54=0 -> slot 0",
+      "expectMs": 30000
+    },
+    {
+      "name": "choice-screen",
+      "purpose": "a past-the-first-hour save: the retail menu offers METROPOLIS / FORTRESS",
+      "dwellMs": 12000
+    },
+    {
+      "name": "metropolis",
+      "key": "A",
+      "holdMs": 800,
+      "maxPulses": 1,
+      "dwellMs": 2000
+    },
+    {
+      "name": "in-game",
+      "await": "\\[SR_FSCMD\\].*SR_Log 'autosave install'",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "watch",
+      "purpose": "the boss intro / fight frames",
+      "dwellMs": 150000
+    }
+  ]
+}

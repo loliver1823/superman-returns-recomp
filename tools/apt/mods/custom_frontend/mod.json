@@ -1,0 +1,7 @@
+{
+  "name": "Custom front end",
+  "author": "superman-recomp",
+  "version": "iter-464",
+  "description": "The port's MAIN MENU (NEW GAME / LOAD GAME / SETTINGS / MODS / EXIT), universal settings, Autosave without asking, the Dev Tools and MODS pages. A port feature: always on for players, never listed in the MODS menu.",
+  "port_feature": true
+}

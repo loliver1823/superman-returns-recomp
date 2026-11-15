@@ -1,0 +1,17 @@
+; Prepended to Main_Hud.ExitScreen (reg2 = _global, flags 0x129). Stack-only.
+;   _global.SRAutoSave.Teardown();         // restores FlowMgr.CppShowPopup if the HUD owns it,
+;                                          // deletes every other SRAutoSave method
+;   delete _global.SRAutoSave.Teardown;    // here, after it returned (a running function never
+;                                          // deletes itself)
+; Only plain state (slot, active, ...) stays in _global.SRAutoSave; the BistroBaseScreen
+; InitAction binds the methods again on the next load. build_custom_frontend.py checks that the
+; methods srautosave.aptasm binds are exactly the ones Teardown + this snippet delete.
+    EA_PushZero
+    Push [reg2]
+    EA_GetNamedMember 'SRAutoSave'
+    EA_CallNamedMethodPop 'Teardown'
+    Push [reg2]
+    EA_GetNamedMember 'SRAutoSave'
+    EA_PushConstByte 'Teardown'
+    Delete
+    Pop

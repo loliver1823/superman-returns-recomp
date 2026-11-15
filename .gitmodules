@@ -1,0 +1,14 @@
+[submodule "third_party/vcpkg"]
+	path = third_party/vcpkg
+	url = https://github.com/microsoft/vcpkg.git
+[submodule "tools/XenonRecomp"]
+	path = tools/XenonRecomp
+	url = https://github.com/hedge-dev/XenonRecomp.git
+	ignore = untracked
+[submodule "third_party/ffmpeg/FFmpeg"]
+	path = third_party/ffmpeg/FFmpeg
+	url = https://github.com/has207/FFmpeg.git
+	branch = xmaframes
+[submodule "third_party/XenosRecomp"]
+	path = third_party/XenosRecomp
+	url = https://github.com/hedge-dev/XenosRecomp.git

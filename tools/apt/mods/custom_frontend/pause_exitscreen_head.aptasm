@@ -1,0 +1,24 @@
+; Prepended to ScrPauseMenu.ExitScreen (reg1 = this, reg2 = _global, flags 0x129). Stack-only.
+;   _global.SRDevTools.Teardown(); delete _global.SRDevTools.Teardown;
+;   _global.SRPause.Teardown();    delete _global.SRPause.Teardown;
+; Each Teardown deletes the other methods of its object (a running function never deletes
+; itself); only plain state survives the unload (the lifetime rule of 10_menu.patch).
+; (lane E L-c: the iter-464 MORE OPTIONS row btn10 is gone; the nine retail rows' OnExit is the game's own.)
+    EA_PushZero
+    Push [reg2]
+    EA_GetNamedMember 'SRDevTools'
+    EA_CallNamedMethodPop 'Teardown'
+    Push [reg2]
+    EA_GetNamedMember 'SRDevTools'
+    EA_PushConstByte 'Teardown'
+    Delete
+    Pop
+    EA_PushZero
+    Push [reg2]
+    EA_GetNamedMember 'SRPause'
+    EA_CallNamedMethodPop 'Teardown'
+    Push [reg2]
+    EA_GetNamedMember 'SRPause'
+    EA_PushConstByte 'Teardown'
+    Delete
+    Pop

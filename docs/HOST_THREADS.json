@@ -1,0 +1,154 @@
+{
+  "_doc": [
+    "Host-launch registry for scripts/audit_host_threads.py (run by scripts/audit_forcing.py).",
+    "A host thread / timer / VEH / atexit callback whose body writes guest memory, calls guest",
+    "code, allocates from the guest heap, signals a guest-visible kernel object, enqueues an",
+    "XNotify event or patches the dispatch table FAILS the audit unless its LAUNCH is master-",
+    "gated (inside if (forcingAllowed()) or after an if (!forcingAllowed()) return guard) or it",
+    "is listed under 'allow' with class platform|diagnostic and a reason.",
+    "'allow' holds ONLY platform and observe verdicts (iter-463 host-thread sweep). Match =",
+    "file + entry (function name, or 'lambda') + optional anchor (substring of the launch",
+    "statement or the launched body). 'must_gate' names predicates guarding a forcing branch",
+    "inside an allowed thread; each must itself require forcingAllowed(). 'requires' regexes",
+    "keep an observe claim checkable; if one disappears the site fails.",
+    "'open_forcing' is the register of FORCING verdicts not fixed yet. 'launch' entries only",
+    "annotate failing launches (deleting one clears nothing). 'site' entries are forcing that",
+    "is not a host launch; each fails while its anchor regex matches code that is not",
+    "master-gated. Remove an entry once the audit lists it as fixed.",
+    "'declared' holds DECLARED BAND-AIDS: forcing launches kept live on purpose because removing",
+    "them exposes a platform gap not fixed yet. Each entry needs id, file, entry, reason, a",
+    "'retirement' condition and a 'bandaids' pointer into docs/BANDAIDS.md. A matching launch",
+    "reports DECLARED and passes; the audit always prints the list. Keep it as short as possible.",
+    "'devtool' (iter-463 phase 2, docs/DEVTOOLS_DESIGN.md 2.2) MUST stay EMPTY: every dev-tool action runs on the game's own tick thread (kernel/devtools_levelskip.cpp); a host thread registered here as devtool, or an 'allow' entry of class devtool, fails scripts/audit_host_threads.py. The level-skip deadline poll rides the existing [GAUGE] census thread and touches no guest memory."
+  ],
+  "allow": [
+    {
+      "file": "kernel/audio_render_driver.cpp",
+      "entry": "audioRenderThreadMain",
+      "class": "platform",
+      "reason": "XAudio render-driver callback thread, started only by the guest's own XAudioRegisterRenderDriverClient. Xenia AudioSystem::WorkerThreadMain (apu/audio_system.cc:100-155) calls the client callback on a guest thread the same way; the guest-heap stack is the console audio subsystem's thread stack. Known deviations (fixed 5 ms cadence, r3 = arg not wrapped_callback_arg, no PCR) are fidelity gaps, not forcing."
+    },
+    {
+      "file": "kernel/gpu_submit.cpp",
+      "entry": "cpMain",
+      "class": "platform",
+      "reason": "Native submission worker, started by the guest publication. Native records and registered destinations authorize fence/rptr/scratch writes and guest interrupt delivery on its own PCR. Oracle builds additionally accept packet and plain-IB inputs through the separately linked decoder. No release ring-memory reads or guest-body fallback."
+    },
+    {
+      "file": "kernel/guest_context.cpp",
+      "entry": "lambda",
+      "anchor": "[tick, bundle, gb = g_guestBase, gs = g_guestSize]",
+      "class": "platform",
+      "reason": "KeTimeStampBundle 1 ms clock at 0xD0012000 (interrupt time, system time, ms). Xenia KernelState::UpdateKeTimestampBundle on a 1 ms HighResolutionTimer (kernel/kernel_state.cc:1243-1251, 1295-1297). The foreign-writer / repoint detectors only log (iter-463: the thread sets its thread-local guest base first, so they read real memory). iter-463 SR_TIMEBASE_50MHZ=1: all three fields from one 50 MHz guest tick read on a 1 ms high-resolution waitable timer (kernel/sr_timebase.cpp writeBundle), as Xenia."
+    },
+    {
+      "file": "kernel/stubs.cpp",
+      "entry": "guestThreadFunc",
+      "class": "platform",
+      "reason": "The host thread behind the guest's own ExCreateThread (and the harness-created guest threads); SetEvent of the completion event is the thread object becoming signaled on exit, as on the console. Not in the iter-463 verdict list; added by the rule phase because the guest requested the thread."
+    },
+    {
+      "file": "kernel/stubs.cpp",
+      "entry": "lambda",
+      "anchor": "SR async read",
+      "class": "platform",
+      "reason": "iter-466 stutter, SR_ASYNC_READ (default ON, docs/PERFORMANCE.md 7.3): the completion worker of the guest's own overlapped NtReadFile. The game issued the read on a handle it opened for overlapped I/O and got STATUS_PENDING; the worker performs that read, writes the IOSB the game passed, and sets the event the game passed and the file object - the console kernel's asynchronous I/O completion (Xenia completes the same read synchronously). It starts nothing on its own: it only runs queued guest reads, and the guest makes every decision."
+    },
+    {
+      "file": "kernel/stubs.cpp",
+      "entry": "vdVblankThread",
+      "class": "platform",
+      "reason": "60 Hz vblank: calls the guest-registered graphics ISR with source 0, started only by the guest's VdSetGraphicsInterruptCallback. Xenia GraphicsSystem::MarkVblank -> DispatchInterruptCallback(0, 2) (gpu/graphics_system.cc:336-346). Open fidelity items: the ISR mirrors the MAIN thread's r13 instead of an own PCR with cpu 2, and the legacy source-1 deliveries under !cpOwnsIrq (SR_PM4_CP=0 only) fabricate CP interrupts - gate or delete them with the legacy VdSwap path."
+    },
+    {
+      "file": "kernel/stubs.cpp",
+      "entry": "xnBootDeliveryThread",
+      "class": "platform",
+      "must_gate": [
+        "xnForceBootUiOn"
+      ],
+      "reason": "Delivers XN_SYS_SIGNINCHANGED(10,1) to the host XNotify queue after the guest's first XamNotifyCreateListener; the guest pulls it with XNotifyGetNext. Xenia KernelState::RegisterNotifyListener (kernel/kernel_state.cc:1017-1037). Deviations to port: synchronous, first kXNotifySystem listener only, plus SystemUI(IsUIActive). The SR_XNOTIFY_FORCE_BOOTUI tail fabricates (9,0) and is forcing: xnForceBootUiOn must require forcingAllowed()."
+    },
+    {
+      "file": "kernel/stubs.cpp",
+      "entry": "lambda",
+      "anchor": "xnEnqueue(0x09u, 0x00u)",
+      "class": "platform",
+      "reason": "xnSystemUiCloseLater: XN_SYS_UI(9,0) 100 ms after the guest's own XamShowDeviceSelectorUI_v2; host queue only. Xenia xam_ui.cc headless dispatch: Sleep(100 ms) then BroadcastNotification(kXNotificationSystemUI, false)."
+    },
+    {
+      "file": "kernel/audio_render_driver.cpp",
+      "entry": "moduleStructWatchPollerMain",
+      "class": "diagnostic",
+      "requires": [
+        "\\(void\\)writeBE32;"
+      ],
+      "reason": "MODSTRUCT_WATCH: reads *(modA+0)/*(modB+0) and logs transitions. The iter-39 restore was reverted; writeBE32 is only (void)-referenced. Costs a host core (20 us poll) - make it opt-in or delete."
+    },
+    {
+      "file": "kernel/fe_flow_watch.cpp",
+      "entry": "simMgrGuardThread",
+      "class": "diagnostic",
+      "must_gate": [
+        "simKeepOn"
+      ],
+      "reason": "[KHEAL] observer of the sim manager's run byte; logs and returns. The heal write p[0x40]/p[0x42] runs only under simKeepOn() = forcingAllowed() && SR_SIM_KEEP=1. Hygiene: spawned per sim-mgr Run entry with no once-guard."
+    },
+    {
+      "file": "kernel/fe_flow_watch.cpp",
+      "entry": "lambda",
+      "anchor": "table-patch watch ARMED",
+      "class": "diagnostic",
+      "reason": "FlowWatchStarter: installs ~50 PPC_LOOKUP_FUNC dispatch-table logging shims that call their originals; the mutating shim branches (shimKStop destroy refusal, PUMP_SWEEP) are master-gated. Its FE-drive launches are master-gated and cfgSoundOffThread is audited as its own site. The table patches are not yet in docs/OVERRIDES.json (gen_override_manifest.py does not scan PPC_LOOKUP_FUNC(...) = assignments)."
+    },
+    {
+      "file": "kernel/fm_world_ptr_patcher.cpp",
+      "entry": "patcherMain",
+      "class": "diagnostic",
+      "requires": [
+        "constexpr bool kObserveOnly = true"
+      ],
+      "reason": "FM_WORLD_PATCHER: polls module+4 of the four managers and logs. The writeGuestBE32 branch is unreachable while kObserveOnly is constexpr true (iter-188: the write crashed runs). Delete the dead write branch."
+    }
+  ],
+  "declared": [],
+  "open_forcing": [
+    {
+      "id": "main-bootstraps",
+      "kind": "site",
+      "file": "guest/ppc/ppc_recomp.5.cpp",
+      "anchor": "ctx\\.lr = 0x8214991[08];",
+      "default_on": true,
+      "what": "SR_MAIN_BOOTSTRAPS splice in game main sub_821498F8 calls sub_82720360 (before Init2) and sub_822AE160 (after Init2) with synthetic LRs - guest calls the game does not make there (BANDAIDS.md:191: TIMING, both construct naturally). Default ON, not master-gated; scan_generated counts any getenv as gated.",
+      "recommendation": "Gate both calls behind forcingAllowed() in tools/regen/splice_bodies.json and regenerate; re-measure SR_MAIN_BOOTSTRAPS=0 and root-cause the FE-tick-job race."
+    },
+    {
+      "id": "gameloop-quitflag-clear",
+      "kind": "site",
+      "file": "kernel/init_wait_bypass.cpp",
+      "anchor": "\\*qf = 0;",
+      "default_on": true,
+      "what": "The sub_82176300 override writes 0 to the game loop quit flag [gameState+0x18] before running the real loop. IDA: Init2 (sub_8218CFE8) already zeroes it; logs show preValue=0x00 in every roll, so the write is inert but would erase a genuine early quit.",
+      "recommendation": "Make it observe-only (log a WARN if preValue != 0, do not clear); reclassify sub_82176300 in OVERRIDES.json."
+    },
+    {
+      "id": "crt-doexit-flags",
+      "kind": "site",
+      "file": "kernel/guest_context.cpp",
+      "anchor": "writeGuestBE32\\(g_guestBase \\+ kDogmaGuard[12]VA",
+      "default_on": true,
+      "what": "initKernelDataStructures writes 1 to 0x829AAE78/0x829AAE74 ('DOGMA guard globals'). They are the CRT doexit _C_Exit_Done/_C_Termination_Done flags (sub_827A1698); golden dump reads 0; the spliced goto loc_827A1770 in sub_827A1690/1698 makes the write inert.",
+      "recommendation": "Delete the write (and separately retire the spliced doexit bypass so exit() runs its atexit path). ENGINE_MAP note: sub_827A1698 = CRT doexit."
+    },
+    {
+      "id": "cs-oor-force-recreate",
+      "kind": "site",
+      "file": "kernel/stubs.cpp",
+      "anchor": "oorCs = oorRecreateCS\\(csKey\\);",
+      "default_on": true,
+      "what": "RtlEnterCriticalSection breaks a held out-of-range CS after 2 s (force-recreate) and returns pretend-success when the OOR table is full. 'Out of range' uses the stale 0xB4000000 top, so real CSes up to 0xBF000000 (guest stacks) qualify. Armed, never fired (0 CRITSEC_ABANDONED).",
+      "recommendation": "Fix csCanonicalKey's range to the real arena top; gate the force-recreate and the table-full pretend-success behind forcingAllowed() (plain waiting is the console behaviour, Xenia xboxkrnl_rtl.cc:596)."
+    }
+  ],
+  "devtool": []
+}

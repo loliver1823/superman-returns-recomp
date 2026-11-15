@@ -1,0 +1,26 @@
+; Prepended to ScrSaveLoad.LoadComplete(successful r3) (reg2 = _global, flags 0x129): an
+; in-game LOAD (pause menu -> SAVE/LOAD). The save's own options were just restored
+; (ScriptCmd_FillRecordArray_sub_821652E0); re-apply the universal store when
+; apply_to_loaded_saves is on. The function is spliced in here (a copy from this movie) so
+; nothing calls into ScrPressStart, which is not loaded in game.
+;   if (successful) { _global.SR_ApplyStore = <apply_store_fn>; _global.SR_ApplyStore(2);
+;                     delete _global.SR_ApplyStore; }
+; The delete keeps the lifetime rule (exitscreen_head.aptasm): no function object created by
+; this movie's bytecode outlives the call that needed it.
+    Push [reg3]
+    Not
+    If sl_done
+    GetURL 'FSCommand:SR_SaveEvent', 'load'
+    Push [reg2]
+    EA_PushConstByte 'SR_ApplyStore'
+.include 'apply_store_fn.aptasm'
+    SetMember
+    EA_PushByte 2
+    EA_PushOne
+    Push [reg2]
+    EA_CallNamedMethodPop 'SR_ApplyStore'
+    Push [reg2]
+    EA_PushConstByte 'SR_ApplyStore'
+    Delete
+    Pop
+sl_done:

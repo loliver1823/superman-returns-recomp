@@ -1,0 +1,30 @@
+# p2.zpd (native/zpd-bake, zbk2's follow-up, 2026-10-16): THE PARKED WORKLOAD - a save-started Metropolis session that
+# presses NOTHING after the HUD, so Superman stays at the spawn and the camera keeps the spawn's own view for the whole
+# roll. For perf_run --from-save on archive/saves/18_ch18_before_twister (native_proof ZPD_PARK_SEED): every
+# Metropolis seed loads at the same spawn and heading (the Midtown plaza, poshud on ours_start and on the Xenia gameplay
+# golden: (-2267, 1177, -412), heading 51.57 deg), and seed 18's view from there holds a threat marker farther than its
+# type's distance - the only seed whose HUD glow query (HudGlowOcclusionQuery_sub_82304058) fired before any input in
+# the seed library's load checks (exe 2087ca4acdb4: zpd +2 at HUD+5.8 s, the play's first input at +14.5 s; every other
+# seed 0 until it flew). zbk2's blind 5-block flight (zpd_play.txt) left the markers behind: pace1 issued 12 queries in
+# its 28,672-present window, the A/B 16 query-bearing holds of 55, both =0 meter rolls none.
+# The prelude is flicker_gate.py's SAVE_PRELUDE (as zpd_play.txt). The sample marks only label the perf report; the
+# `mark dump` opens the flicker gate's span window (SR_PRESENT_DUMP_FROM_MARK=1) and is read by no other roll.
+# (no '#' inside a command: harness_play.py strips everything after one as a comment)
+await \[SR_FSCMD\].*answer cppId=\S+ button=1 1500
+await \[APT_(REQ|SCREEN)\].*path='screens/hud/main_hud' 900
+await \[PC_CONTROLS\] context gameplay 240
+wait 7000
+keymap player
+sample start
+mark dump
+wait 45000
+sample park-1
+wait 45000
+sample park-2
+wait 45000
+sample park-3
+wait 45000
+sample park-4
+wait 45000
+sample park-5
+releaseall

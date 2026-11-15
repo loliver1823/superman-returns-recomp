@@ -1,0 +1,187 @@
+{
+  "name": "femenu-quit",
+  "purpose": "REPRODUCER of the QUIT GAME soft-lock (2026-09-30: failed at fe-reloaded, rolls settings_fix/quit_on1..v6; ENGINE_MAP 'A ScrPressStart reloaded ... never reaches InitGui'; fixed offline in a1f76ae/cbd8f92 - the .const renumbering). iter-463 settings review finding 4: QUIT GAME back to the front end with the custom_frontend mod ON (-Gates SR_MODS=custom_frontend). Title -> START -> MAIN MENU (claim) -> A = NEW GAME -> main_hud -> in game: START = pause menu (pulsed every 10 s for up to 3 min until the pause screen's own [APT_SCREEN] request appears: the scripted opening ignores START, roll renum_live/quit_renum2) -> UP (the wrap) = QUIT GAME -> A -> the QUIT GAME popup (lane E L-c: QUIT TO TITLE, the default / QUIT TO DESKTOP; its fresh [APT_SCREEN] request) -> A = QUIT TO TITLE -> StateAdapter.QuitGame -> the game's own return to the front end -> ScrPressStart reloads: its InitGui must run (the mod's Install logs 'install' with the OLD popup id still at saveFlow+16, unlike the first boot's 0) -> START -> the mod claims the re-raised LOAD A GAME? popup -> EXIT -> YES -> exit code 0. The A/B with the mod off is natural_quit.json. -TimeoutSeconds 600.",
+  "gates": "SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=20,SR_PRESENT_DUMP_SPARSE_CAP=900",
+  "steps": [
+    {
+      "name": "fe-alive",
+      "await": "\\[NAT_FE\\] #1 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "settle-title",
+      "await": "\\[NAT_FE\\] #256 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "press-start",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 4,
+      "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)",
+      "expectMs": 90000
+    },
+    {
+      "name": "title-ui-tail",
+      "await": "\\[APT_REQ\\] #15 path='\\.\\./common/ButtonHints/XBox360/HintB'",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "title-visible",
+      "requireVisibleMs": 8000,
+      "visibleTimeoutMs": 200000,
+      "dwellMs": 6000
+    },
+    {
+      "name": "start-bootflow",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 10000,
+      "expect": "\\[SR_FSCMD\\].*claim LoadCreate",
+      "expectMs": 30000
+    },
+    {
+      "name": "menu-visible",
+      "dwellMs": 4000
+    },
+    {
+      "name": "new-game",
+      "key": "A",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*answer cppId=\\S+ button=0",
+      "expectMs": 15000
+    },
+    {
+      "name": "game-starts",
+      "expect": "\\[APT_REQ\\] #\\d+ path='screens/hud/main_hud'",
+      "expectMs": 120000
+    },
+    {
+      "name": "play",
+      "purpose": "Intro cinematic + first gameplay.",
+      "dwellMs": 30000
+    },
+    {
+      "name": "pause",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 18,
+      "gapMs": 10000,
+      "purpose": "START until the pause menu's own screen request appears (the scripted opening ignores START; quit_renum2). A pulse only repeats while the marker is absent, so an open pause menu is never toggled shut.",
+      "expect": "\\[APT_SCREEN\\] path='screens/misc/ScrPauseMenu'",
+      "expectFresh": true,
+      "expectMs": 10000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "up-to-quit",
+      "key": "UP",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 1,
+      "gapMs": 900,
+      "dwellMs": 2000,
+      "purpose": "QUIT GAME is the LAST row and the pause menu wraps: UP once from RESUME reaches it (lane E L-c: the 9-row pause menu keeps QUIT GAME last)."
+    },
+    {
+      "name": "quit",
+      "key": "A",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 10000,
+      "purpose": "QUIT GAME -> the two-choice popup (lane E L-c, srpause.aptasm ShowQuit; the game's own WARNING title and body) through FlowMgr.ShowGenPop: its own screen request (fresh: earlier requests of the path do not count).",
+      "expect": "\\[APT_SCREEN\\] path='screens/misc/ScrGenPop'",
+      "expectFresh": true,
+      "expectMs": 10000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "yes-quit",
+      "key": "A",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 1,
+      "purpose": "A on the default QUIT TO TITLE (lane E L-c) -> StateAdapter.QuitGame, the game's own quit -> the game's own return to the front end: the title screen's own request again (roll quit_verify/discover_natural1: seen=2 ~1 s after YES). Absent = quit signature A (no reload request).",
+      "expect": "\\[APT_SCREEN\\] path='screens/bootflow/ScrPressStart'",
+      "expectFresh": true,
+      "expectMs": 30000,
+      "dwellMs": 2000
+    },
+    {
+      "name": "fe-reloaded",
+      "purpose": "ScrPressStart's InitGui ran on the reload (the mod's Install; saveFlow+16 still holds the first session's popup id).",
+      "expect": "\\[SR_FSCMD\\].*SR_Log 'install' saveFlow\\+16=[1-9]",
+      "expectMs": 120000
+    },
+    {
+      "name": "title-again",
+      "purpose": "Capture window: the title after QUIT GAME.",
+      "dwellMs": 15000
+    },
+    {
+      "name": "start-again",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 10000,
+      "purpose": "START on the reloaded title: the sign-in read (XAM_PROFILE #3) and the menu claim again.",
+      "expect": "\\[XAM_PROFILE\\] #3 ",
+      "expectMs": 30000
+    },
+    {
+      "name": "menu-again",
+      "purpose": "Capture window: the MAIN MENU after QUIT GAME.",
+      "dwellMs": 8000
+    },
+    {
+      "name": "down-to-exit",
+      "key": "DOWN",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 4,
+      "gapMs": 1500,
+      "dwellMs": 2000
+    },
+    {
+      "name": "exit",
+      "key": "A",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*menu button=4",
+      "expectMs": 10000,
+      "dwellMs": 4000
+    },
+    {
+      "name": "down-to-yes-exit",
+      "key": "DOWN",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 1,
+      "dwellMs": 2000
+    },
+    {
+      "name": "yes-exit",
+      "key": "A",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*SR_Quit",
+      "expectMs": 10000
+    },
+    {
+      "name": "exit-clean",
+      "expectExitCode": 0,
+      "exitTimeoutMs": 2000
+    }
+  ]
+}

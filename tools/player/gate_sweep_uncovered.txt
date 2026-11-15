@@ -1,0 +1,57 @@
+# gate_sweep.py --uncovered-ok: the UNCOVERED inputs of SupermanReturns.exe, judged (one item per line, exactly as
+# the sweep prints it; `#` lines are comments). gate_sweep reads the C / C++ units of the exe's link closure and
+# nothing else; these inputs' bytes it does not examine. tools/player/exe_sweep.py on the built binary is their
+# authority: the release exe holds the resource, the manifest and the static libraries' code; a DLL is its own file
+# (exe_sweep.py --release <the dll>). A new item makes the sweep exit 2 until it is judged and listed here.
+
+# The exe's icon: one ICON statement (app/app_icon.ico, an original design drawn by tools/player/make_app_icon.py), no
+# string table; its bytes sit in the exe's .rsrc section.
+resource app/app_icon.rc
+
+# Xenia's FFmpeg fork (the XMA decoder: third_party/ffmpeg/FFmpeg with third_party/ffmpeg/xenia-config, no "SR_"
+# text in either), built by this graph from 161 C units into its own DLL and delay-loaded by the exe.
+dll ffmpeg_xenia.dll
+
+# vcpkg's SDL3: the import library of SDL3.dll (third-party, prebuilt; SDL3 has no SDLmain library).
+external <build>/vcpkg_installed/x64-windows/lib/SDL3.lib
+
+# The application manifest (/MANIFESTINPUT): XML (asInvoker, longPathAware), no "SR_" text; embedded in the exe.
+external app/windows.manifest
+
+# Libraries the release units ask the linker for themselves (#pragma comment(lib); the sweep reads them from clang's
+# -E since Astra round 8): Windows SDK / Visual C++ import libraries, no code of the tree's.
+# kernel/vpad_filter.cpp (the virtual-pad device filter): the Configuration Manager and SetupAPI import libraries.
+external cfgmgr32.lib
+external setupapi.lib
+# kernel/image_write_watchdog.cpp: the process-status (PSAPI) import library (its dbghelp.lib is on the link line too).
+external psapi.lib
+# third_party/imgui/imgui.cpp: the Input Method Manager import library for imgui's default Win32 IME handler.
+external imm32.lib
+# The MSVC C++ standard library's use_ansi.h (under _DLL): the import library of the C++ runtime DLL (msvcp140).
+external msvcprt.lib
+# The UCRT's wchar.h: a weak default for the CRT's own AVX2 wmem switch - a symbol alias, no input.
+linker /alternatename:_Avx2WmemEnabled=_Avx2WmemEnabledWeakValue
+
+# Windows SDK and C runtime import libraries, named on the link line (-l / --dependent-lib); some also by #pragma
+# comment(lib) in the tree (dbghelp, d3d12, dxgi, d3dcompiler) or in imgui.cpp and SDK headers (kernel32, user32,
+# shell32, uuid).
+external advapi32.lib
+external comdlg32.lib
+external d3d12.lib
+external d3dcompiler.lib
+external dbghelp.lib
+external delayimp.lib
+external dxgi.lib
+external gdi32.lib
+external kernel32.lib
+external msvcrt.lib
+external oldnames.lib
+external ole32.lib
+external oleaut32.lib
+external shell32.lib
+external user32.lib
+external uuid.lib
+external windowscodecs.lib
+external winmm.lib
+external winspool.lib
+external xinput.lib

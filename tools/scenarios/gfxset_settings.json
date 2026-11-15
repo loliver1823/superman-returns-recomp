@@ -1,0 +1,961 @@
+{
+ "name": "gfxset-settings",
+ "purpose": "iter-466 gfx (docs/GRAPHICS_SETTINGS.md): ONE background PORT FEATURE roll (natural=false) of the OPTIONS screen (was PC SETTINGS; lane E L-b): opened from MAIN MENU > OPTIONS on its DISPLAY tab, driven by keyboard (harness keys), mouse (harness mouse feed) and an Xbox pad (tools/glyphs/vpad_hotplug.py --plan gfxset beside it), options applied, then NEW GAME and the screen again from PAUSE > OPTIONS (lane E L-c), where each option is held ~14 s on and off for its GPU cost ([PM4_GPU_TIME], [PRESENT_CHAIN_TIME]) and present dumps (no overlay in them) show its live frame. F12 composites (SR_MOD_LIBRARY_SHOTS) are the UI frames. Gates: SR_INSTANCE_ID=gfxset,SR_PORT_FEATURES=1,SR_HARNESS_REAL_INPUT=1,SR_MOD_LIBRARY_SHOTS=<dir>,SR_WINDOW_SIZE=1920x1080; -TimeoutSeconds 1800.",
+ "gates": "SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=30,SR_PRESENT_DUMP_SPARSE_CAP=3000,SR_PM4_GPU_TIME=1,SR_PRESENT_CHAIN_TIME=1",
+ "steps": [
+  {
+   "name": "fe-alive",
+   "await": "\\[NAT_FE\\] #1 natural FE master tick",
+   "timeoutMs": 240000
+  },
+  {
+   "name": "first-start-not-written",
+   "purpose": "an automated run never writes display.ini at first start",
+   "expect": "\\[DISPLAY\\] first start",
+   "expectMs": 3000,
+   "optional": true
+  },
+  {
+   "name": "settle-title",
+   "await": "\\[NAT_FE\\] #256 natural FE master tick",
+   "timeoutMs": 240000
+  },
+  {
+   "name": "press-start",
+   "key": "ENTER",
+   "holdMs": 2000,
+   "holdUntilConfirmed": true,
+   "maxPulses": 4,
+   "gapMs": 12000,
+   "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\\\"main\\\"\\)",
+   "expectMs": 90000
+  },
+  {
+   "name": "title-ui-tail",
+   "await": "\\[APT_REQ\\] #\\d+ path='\\.\\./common/ButtonHints/XBox360/HintB'",
+   "timeoutMs": 240000
+  },
+  {
+   "name": "title-visible",
+   "requireVisibleMs": 6000,
+   "visibleTimeoutMs": 200000,
+   "dwellMs": 3000
+  },
+  {
+   "name": "start-bootflow",
+   "key": "ENTER",
+   "holdMs": 2000,
+   "holdUntilConfirmed": true,
+   "maxPulses": 3,
+   "gapMs": 10000,
+   "expect": "\\[SR_FSCMD\\].*claim LoadCreate",
+   "expectMs": 30000
+  },
+  {
+   "name": "menu-visible",
+   "dwellMs": 5000
+  },
+  {
+   "name": "down-to-settings",
+   "key": "DOWN",
+   "holdMs": 160,
+   "maxPulses": 2,
+   "gapMs": 500,
+   "dwellMs": 1500
+  },
+  {
+   "name": "open-settings",
+   "key": "A",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 4000,
+   "expect": "\\[PC_SETTINGS\\] shown \\(FE",
+   "expectMs": 15000
+  },
+  {
+   "name": "open-display",
+   "key": "RB",
+   "holdMs": 160,
+   "maxPulses": 2,
+   "gapMs": 900,
+   "dwellMs": 1500,
+   "expect": "\\[PC_SETTINGS\\] tab DISPLAY",
+   "expectMs": 8000,
+   "purpose": "DISPLAY OPTIONS opens the PC SETTINGS overlay (kernel/display_menu.cpp hand-off)"
+  },
+  {
+   "name": "shot-k-display",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "k-to-bottom",
+   "key": "DOWN",
+   "holdMs": 160,
+   "maxPulses": 12,
+   "gapMs": 500,
+   "dwellMs": 600,
+   "purpose": "the last DISPLAY row (MONITOR is listed only with 2+ monitors)"
+  },
+  {
+   "name": "k-up-to-resolution",
+   "key": "UP",
+   "holdMs": 160,
+   "maxPulses": 7,
+   "gapMs": 500,
+   "dwellMs": 800
+  },
+  {
+   "name": "k-open-list",
+   "key": "A",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 1500
+  },
+  {
+   "name": "shot-k-resolution-list",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "k-close-list",
+   "key": "B",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 800
+  },
+  {
+   "name": "k-size-next",
+   "key": "RIGHT",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 1200
+  },
+  {
+   "name": "k-apply-size",
+   "key": "Y",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 2500,
+   "expect": "\\[PC_SETTINGS\\] resolution = ",
+   "expectMs": 8000,
+   "optional": true
+  },
+  {
+   "name": "shot-k-keep-or-revert",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "k-revert-size",
+   "key": "B",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 2000,
+   "expect": "\\[PC_SETTINGS\\] display settings reverted",
+   "expectMs": 8000,
+   "optional": true
+  },
+  {
+   "name": "k-tab-graphics",
+   "key": "RB",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 1500,
+   "expect": "\\[PC_SETTINGS\\] tab GRAPHICS",
+   "expectMs": 8000
+  },
+  {
+   "name": "shot-k-graphics",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "k-to-aniso",
+   "key": "DOWN",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 600
+  },
+  {
+   "name": "k-aniso-16",
+   "key": "RIGHT",
+   "holdMs": 160,
+   "maxPulses": 4,
+   "gapMs": 500,
+   "dwellMs": 2500,
+   "expect": "\\[PC_SETTINGS\\] preview anisotropic = 16",
+   "expectMs": 10000
+  },
+  {
+   "name": "shot-k-aniso16-preview",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "k-to-postaa",
+   "key": "DOWN",
+   "holdMs": 160,
+   "maxPulses": 2,
+   "gapMs": 500,
+   "dwellMs": 600
+  },
+  {
+   "name": "k-fxaa",
+   "key": "RIGHT",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 2500,
+   "expect": "\\[PC_SETTINGS\\] preview post_aa = fxaa",
+   "expectMs": 8000
+  },
+  {
+   "name": "shot-k-fxaa-preview",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "k-apply",
+   "key": "Y",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 2000,
+   "expect": "\\[PC_SETTINGS\\] post_aa = fxaa \\(applied, stored\\)",
+   "expectMs": 8000
+  },
+  {
+   "name": "shot-k-applied",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "k-reset-modal",
+   "key": "X",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 1500
+  },
+  {
+   "name": "shot-k-reset-modal",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "k-reset-cancel",
+   "key": "B",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 800
+  },
+  {
+   "name": "k-tab-world",
+   "key": "RB",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 1500,
+   "expect": "\\[PC_SETTINGS\\] tab WORLD",
+   "expectMs": 8000,
+   "purpose": "WORLD is listed when the density port feature registered its rows",
+   "optional": true
+  },
+  {
+   "name": "shot-k-world",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "k-tab-audio",
+   "key": "RB",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 1500,
+   "expect": "\\[PC_SETTINGS\\] tab AUDIO",
+   "expectMs": 8000
+  },
+  {
+   "name": "shot-k-audio",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "m-tab-graphics",
+   "mouse": "move 640,400; wait 600; move 663,55; wait 500; click 663,55",
+   "expect": "\\[PC_SETTINGS\\] tab GRAPHICS",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 1500
+  },
+  {
+   "name": "m-open-aniso",
+   "mouse": "move 630,249; wait 400; click 630,249",
+   "dwellMs": 1500
+  },
+  {
+   "name": "shot-m-aniso-list",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "m-pick-2x",
+   "mouse": "move 630,314; wait 600; click 630,314",
+   "expect": "\\[PC_SETTINGS\\] preview anisotropic = 2",
+   "expectMs": 8000,
+   "dwellMs": 1200,
+   "optional": true
+  },
+  {
+   "name": "m-drag-lod",
+   "mouse": "drag 595,283 540,283",
+   "dwellMs": 1500
+  },
+  {
+   "name": "shot-m-lod-drag",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "m-apply",
+   "mouse": "move 716,631; wait 500; click 716,631",
+   "expect": "\\[PC_SETTINGS\\] (anisotropic|lod_bias) = ",
+   "expectMs": 8000,
+   "dwellMs": 2000,
+   "optional": true
+  },
+  {
+   "name": "shot-m-applied",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "m-tab-display",
+   "mouse": "move 573,55; wait 400; click 573,55",
+   "expect": "\\[PC_SETTINGS\\] tab DISPLAY",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 1200
+  },
+  {
+   "name": "m-wheel",
+   "mouse": "move 300,420; wait 400; wheel -4; wait 800",
+   "dwellMs": 1200
+  },
+  {
+   "name": "shot-m-display-scrolled",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "m-tab-controls",
+   "mouse": "move 482,55; wait 400; click 482,55",
+   "expect": "\\[PC_SETTINGS\\] tab CONTROLS",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 1500,
+   "purpose": "CONTROLS starts the pad tour (tools/glyphs/vpad_hotplug.py --plan gfxset)"
+  },
+  {
+   "name": "shot-m-controls",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "p-graphics",
+   "await": "\\[PC_SETTINGS\\] tab GRAPHICS",
+   "timeoutMs": 60000,
+   "dwellMs": 5000,
+   "optional": true
+  },
+  {
+   "name": "shot-p-graphics",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "p-list",
+   "dwellMs": 7000
+  },
+  {
+   "name": "shot-p-aniso-list",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "p-applied",
+   "await": "\\[PC_SETTINGS\\] anisotropic = \\S+ \\(applied",
+   "timeoutMs": 60000,
+   "dwellMs": 1500,
+   "optional": true
+  },
+  {
+   "name": "shot-p-applied",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "p-closed",
+   "await": "\\[PC_SETTINGS\\] close",
+   "timeoutMs": 60000,
+   "dwellMs": 4000,
+   "optional": true
+  },
+  {
+   "name": "close-if-open",
+   "key": "B",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 3000,
+   "optional": true
+  },
+  {
+   "name": "up-to-new",
+   "key": "UP",
+   "holdMs": 160,
+   "maxPulses": 2,
+   "gapMs": 500,
+   "dwellMs": 1500
+  },
+  {
+   "name": "new-game",
+   "key": "A",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 2000,
+   "expect": "\\[SR_FSCMD\\].*answer cppId=\\S+ button=0",
+   "expectMs": 15000,
+   "optional": true
+  },
+  {
+   "name": "game-starts",
+   "expect": "\\[APT_REQ\\] #\\d+ path='screens/hud/main_hud'",
+   "expectMs": 300000,
+   "optional": true
+  },
+  {
+   "name": "play",
+   "purpose": "the opening cinematic and the tutorial; the options applied in the front end (anisotropic 8x, FXAA, LOD bias) draw the game",
+   "dwellMs": 90000
+  },
+  {
+   "name": "pause",
+   "key": "ENTER",
+   "holdMs": 250,
+   "maxPulses": 12,
+   "gapMs": 10000,
+   "expect": "\\[SR_FSCMD\\].*SR_Log 'pause install'",
+   "expectFresh": true,
+   "expectMs": 9000,
+   "dwellMs": 5000
+  },
+  {
+   "name": "up-to-options",
+   "key": "UP",
+   "holdMs": 160,
+   "maxPulses": 2,
+   "gapMs": 500,
+   "dwellMs": 2500,
+   "purpose": "lane E L-c: RESUME -> (wrap) QUIT GAME -> OPTIONS (the hidden PHOTO MODE slot is skipped)"
+  },
+  {
+   "name": "open-display-ig",
+   "key": "A",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 5000,
+   "expect": "\\[PC_SETTINGS\\] shown \\(IG",
+   "expectMs": 15000
+  },
+  {
+   "name": "ig-open-on-display",
+   "key": "RB",
+   "holdMs": 160,
+   "maxPulses": 2,
+   "gapMs": 900,
+   "dwellMs": 1500,
+   "expect": "\\[PC_SETTINGS\\] tab DISPLAY",
+   "expectMs": 8000,
+   "purpose": "lane E L-b: every open starts on GAME; RB twice = DISPLAY"
+  },
+  {
+   "name": "shot-ig-display",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "ig-tab-graphics",
+   "key": "RB",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 14000,
+   "expect": "\\[PC_SETTINGS\\] tab GRAPHICS",
+   "expectMs": 8000
+  },
+  {
+   "name": "ig-to-aniso",
+   "key": "DOWN",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 600
+  },
+  {
+   "name": "ig-aniso-off",
+   "key": "LEFT",
+   "holdMs": 160,
+   "maxPulses": 4,
+   "gapMs": 500,
+   "dwellMs": 14000,
+   "expect": "\\[PC_SETTINGS\\] preview anisotropic = off",
+   "expectMs": 8000
+  },
+  {
+   "name": "shot-ig-aniso-off",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "ig-aniso-16",
+   "key": "RIGHT",
+   "holdMs": 160,
+   "maxPulses": 4,
+   "gapMs": 500,
+   "dwellMs": 14000,
+   "expect": "\\[PC_SETTINGS\\] preview anisotropic = 16",
+   "expectMs": 8000
+  },
+  {
+   "name": "shot-ig-aniso-16",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "ig-to-postaa",
+   "key": "DOWN",
+   "holdMs": 160,
+   "maxPulses": 2,
+   "gapMs": 500,
+   "dwellMs": 600
+  },
+  {
+   "name": "ig-aa-off",
+   "key": "LEFT",
+   "holdMs": 160,
+   "maxPulses": 2,
+   "gapMs": 500,
+   "dwellMs": 14000,
+   "expect": "\\[PC_SETTINGS\\] preview post_aa = off",
+   "expectMs": 8000
+  },
+  {
+   "name": "ig-aa-fxaa",
+   "key": "RIGHT",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 14000,
+   "expect": "\\[PC_SETTINGS\\] preview post_aa = fxaa",
+   "expectMs": 8000
+  },
+  {
+   "name": "ig-aa-extreme",
+   "key": "RIGHT",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 14000,
+   "expect": "\\[PC_SETTINGS\\] preview post_aa = fxaa_extreme",
+   "expectMs": 8000
+  },
+  {
+   "name": "shot-ig-aa-extreme",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "ig-aa-off2",
+   "key": "LEFT",
+   "holdMs": 160,
+   "maxPulses": 2,
+   "gapMs": 500,
+   "dwellMs": 3000
+  },
+  {
+   "name": "ig-to-edge",
+   "key": "DOWN",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 600
+  },
+  {
+   "name": "ig-edge-off",
+   "key": "A",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 6000,
+   "expect": "\\[PC_SETTINGS\\] preview edge_blur = off",
+   "expectMs": 8000,
+   "optional": true
+  },
+  {
+   "name": "shot-ig-edge-off",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "ig-edge-on",
+   "key": "A",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 1500,
+   "optional": true
+  },
+  {
+   "name": "ig-to-bloom",
+   "key": "DOWN",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 600
+  },
+  {
+   "name": "ig-bloom-0",
+   "key": "LEFT",
+   "holdMs": 160,
+   "maxPulses": 10,
+   "gapMs": 500,
+   "dwellMs": 6000,
+   "expect": "\\[PC_SETTINGS\\] preview bloom = 0",
+   "expectMs": 15000,
+   "optional": true
+  },
+  {
+   "name": "shot-ig-bloom0",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "ig-bloom-100",
+   "key": "RIGHT",
+   "holdMs": 160,
+   "maxPulses": 10,
+   "gapMs": 500,
+   "dwellMs": 1500,
+   "optional": true
+  },
+  {
+   "name": "ig-to-lod",
+   "key": "UP",
+   "holdMs": 160,
+   "maxPulses": 3,
+   "gapMs": 500,
+   "dwellMs": 600
+  },
+  {
+   "name": "ig-lod-minus",
+   "key": "LEFT",
+   "holdMs": 160,
+   "maxPulses": 4,
+   "gapMs": 500,
+   "dwellMs": 14000,
+   "optional": true
+  },
+  {
+   "name": "ig-lod-zero",
+   "key": "RIGHT",
+   "holdMs": 160,
+   "maxPulses": 4,
+   "gapMs": 500,
+   "dwellMs": 3000,
+   "optional": true
+  },
+  {
+   "name": "ig-tab-display",
+   "key": "LB",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 2000,
+   "expect": "\\[PC_SETTINGS\\] tab DISPLAY",
+   "expectMs": 8000
+  },
+  {
+   "name": "ig-to-bottom",
+   "key": "DOWN",
+   "holdMs": 160,
+   "maxPulses": 12,
+   "gapMs": 500,
+   "dwellMs": 600
+  },
+  {
+   "name": "ig-to-brightness",
+   "key": "UP",
+   "holdMs": 160,
+   "maxPulses": 2,
+   "gapMs": 500,
+   "dwellMs": 800
+  },
+  {
+   "name": "ig-bright-up",
+   "key": "RIGHT",
+   "holdMs": 160,
+   "maxPulses": 15,
+   "gapMs": 500,
+   "dwellMs": 14000,
+   "expect": "\\[PC_SETTINGS\\] preview brightness = 15",
+   "expectMs": 15000,
+   "optional": true
+  },
+  {
+   "name": "shot-ig-bright15",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "ig-bright-zero",
+   "key": "LEFT",
+   "holdMs": 160,
+   "maxPulses": 15,
+   "gapMs": 500,
+   "dwellMs": 1500,
+   "optional": true
+  },
+  {
+   "name": "ig-to-gamma",
+   "key": "DOWN",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 600
+  },
+  {
+   "name": "ig-gamma-up",
+   "key": "RIGHT",
+   "holdMs": 160,
+   "maxPulses": 4,
+   "gapMs": 500,
+   "dwellMs": 14000,
+   "expect": "\\[PC_SETTINGS\\] preview gamma = 1.20",
+   "expectMs": 15000,
+   "optional": true
+  },
+  {
+   "name": "shot-ig-gamma120",
+   "key": "F12",
+   "holdMs": 150,
+   "maxPulses": 1,
+   "expect": "\\[MODLIB\\] shot",
+   "expectFresh": true,
+   "expectMs": 8000,
+   "dwellMs": 700,
+   "optional": true
+  },
+  {
+   "name": "ig-revert",
+   "key": "B",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 3000,
+   "purpose": "leave: APPLY CHANGES? -> DISCARD (row 2)"
+  },
+  {
+   "name": "ig-to-discard",
+   "key": "RIGHT",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 800
+  },
+  {
+   "name": "ig-discard",
+   "key": "A",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 4000,
+   "expect": "\\[PC_SETTINGS\\] (close|revert)",
+   "expectMs": 8000,
+   "optional": true
+  },
+  {
+   "name": "resume",
+   "key": "B",
+   "holdMs": 160,
+   "maxPulses": 1,
+   "gapMs": 500,
+   "dwellMs": 20000,
+   "optional": true,
+   "purpose": "lane E L-c: the screen closed back to the pause menu (no MORE OPTIONS panel to leave): B resumes"
+  }
+ ]
+}

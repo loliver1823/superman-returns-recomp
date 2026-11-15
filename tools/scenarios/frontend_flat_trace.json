@@ -1,0 +1,130 @@
+{
+  "name": "frontend-flat-trace",
+  "purpose": "Capture an HLE trace OF THE FLAT-BLACK ERA itself, so the replay can answer the C-450V4 mechanism question: does the flat frame already exist in the active render target before Present, or is it introduced by the final composite/present path? Navigation is frontend_navigate.json verbatim through select-third; only the final observation dwell is replaced. Host-only F9 arms the existing default-OFF SR_HLE_TRACE_HOTKEY recorder - no guest write, no fabricated state, no production change.",
+  "gates": "SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1",
+  "steps": [
+    {
+      "name": "fe-alive",
+      "await": "\\[NAT_FE\\] #1 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "settle-title",
+      "await": "\\[NAT_FE\\] #256 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "press-start",
+      "key": "ENTER",
+      "holdMs": 250,
+      "maxPulses": 4,
+      "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)",
+      "expectMs": 90000
+    },
+    {
+      "name": "first-screen",
+      "expect": "\\[FE_SETSCREEN\\] #1 ",
+      "expectMs": 60000
+    },
+    {
+      "name": "clear-dialog",
+      "purpose": "Accept the storage dialog. Confirmed when the guest opens the device blade, which is the guest's own decision and therefore a real transition, not a guess.",
+      "key": "A",
+      "holdMs": 4000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 6,
+      "gapMs": 5000,
+      "expect": "XamShowDeviceSelectorUI\\(user=",
+      "expectMs": 60000
+    },
+    {
+      "name": "settle-modepage",
+      "purpose": "Let the mode-select page finish coming up before navigating it.",
+      "dwellMs": 60000
+    },
+    {
+      "name": "select-mode",
+      "purpose": "Press A on whatever is focused. Blind by necessity - the item text does not render (atlas defect C-450UB/UC).",
+      "key": "A",
+      "holdMs": 3000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 8000,
+      "optional": true
+    },
+    {
+      "name": "nav-down",
+      "purpose": "Move the selection. DOWN is an EXTENDED key - without KEYEVENTF_EXTENDEDKEY the guest never sees it (iter-450V3).",
+      "key": "DOWN",
+      "holdMs": 3000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 4000,
+      "optional": true
+    },
+    {
+      "name": "select-again",
+      "key": "A",
+      "holdMs": 3000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 8000,
+      "optional": true
+    },
+    {
+      "name": "nav-up-select",
+      "purpose": "And the other direction, in case the first item was the wrong one.",
+      "key": "UP",
+      "holdMs": 3000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 2,
+      "gapMs": 4000,
+      "optional": true
+    },
+    {
+      "name": "select-third",
+      "key": "A",
+      "holdMs": 3000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 8000,
+      "optional": true
+    },
+
+    {
+      "name": "await-main-hud-request",
+      "purpose": "Waits for the GUEST to request the in-game HUD package set. This is a MAIN-HUD REQUEST and nothing more: main_hud plus LR 0x826AFB40 are APT witnesses, NOT proof of gameplay, a level, a camera or a player entity (director ruling, iter-453 - the earlier \"gameplay entry\" wording is withdrawn). Waiting on this rather than on a colour means the scenario pins no level state, no present number and no pixel value.",
+      "await": "\\[APT_REQ\\].*path='screens/hud/main_hud'",
+      "timeoutMs": 300000
+    },
+    {
+      "name": "await-flat-era",
+      "purpose": "Then wait for the flat frame itself. Deliberately NOT keyed to fnv=3F1965ED15C74383: that hash was observed on one roll and DOGMA non-determinism may change the colour without changing the phenomenon. 'distinct=1 fnv=' is the exact field boundary from the PRESENT_SIG format string - bare 'distinct=1' would also match distinct=100.",
+      "await": "\\[PRESENT_SIG\\].*distinct=1 fnv=",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "arm-trace",
+      "purpose": "Host-only F9 (KEYS table mask=0, so it maps to no pad bit and the guest never sees it). Confirmation is the host log line, not [KBPAD_OBS] - a mask=0 key is unconfirmable by design.",
+      "key": "F9",
+      "holdMs": 250,
+      "maxPulses": 3,
+      "gapMs": 6000,
+      "expect": "\\[TRACE_HOTKEY\\] HOTKEY HIT",
+      "expectMs": 30000
+    },
+    {
+      "name": "trace-open",
+      "purpose": "The recorder opens at the NEXT Present after arming, so OPENED is a separate event from the hotkey hit.",
+      "await": "\\[TRACE_HOTKEY\\] OPENED",
+      "timeoutMs": 60000
+    },
+    {
+      "name": "bank-frames",
+      "purpose": "Wait for the recorder to CLOSE the file rather than dwelling a guessed interval. hle_video.cpp:2138 emits this immediately after fclose() once presents >= SR_HLE_TRACE_FRAMES, so it is proof the trace is complete, not an assumption that it is.",
+      "await": "\\[HLE_TRACE\\] wrote .* presents",
+      "timeoutMs": 180000
+    }
+  ]
+}

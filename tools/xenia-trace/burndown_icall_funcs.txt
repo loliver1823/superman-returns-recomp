@@ -1,0 +1,11 @@
+# XENIA_GUEST_TRACE_ICALL_FUNCS list (iter-463 burndown oracle): every indirect call made
+# from inside these functions is recorded (tag 2; tag 3 if the target is out of code range).
+# These are the functions whose bctrl our PPC_CALL_INDIRECT_FUNC saw with garbage or
+# mid-function targets (archive/v1_burndown2/log_scan.txt, oor_per_log.txt).
+# Trimmed to the item-10 input functions + luaD_throw: the per-draw / per-alloc functions made one
+# fflush'ed record per call. Their BAD targets are still caught by the -IcallBad run (tag 3, every function).
+0x82722DB8  # InputContext_UpdateCommands        lr 0x82722E24 / 0x82722E34
+0x82722E50  # InputContext_DispatchActiveCommands lr 0x82722EA4
+0x82724590  # InputCommandChord_UpdateChildAndAge lr 0x827245C4 / 0x827245D8
+0x8229A0F0  # InputContext dtor                   lr 0x8229A140
+0x827623B8  # luaD_throw panic bctrl              lr 0x827623F8 (827A177C/82762680/82766C30/82766CA0)

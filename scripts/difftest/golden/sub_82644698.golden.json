@@ -1,0 +1,97 @@
+[
+  {
+    "guest_va": "0x82644698",
+    "fn": "sub_82644698",
+    "case_id": "zero",
+    "inputs": {
+      "regs": {
+        "r4": "0x00000000"
+      },
+      "mem": {}
+    },
+    "oracle": "ghidra-emulate",
+    "status": "ok",
+    "deltas": {
+      "regs": {
+        "r3": "0x00000000"
+      },
+      "mem": {}
+    }
+  },
+  {
+    "guest_va": "0x82644698",
+    "fn": "sub_82644698",
+    "case_id": "four",
+    "inputs": {
+      "regs": {
+        "r4": "0x00000004"
+      },
+      "mem": {}
+    },
+    "oracle": "ghidra-emulate",
+    "status": "ok",
+    "deltas": {
+      "regs": {
+        "r3": "0x00000000"
+      },
+      "mem": {}
+    }
+  },
+  {
+    "guest_va": "0x82644698",
+    "fn": "sub_82644698",
+    "case_id": "one",
+    "inputs": {
+      "regs": {
+        "r4": "0x00000001"
+      },
+      "mem": {}
+    },
+    "oracle": "ghidra-emulate",
+    "status": "ok",
+    "deltas": {
+      "regs": {
+        "r3": "0xfffffffd"
+      },
+      "mem": {}
+    }
+  },
+  {
+    "guest_va": "0x82644698",
+    "fn": "sub_82644698",
+    "case_id": "sixteen",
+    "inputs": {
+      "regs": {
+        "r4": "0x00000010"
+      },
+      "mem": {}
+    },
+    "oracle": "ghidra-emulate",
+    "status": "ok",
+    "deltas": {
+      "regs": {
+        "r3": "0x0000000c"
+      },
+      "mem": {}
+    }
+  },
+  {
+    "guest_va": "0x82644698",
+    "fn": "sub_82644698",
+    "case_id": "max",
+    "inputs": {
+      "regs": {
+        "r4": "0xffffffff"
+      },
+      "mem": {}
+    },
+    "oracle": "ghidra-emulate",
+    "status": "ok",
+    "deltas": {
+      "regs": {
+        "r3": "0xfffffffb"
+      },
+      "mem": {}
+    }
+  }
+]

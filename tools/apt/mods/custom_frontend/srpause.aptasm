@@ -1,0 +1,681 @@
+; iter-464 / lane E L-c: the pause menu's port rows (docs/CUSTOM_FRONTEND.md 5.14; 40_pause.patch). Appended to
+; ScrPauseMenu's class InitAction (sprite 4), after its guarded class body, so it runs on every load of the pause
+; menu. Pseudo-AS:
+;
+;   if (_global.SRPause == undefined) _global.SRPause = new Object();
+;   var sp = _global.SRPause;
+;   sp.Install(screen)          ScrPauseMenu.InitGui: remember the screen, fetch the options
+;   sp.OnRow(name)              A on a re-purposed row (40_pause.patch HandleInput): btn4 ACHIEVEMENTS (the host page,
+;                               fscommand SR_Achievements), btn5 STATISTICS / btn6 MOVES LIST (the game's own screens),
+;                               btn7 OPTIONS (OpenOptions), btn9 QUIT GAME (ShowQuit)
+;   sp.OpenOptions(row)         OPTIONS: the game's own options to the host (SR_GameOptionsLive), then
+;                               _global.SRDevTools.Open("display", "IG", sp, "Back", row)
+;   sp.ShowQuit()               QUIT GAME: the game's own warning (title, body) with two choices,
+;                               QUIT TO TITLE (the default) / QUIT TO DESKTOP; B cancels
+;   sp.OnQuit(popup, button)    0 = the game's own quit (ScrPauseMenu quitCallBack's YES, exactly: CLOSE sound,
+;                               StateAdapter.QuitGame, FlowMgr.ChangeInterfaceState("IG"), PauseSelectedItem = btn1);
+;                               1 = fscommand SR_Quit (the front end's EXIT); B = back
+;   sp.Back(row)                the pause menu again: its hints, row btn<row> focused
+;   sp.OpenDevTools(row)        _global.SRDevTools.Open("main", "IG", sp, "Back", row) (a development build's DEV TOOLS row)
+;   sp.OnReady()                popups' readyCallBack: wraps ScrGenPop.prototype.HandleInput
+;                               once (GenPopInputHook) while the pause menu is loaded
+;   sp.GenPopInputHook(...)     only the mod's popups: Enter = A (after 400 ms), Esc = B;
+;                               the Dev Tools pages' keys go to SRDevTools.PopupKey
+;   sp.Teardown()               ScrPauseMenu.ExitScreen: restores ScrGenPop's HandleInput and
+;                               deletes every other method (ExitScreen deletes Teardown)
+; (L-c removes the iter-464 MORE OPTIONS panel - ShowPanel / OnPanel / OpenMods / OpenCheats: its rows are in OPTIONS,
+; MODS is on the MAIN MENU only.)
+    op_71
+    EA_GetNamedMember 'SRPause'
+    op_76
+    Equals2
+    Not
+    If sp_have
+    op_71
+    EA_PushConstByte 'SRPause'
+    EA_PushZero
+    EA_PushConstByte 'Object'
+    NewObject
+    SetMember
+sp_have:
+    op_71
+    EA_GetNamedMember 'SRPause'
+    StoreRegister 1
+    Pop
+
+    Push [reg1]
+    EA_PushConstByte 'Install'
+    .func2 ''(r3 'screen') flags=0x40129
+        GetURL 'FSCommand:SR_Log', 'pause install'
+        Push [reg1]
+        EA_PushConstByte 'screen'
+        Push [reg3]
+        SetMember
+        EA_PushZero
+        Push [reg1]
+        EA_CallNamedMethodPop 'FetchModOptions'
+    .end
+    SetMember
+
+; sp.OnRow(name): the re-purposed rows (the game's own PauseSelectedItem / press / OPEN sound came first, 40_pause.patch)
+;   if (name == "btn4") { fscommand("SR_Achievements", "IG"); return; }
+;   if (name == "btn5") { _global.FlowMgr.SwitchScreen(_global.SCREEN.STATISTICS); return; }
+;   if (name == "btn6") { _global.FlowMgr.SwitchScreen(_global.SCREEN.MOVESLIST); return; }
+;   if (name == "btn7") { this.OpenOptions(7); return; }
+;   this.ShowQuit();                                          // btn9
+    Push [reg1]
+    EA_PushConstByte 'OnRow'
+    .func2 ''(r3 'name') flags=0x40129
+        Push [reg3]
+        EA_PushConstByte 'btn4'
+        Equals2
+        Not
+        If or_n4
+        GetURL 'FSCommand:SR_Achievements', 'IG'
+        op_76
+        Return
+or_n4:
+        Push [reg3]
+        EA_PushConstByte 'btn5'
+        Equals2
+        Not
+        If or_n5
+        Push [reg2]
+        EA_GetNamedMember 'SCREEN'
+        EA_GetNamedMember 'STATISTICS'
+        EA_PushOne
+        Push [reg2]
+        EA_GetNamedMember 'FlowMgr'
+        EA_CallNamedMethodPop 'SwitchScreen'
+        op_76
+        Return
+or_n5:
+        Push [reg3]
+        EA_PushConstByte 'btn6'
+        Equals2
+        Not
+        If or_n6
+        Push [reg2]
+        EA_GetNamedMember 'SCREEN'
+        EA_GetNamedMember 'MOVESLIST'
+        EA_PushOne
+        Push [reg2]
+        EA_GetNamedMember 'FlowMgr'
+        EA_CallNamedMethodPop 'SwitchScreen'
+        op_76
+        Return
+or_n6:
+        Push [reg3]
+        EA_PushConstByte 'btn7'
+        Equals2
+        Not
+        If or_n7
+        EA_PushByte 7
+        EA_PushOne
+        Push [reg1]
+        EA_CallNamedMethodPop 'OpenOptions'
+        op_76
+        Return
+or_n7:
+        EA_PushZero
+        Push [reg1]
+        EA_CallNamedMethodPop 'ShowQuit'
+    .end
+    SetMember
+
+; sp.OpenOptions(row): OPTIONS (the PC SETTINGS screen, its GAME tab first; lane E L-b): the game's own options as its
+; getters return them now go to the host first (fscommand SR_GameOptionsLive, kernel/game_options.hpp), then the open
+; request. With port features the open hands the screen over (SR_DTEnd action 3) and SR_OptionsClosed brings the menu
+; back; without them (a front end mounted by SR_MODS) the Dev Tools renderer calls Back(row) at once.
+    Push [reg1]
+    EA_PushConstByte 'OpenOptions'
+    .func2 ''(r3 'row') flags=0x40129
+        EA_PushConstByte 'FSCommand:SR_GameOptionsLive'
+        EA_PushConstByte 'IG '
+.include 'snapshot_expr.aptasm'
+        Add2
+        GetURL2
+        Push [reg3]
+        EA_PushConstByte 'Back'
+        Push [reg1]
+        EA_PushConstByte 'IG'
+        EA_PushConstByte 'display'
+        EA_PushByte 5
+        Push [reg2]
+        EA_GetNamedMember 'SRDevTools'
+        EA_CallNamedMethodPop 'Open'
+    .end
+    SetMember
+
+; sp.ShowQuit(): the same shape as ScrPauseMenu.showWarning (0x0E8C-0x1048), the game's own title and body, two
+; choices (the owner's QUIT GAME: main menu or desktop):
+;   var L = _global.LocalizationAdapter; _global.ClearHints();
+;   _global.FlowMgr.ShowGenPop(L.GetLocalizedText("Generic_WARNING"), L.GetLocalizedText("Generic_AREYOUSUREQUITGAME"),
+;       2, 0, ["QUIT TO TITLE", "QUIT TO DESKTOP"], this.OnQuit, this.OnReady, this, true /*B*/, true, 29153);
+    Push [reg1]
+    EA_PushConstByte 'ShowQuit'
+    .func2 ''() flags=0x40129
+        Push [reg2]
+        EA_GetNamedMember 'LocalizationAdapter'
+        StoreRegister 3
+        Pop
+        EA_PushZero
+        Push [reg2]
+        EA_CallNamedMethodPop 'ClearHints'
+        EA_PushShort 29153
+        op_73
+        op_73
+        Push [reg1]
+        Push [reg1]
+        EA_GetNamedMember 'OnReady'
+        Push [reg1]
+        EA_GetNamedMember 'OnQuit'
+        EA_PushConstByte 'QUIT TO DESKTOP'
+        EA_PushConstByte 'QUIT TO TITLE'
+        EA_PushByte 2
+        InitArray
+        EA_PushZero
+        EA_PushByte 2
+        EA_PushConstByte 'Generic_AREYOUSUREQUITGAME'
+        EA_PushOne
+        Push [reg3]
+        EA_PushConstByte 'GetLocalizedText'
+        CallMethod
+        EA_PushConstByte 'Generic_WARNING'
+        EA_PushOne
+        Push [reg3]
+        EA_PushConstByte 'GetLocalizedText'
+        CallMethod
+        EA_PushByte 11
+        Push [reg2]
+        EA_GetNamedMember 'FlowMgr'
+        EA_CallNamedMethodPop 'ShowGenPop'
+    .end
+    SetMember
+
+; sp.OnQuit(popup, button):
+;   fscommand("SR_Log", "pause quit button=" + button);
+;   if (button < 0) { this.Defer("Back", 9); return; }        // B: the pause menu, QUIT GAME focused (after the
+;                                                             // popup has gone: Defer, as srfrontend.aptasm)
+;   if (button == 1) { fscommand("SR_Quit", ""); return; }    // QUIT TO DESKTOP: the front end's EXIT
+;   // QUIT TO TITLE: the retail quitCallBack's YES (disc SCRPAUSEMENU 0x1088-0x111C, mCurAction 0): QuitGame only
+;   // raises the request; ChangeInterfaceState("IG") takes the pause screen down and un-pauses, and the next pause
+;   // opens on RESUME (the review's P1-1)
+;   _global.playSound(_global.SOUND.CLOSE); _global.StateAdapter.QuitGame();
+;   _global.FlowMgr.ChangeInterfaceState("IG"); _global.PauseSelectedItem = "btn1";
+    Push [reg1]
+    EA_PushConstByte 'OnQuit'
+    .func2 ''(r3 'popup', r4 'button') flags=0x50129
+        EA_PushConstByte 'FSCommand:SR_Log'
+        EA_PushConstByte 'pause quit button='
+        Push [reg4]
+        Add2
+        GetURL2
+        Push [reg4]
+        EA_PushZero
+        Less2
+        Not
+        If oq_n
+        EA_PushByte 9
+        EA_PushConstByte 'Back'
+        EA_PushByte 2
+        Push [reg1]
+        EA_CallNamedMethodPop 'Defer'
+        op_76
+        Return
+oq_n:
+        Push [reg4]
+        EA_PushOne
+        Equals2
+        Not
+        If oq_menu
+        GetURL 'FSCommand:SR_Quit', ''
+        op_76
+        Return
+oq_menu:
+        Push [reg2]
+        EA_GetNamedMember 'SOUND'
+        EA_GetNamedMember 'CLOSE'
+        EA_PushOne
+        Push [reg2]
+        EA_CallNamedMethodPop 'playSound'
+        EA_PushZero
+        Push [reg2]
+        EA_GetNamedMember 'StateAdapter'
+        EA_CallNamedMethodPop 'QuitGame'
+        EA_PushConstByte 'IG'
+        EA_PushOne
+        Push [reg2]
+        EA_GetNamedMember 'FlowMgr'
+        EA_CallNamedMethodPop 'ChangeInterfaceState'
+        Push [reg2]
+        EA_PushConstByte 'PauseSelectedItem'
+        EA_PushConstByte 'btn1'
+        SetMember
+    .end
+    SetMember
+
+; sp.Back(row): the pause menu again after one of the mod's popups or pages (the game's own NO path re-shows its hints)
+;   if (this.screen == undefined) return;
+;   this.screen.ShowHints(); _global.gFM.selectItem(this.screen["btn" + row]);
+    Push [reg1]
+    EA_PushConstByte 'Back'
+    .func2 ''(r3 'row') flags=0x40129
+        Push [reg1]
+        EA_GetNamedMember 'screen'
+        op_76
+        Equals2
+        If bk_end
+        EA_PushZero
+        Push [reg1]
+        EA_GetNamedMember 'screen'
+        EA_CallNamedMethodPop 'ShowHints'
+        Push [reg1]
+        EA_GetNamedMember 'screen'
+        EA_PushConstByte 'btn'
+        Push [reg3]
+        Add2
+        GetMember
+        EA_PushOne
+        Push [reg2]
+        EA_GetNamedMember 'gFM'
+        EA_CallNamedMethodPop 'selectItem'
+bk_end:
+    .end
+    SetMember
+
+    Push [reg1]
+    EA_PushConstByte 'OpenDevTools'
+    .func2 ''(r3 'row') flags=0x40129
+        Push [reg3]
+        EA_PushConstByte 'Back'
+        Push [reg1]
+        EA_PushConstByte 'IG'
+        EA_PushConstByte 'main'
+        EA_PushByte 5
+        Push [reg2]
+        EA_GetNamedMember 'SRDevTools'
+        EA_CallNamedMethodPop 'Open'
+    .end
+    SetMember
+
+    Push [reg1]
+    EA_PushConstByte 'OnReady'
+    .func2 ''() flags=0x40129
+        Push [reg1]
+        EA_PushConstByte 'shownAt'
+        GetTime
+        SetMember
+        Push [reg2]
+        EA_GetNamedMember 'ScrGenPop'
+        EA_GetNamedMember 'prototype'
+        StoreRegister 3
+        Pop
+        Push [reg3]
+        EA_GetNamedMember 'SR_OrigHandleInput'
+        op_76
+        Equals2
+        Not
+        If pr_done
+        Push [reg3]
+        EA_PushConstByte 'SR_OrigHandleInput'
+        Push [reg3]
+        EA_GetNamedMember 'HandleInput'
+        SetMember
+        Push [reg3]
+        EA_PushConstByte 'HandleInput'
+        Push [reg1]
+        EA_GetNamedMember 'GenPopInputHook'
+        SetMember
+pr_done:
+    .end
+    SetMember
+
+; GenPopInputHook(keyCode, controllerId, ascii): this = the popup; reg6 = its context
+    Push [reg1]
+    EA_PushConstByte 'GenPopInputHook'
+    .func2 ''(r3 'keyCode', r4 'controllerId', r5 'ascii') flags=0x70129
+        Push [reg1]
+        EA_GetNamedMember 'mParams'
+        EA_GetNamedMember 'context'
+        StoreRegister 6
+        Pop
+        Push [reg6]
+        Push [reg2]
+        EA_GetNamedMember 'SRPause'
+        Equals2
+        Not
+        If pg_notmine
+        Push [reg3]
+        Push [reg2]
+        EA_GetNamedMember 'INPUTCODE'
+        EA_GetNamedMember 'START'
+        Equals2
+        Not
+        If pg_notstart
+        GetTime
+        Push [reg6]
+        EA_GetNamedMember 'shownAt'
+        Subtract
+        EA_PushShort 400
+        Greater
+        If pg_start_ok
+        op_74
+        Return
+pg_start_ok:
+        Push [reg2]
+        EA_GetNamedMember 'INPUTCODE'
+        EA_GetNamedMember 'CROSS'
+        StoreRegister 3
+        Pop
+        Jump pg_orig
+pg_notstart:
+        Push [reg3]
+        Push [reg2]
+        EA_GetNamedMember 'INPUTCODE'
+        EA_GetNamedMember 'SELECT'
+        Equals2
+        Not
+        If pg_orig
+        Push [reg2]
+        EA_GetNamedMember 'INPUTCODE'
+        EA_GetNamedMember 'TRIANGLE'
+        StoreRegister 3
+        Pop
+        Jump pg_orig
+pg_notmine:
+        Push [reg6]
+        Push [reg2]
+        EA_GetNamedMember 'SRDevTools'
+        Equals2
+        Not
+        If pg_orig
+        Push [reg3]
+        Push [reg1]
+        EA_PushByte 2
+        Push [reg2]
+        EA_GetNamedMember 'SRDevTools'
+        EA_PushConstByte 'PopupKey'
+        CallMethod
+        StoreRegister 3
+        Pop
+        Push [reg3]
+        EA_PushZero
+        Less2
+        Not
+        If pg_orig
+        op_74
+        Return
+pg_orig:
+        Push [reg5]
+        Push [reg4]
+        Push [reg3]
+        EA_PushByte 3
+        Push [reg1]
+        EA_PushConstByte 'SR_OrigHandleInput'
+        CallMethod
+        Return
+    .end
+    SetMember
+
+; Defer(fn, arg) / RunDeferred(): as srfrontend.aptasm (a popup shown inside a ScrGenPop
+; callback is lost)
+    Push [reg1]
+    EA_PushConstByte 'Defer'
+    .func2 ''(r3 'fn', r4 'arg') flags=0x50129
+        Push [reg1]
+        EA_GetNamedMember 'deferId'
+        op_76
+        Equals2
+        If pd_clear
+        Push [reg1]
+        EA_GetNamedMember 'deferId'
+        EA_PushOne
+        EA_PushConstByte 'clearInterval'
+        CallFunction
+        Pop
+pd_clear:
+        Push [reg1]
+        EA_PushConstByte 'deferFn'
+        Push [reg3]
+        SetMember
+        Push [reg1]
+        EA_PushConstByte 'deferArg'
+        Push [reg4]
+        SetMember
+        Push [reg1]
+        EA_PushConstByte 'deferId'
+        EA_PushByte 20
+        EA_PushConstByte 'RunDeferred'
+        Push [reg1]
+        EA_PushByte 3
+        EA_PushConstByte 'setInterval'
+        CallFunction
+        SetMember
+    .end
+    SetMember
+
+    Push [reg1]
+    EA_PushConstByte 'RunDeferred'
+    .func2 ''() flags=0x30129
+        Push [reg1]
+        EA_GetNamedMember 'deferId'
+        EA_PushOne
+        EA_PushConstByte 'clearInterval'
+        CallFunction
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'deferId'
+        op_76
+        SetMember
+        Push [reg1]
+        EA_GetNamedMember 'screen'
+        op_76
+        Equals2
+        If pr_end
+        Push [reg1]
+        EA_GetNamedMember 'deferArg'
+        EA_PushOne
+        Push [reg1]
+        Push [reg1]
+        EA_GetNamedMember 'deferFn'
+        CallMethod
+        Pop
+pr_end:
+    .end
+    SetMember
+
+.include 'modopts_methods.aptasm'
+
+; ---- lane E L-b (step 5, STEP5_PLAN 10): the OPTIONS screen's GAME tab, open over the pause menu ----
+; sp.ApplyStore(why): the universal store through the game's own SettingsAdapter setters (apply_store_fn.aptasm,
+; the same function as SRFrontEnd's and the ScrSaveLoad patch's).
+    Push [reg1]
+    EA_PushConstByte 'ApplyStore'
+.include 'apply_store_fn.aptasm'
+    SetMember
+
+; sp.SR_GameOptions(p, s): the host's call (kernel/game_options.hpp) - the game's options := p through ApplyStore;
+; s = the value APPLY stored, or -1 (game_options_fn.aptasm).
+    Push [reg1]
+    EA_PushConstByte 'SR_GameOptions'
+.include 'game_options_fn.aptasm'
+    SetMember
+
+; sp.SR_OptionsClosed(what): the host's call once the OPTIONS screen is gone (kernel/game_options.hpp; the open hands
+; the screen over with SR_DTEnd action 3, so nothing of ours is left up under it).
+;   if (what == 1) {                       // VIEW PAD LAYOUT: the game's own CONTROLLER OPTIONS screen, the way the
+;     _global.PauseSelectedItem = "btn7"; // retail CONTROLLER OPTIONS row opened it (ScrPauseMenu.HandleInput 0x0D08);
+;     _global.playSound(_global.SOUND.OPEN);           // its own back returns to the pause menu, OPTIONS focused
+;     _global.FlowMgr.SwitchScreen(_global.SCREEN.CONTROLLER_OPT); return; }
+;   if (what == 2) { this.OpenDevTools(7); return; }   // DEV TOOLS (dev builds), back to the pause menu
+;   this.Back(7);                                      // the pause menu, OPTIONS focused
+    Push [reg1]
+    EA_PushConstByte 'SR_OptionsClosed'
+    .func2 ''(r3 'what') flags=0x40129
+        Push [reg3]
+        EA_PushOne
+        Equals2
+        Not
+        If pc_n1
+        Push [reg2]
+        EA_PushConstByte 'PauseSelectedItem'
+        EA_PushConstByte 'btn7'
+        SetMember
+        Push [reg2]
+        EA_GetNamedMember 'SOUND'
+        EA_GetNamedMember 'OPEN'
+        EA_PushOne
+        Push [reg2]
+        EA_CallNamedMethodPop 'playSound'
+        Push [reg2]
+        EA_GetNamedMember 'SCREEN'
+        EA_GetNamedMember 'CONTROLLER_OPT'
+        EA_PushOne
+        Push [reg2]
+        EA_GetNamedMember 'FlowMgr'
+        EA_CallNamedMethodPop 'SwitchScreen'
+        op_76
+        Return
+pc_n1:
+        Push [reg3]
+        EA_PushByte 2
+        Equals2
+        Not
+        If pc_n2
+        EA_PushByte 7
+        EA_PushOne
+        Push [reg1]
+        EA_CallNamedMethodPop 'OpenDevTools'
+        op_76
+        Return
+pc_n2:
+        EA_PushByte 7
+        EA_PushOne
+        Push [reg1]
+        EA_CallNamedMethodPop 'Back'
+    .end
+    SetMember
+
+    Push [reg1]
+    EA_PushConstByte 'Teardown'
+    .func2 ''() flags=0x40129
+        GetURL 'FSCommand:SR_Log', 'pause teardown'
+        Push [reg2]
+        EA_GetNamedMember 'ScrGenPop'
+        EA_GetNamedMember 'prototype'
+        StoreRegister 3
+        Pop
+        Push [reg3]
+        EA_GetNamedMember 'SR_OrigHandleInput'
+        op_76
+        Equals2
+        If pt_noinput
+        Push [reg3]
+        EA_PushConstByte 'HandleInput'
+        Push [reg3]
+        EA_GetNamedMember 'SR_OrigHandleInput'
+        SetMember
+        Push [reg3]
+        EA_PushConstByte 'SR_OrigHandleInput'
+        Delete
+        Pop
+pt_noinput:
+        Push [reg1]
+        EA_GetNamedMember 'deferId'
+        op_76
+        Equals2
+        If pt_nodefer
+        Push [reg1]
+        EA_GetNamedMember 'deferId'
+        EA_PushOne
+        EA_PushConstByte 'clearInterval'
+        CallFunction
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'deferId'
+        op_76
+        SetMember
+pt_nodefer:
+        Push [reg1]
+        EA_PushConstByte 'screen'
+        op_76
+        SetMember
+        Push [reg1]
+        EA_PushConstByte 'Install'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'OnRow'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'OpenOptions'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'ShowQuit'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'OnQuit'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'Back'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'OpenDevTools'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'OnReady'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'GenPopInputHook'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'Defer'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'RunDeferred'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'AutosaveOn'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'AutosaveLabel'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'OnModOptions'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'FetchModOptions'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'ToggleAutosave'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'ApplyStore'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'SR_GameOptions'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'SR_OptionsClosed'
+        Delete
+        Pop
+    .end
+    SetMember

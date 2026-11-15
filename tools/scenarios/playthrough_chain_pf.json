@@ -1,0 +1,81 @@
+{
+  "name": "playthrough-chain-pf",
+  "purpose": "iter-465 playthrough lane (docs/PLAYTHROUGH.md): walk the story spine past the Warworld return with the level-skip dev tool, PORT FEATURES ON (custom front end + autosave; natural=false). Title -> START -> custom MAIN MENU -> NEW GAME (mouse) -> main_hud -> the plan (archive/v1_playthrough/plans/pf_*.txt, made by tools/devtools/skipplan.py --carrier auto + holds) runs the game's own objectives chapter by chapter; the autosave port feature answers save prompts Continue Without Saving while the skip is armed. Ends at the plan's end (done/timeout/aborted), a crash marker, or the timeout; then holds 180 s to see what the game does by itself. Tag: dev-tool assisted. Gates: -Gates \"SR_INSTANCE_ID=playthrough,SR_PORT_FEATURES=1,SR_DEVTOOLS=levelskip,SR_DEVTOOLS_CMDS=<abs plan>,SR_DEVTOOLS_OUT=<dir>,SDL_AUDIODRIVER=disk\". -TimeoutSeconds 3600.",
+  "gates": "SR_KB_PAD_OBS=1,SR_MOUSE_UI_LOG=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=300,SR_PRESENT_DUMP_SPARSE_CAP=900",
+  "steps": [
+    {
+      "name": "fe-alive",
+      "await": "\\[NAT_FE\\] #1 natural FE master tick",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "front-end-feature",
+      "expect": "\\[PORT\\] applied custom_frontend",
+      "expectMs": 5000,
+      "optional": true
+    },
+    {
+      "name": "settle-title",
+      "await": "\\[NAT_FE\\] #256 natural FE master tick",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "press-start",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 4,
+      "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)",
+      "expectMs": 90000
+    },
+    {
+      "name": "title-ui-tail",
+      "await": "\\[APT_REQ\\] #\\d+ path='\\.\\./common/ButtonHints/XBox360/HintB'",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "title-visible",
+      "requireVisibleMs": 6000,
+      "visibleTimeoutMs": 200000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "start-bootflow",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 10000,
+      "expect": "\\[SR_FSCMD\\].*claim LoadCreate",
+      "expectMs": 30000
+    },
+    {
+      "name": "menu-visible",
+      "mouse": "move 640,560; wait 1500; move 660,580; wait 2000",
+      "dwellMs": 2000
+    },
+    {
+      "name": "new-game",
+      "mouse": "moveitem 0; wait 2500; clickitem 0",
+      "expect": "\\[SR_FSCMD\\].*answer cppId=\\S+ button=0",
+      "expectMs": 30000
+    },
+    {
+      "name": "game-starts",
+      "expect": "\\[APT_REQ\\] #\\d+ path='screens/hud/main_hud'",
+      "expectMs": 240000
+    },
+    {
+      "name": "plan-end",
+      "purpose": "the plan ends (done = the target was won) or stops; or a crash marker",
+      "await": "\\[DEVTOOL\\] levelskip \\w+ at k=|\\[ICALL_FAIL\\]|\\[PHYS_CAP\\]",
+      "timeoutMs": 4200000
+    },
+    {
+      "name": "after-hold",
+      "purpose": "what the game does by itself after the plan (frames)",
+      "dwellMs": 180000
+    }
+  ]
+}

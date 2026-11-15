@@ -1,0 +1,110 @@
+diff --git a/XenosRecomp/shader_recompiler.cpp b/XenosRecomp/shader_recompiler.cpp
+index b712c31..16d6e5c 100644
+--- a/XenosRecomp/shader_recompiler.cpp
++++ b/XenosRecomp/shader_recompiler.cpp
+@@ -293,6 +293,11 @@ void ShaderRecompiler::recompile(const TextureFetchInstruction& instr, bool bicu
+         instr.opcode != FetchOpcode::SetTextureLod && instr.opcode != FetchOpcode::GetTextureBorderColorFrac)
+         return;
+ 
++    if (instr.opcode == FetchOpcode::TextureFetch &&
++        (instr.magFilter != 3 || instr.minFilter != 3 || instr.mipFilter != 3 || instr.anisoFilter != 7 ||
++         instr.volMagFilter != 3 || instr.volMinFilter != 3))
++        ++filterOverrides;
++
+     if (instr.isPredicated)
+     {
+         indent();
+@@ -555,6 +560,31 @@ void ShaderRecompiler::recompile(const AluInstruction& instr)
+         SCALAR_CONSTANT_1
+     };
+ 
++    // superman (step 4, 0004): whether a constant operand is indexed by a0 / aL is decided PER OPERAND, as
++    // Xenia's ucode.h AluInstruction::src_const_is_addressed: operand 1 takes const_0_rel_abs; operand 2 takes
++    // const_0_rel_abs when operand 1 is a temp, else const_1_rel_abs; operand 3 (and the scalar constant of
++    // mulsc / addsc / subsc) takes const_0_rel_abs when operands 1 and 2 are temps, else const_1_rel_abs.
++    // Indexing every constant operand when either flag was set turned `c[105 + a0] * c254` into
++    // `c[105 + a0] * c[254 + a0]` - 0 past c255 - so every car after the first of an instanced draw lost its
++    // alpha (gameplay traces gp1 / gp2).
++    // namedArray: the operand reads a named constant array (ctab registerCount > 1). With perOperandConstRelative
++    // false each site keeps its earlier rule exactly: a named array took const0Relative alone, every other constant
++    // operand const0Relative || const1Relative (round-3 review: false must be the old translation).
++    auto constRelative = [&](size_t operand, bool namedArray = false) -> bool
++        {
++            if (!perOperandConstRelative)
++                return namedArray ? instr.const0Relative : (instr.const0Relative || instr.const1Relative);
++            switch (operand)
++            {
++            case VECTOR_0:
++                return instr.const0Relative;
++            case VECTOR_1:
++                return instr.src1Select ? instr.const0Relative : instr.const1Relative;
++            default:
++                return (instr.src1Select && instr.src2Select) ? instr.const0Relative : instr.const1Relative;
++            }
++        };
++
+     // forceMask (vector operands only): print exactly these source components
+     // instead of the ones the write mask selects (setp_*_push reads .x and .w).
+     auto op = [&](size_t operand, uint32_t forceMask = 0)
+@@ -645,12 +675,12 @@ void ShaderRecompiler::recompile(const AluInstruction& instr)
+                     #endif
+                         {
+                             regFormatted = fmt::format("{}({}{})", constantName,
+-                                reg - findResult->second->registerIndex, instr.const0Relative ? (instr.constAddressRegisterRelative ? " + a0" : " + aL") : "");
++                                reg - findResult->second->registerIndex, constRelative(operand, true) ? (instr.constAddressRegisterRelative ? " + a0" : " + aL") : "");
+                         }
+                     }
+                     else
+                     {
+-                        if (instr.const0Relative || instr.const1Relative)
++                        if (constRelative(operand))
+                             regFormatted = fmt::format("g_UnnamedConstants({}{})", reg,
+                                 instr.constAddressRegisterRelative ? " + a0" : " + aL");
+                         else
+@@ -659,7 +689,7 @@ void ShaderRecompiler::recompile(const AluInstruction& instr)
+                 }
+                 else
+                 {
+-                    if (instr.const0Relative || instr.const1Relative)
++                    if (constRelative(operand))
+                         regFormatted = fmt::format("g_UnnamedConstants({}{})", reg,
+                             instr.constAddressRegisterRelative ? " + a0" : " + aL");
+                     else if (literalConstants.count(reg))
+@@ -984,6 +1014,14 @@ void ShaderRecompiler::recompile(const AluInstruction& instr)
+                     (instr.src1Register & 0x80) ? ")" : "",
+                     "");
+             }
++            else if (perOperandConstRelative && instr.const0Relative)
++            {
++                // superman (step 4, 0004 round 3): a constant cube operand is operand 1 - indexed by a0 / aL when
++                // const_0_rel_abs is set (Xenia src_const_is_addressed(1)); false keeps the absolute read below.
++                print("cube({}g_UnnamedConstants({}{}), cubeMapData)",
++                    instr.src1Negate ? "-" : "", uint32_t(instr.src1Register),
++                    instr.constAddressRegisterRelative ? " + a0" : " + aL");
++            }
+             else
+             {
+                 print("cube({}g_UnnamedConstants({}), cubeMapData)",
+diff --git a/XenosRecomp/shader_recompiler.h b/XenosRecomp/shader_recompiler.h
+index 7599e44..3b22bd9 100644
+--- a/XenosRecomp/shader_recompiler.h
++++ b/XenosRecomp/shader_recompiler.h
+@@ -47,6 +47,18 @@ struct ShaderRecompiler : StringBuffer
+     // host-pre-decoded input attribute. Emitted as <hash>.vsf.dxil.
+     bool fetchMode = false;
+ 
++    // superman (step 4, 0004): the addressing mode of each constant operand is the operand's own (Xenia
++    // ucode.h AluInstruction::src_const_is_addressed). false = the earlier rule (every constant operand of an
++    // instruction indexed when either relative flag is set); the game passes SR_XLAT_CONST_REL here
++    // (gfx/xenos_bridge.cpp) until that gate is baked.
++    bool perOperandConstRelative = true;
++
++    // superman (step 4, 0004 round 3): texture fetches whose filter fields override the fetch constant's (mag / min /
++    // mip / aniso / volume mag / min not kUseFetchConst). The game binds one sampler per fetch slot from the fetch
++    // constant, so these overrides are ignored; the game logs a translation that has any (Xenia picks the
++    // instruction's filter first, d3d12_texture_cache.cc GetSamplerParameters). 0 in the step-4 cached corpus.
++    uint32_t filterOverrides = 0;
++
+     // superman (iter-463): a setTexLOD / UseRegisterLOD fetch needs the
+     // register-LOD local; declared after translation at texLodDeclPos.
+     bool usesTexLod = false;

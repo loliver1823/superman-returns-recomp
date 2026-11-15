@@ -1,0 +1,13 @@
+# clangd project config (editor language server, e.g. Cursor/VS Code clangd).
+# guest/ppc is ~150 MB of generated recompiled C++; background-indexing it (and the
+# vendored / reference trees) drove clangd to ~15 GB of RAM (2026-10-01). Files you
+# open are still parsed on demand; only the whole-project background index skips them.
+If:
+  PathMatch: guest/ppc/.*
+Index:
+  Background: Skip
+---
+If:
+  PathMatch: (third_party|reference|archive|tools/regen)/.*
+Index:
+  Background: Skip

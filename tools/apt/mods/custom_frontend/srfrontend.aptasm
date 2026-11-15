@@ -1,0 +1,1227 @@
+; Appended to ScrPressStart's class InitAction (sprite 61), after its guarded class
+; definition, so it runs on EVERY load of the movie. Pseudo-AS:
+;
+;   if (_global.SRFrontEnd == undefined) {           // plain state: survives unloads
+;     _global.SRFrontEnd = new Object();
+;     _global.SRFrontEnd.inSettings = false;          // pendingId starts undefined
+;   }
+;   var fe = _global.SRFrontEnd;                      // functions: re-bound every load
+;   fe.Install = ...; fe.Uninstall = ...; fe.CppShowPopupHook = ...; fe.IsLoadCreate = ...;
+;   fe.ShowMenu = ...; fe.OnReady = ...; fe.GenPopInputHook = ...; fe.OnMenu = ...;
+;   fe.ShowExitConfirm = ...; fe.OnExit = ...; fe.Defer / RunDeferred;
+;   (ScrPressStart.ExitScreen deletes every one of these methods again after Uninstall:
+;   exitscreen_head.aptasm; a new method must be added to that list - the build checks it)
+;   step 7: fe.ApplyStore, fe.ShowSettings, fe.OnSettings, fe.GoSettings and
+;   FlowMgr.SR_OnHostSettings (the host's SR_GetSettings reply).
+;   iter-464: fe.OpenDevTools + the shared mod-option methods (modopts_methods.aptasm:
+;   AutosaveOn, AutosaveLabel, OnModOptions, FetchModOptions, ToggleAutosave); the SETTINGS
+;   panel gains AUTOSAVE WITHOUT ASKING and DEV TOOLS.
+;   iter-465 polish: SETTINGS = GAMEPLAY / CONTROLLER / AUDIO / DISPLAY OPTIONS / MORE OPTIONS
+;   (fe.OpenDisplay = the host-built DISPLAY OPTIONS page; fe.ShowMore / fe.OnMore = the
+;   MORE OPTIONS panel: AUTOSAVE WITHOUT ASKING, DEV TOOLS - as the pause menu's). FlowMgr.CppShowPopup hook ownership is
+;   shared with MAIN_HUD's autosave hook (SR_PopupHookOwner "fe" / "hud"; one
+;   SR_OrigCppShowPopup slot holds the game's own function).
+; Plain state in _global.SRFrontEnd: pendingId, inSettings, fetched, lastAnswer, deferId...;
+; the universal options live in _global.SRSettings (packed, kernel/mod_bridge.hpp).
+;
+; Strings are constant-pool entries (EA_PushConstByte), as retail code pushes them; the
+; only static strings are the GetURL operands. fscommand("SR_Log", s) is GetURL2 with
+; "FSCommand:SR_Log" (AsInterpretBytecode 0x82688B90 -> handler table 0x82931420[0x9A] =
+; AptAS2ActionGetURL2LoadMovie_sub_826BB0F0: no operand byte, pops url then target,
+; "FSCommand:" prefix -> sub_82682DF8 -> the host bridge, kernel/mod_bridge.cpp).
+; In every function reg1 = this and reg2 = _global (flags 0x..0129).
+
+    op_71
+    EA_GetNamedMember 'SRFrontEnd'
+    op_76
+    Equals2
+    Not
+    If sr_have
+    op_71
+    EA_PushConstByte 'SRFrontEnd'
+    EA_PushZero
+    EA_PushConstByte 'Object'
+    NewObject
+    SetMember
+    op_71
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'inSettings'
+    op_74
+    SetMember
+sr_have:
+    op_71
+    EA_GetNamedMember 'SRFrontEnd'
+    StoreRegister 1
+    Pop
+
+; fe.Install(screen) -> true when a pending menu must be re-shown (back from SETTINGS).
+;   if (!this.fetched) { this.fetched = true; fscommand("SR_GetSettings", ""); }
+;       // once per process: the host answers synchronously with
+;       // FlowMgr.SR_OnHostSettings(packed) (bound by this movie's InitAction), which
+;       // stores _global.SRSettings (section 0)
+;   var fm = _global.FlowMgr;
+;   if (fm.SR_OrigCppShowPopup == undefined) {
+;     fm.SR_OrigCppShowPopup = fm.CppShowPopup; fm.CppShowPopup = this.CppShowPopupHook; }
+;   this.screen = screen;
+;   if (!this.inSettings) { this.pendingId = undefined; return false; }   // stale-state guard
+;   this.inSettings = false; return this.pendingId != undefined;
+    Push [reg1]
+    EA_PushConstByte 'Install'
+    .func2 ''(r3 'screen') flags=0x50129
+        GetURL 'FSCommand:SR_Log', 'install'
+        Push [reg1]
+        EA_GetNamedMember 'fetched'
+        If in_fetched
+        Push [reg1]
+        EA_PushConstByte 'fetched'
+        op_73
+        SetMember
+        GetURL 'FSCommand:SR_GetSettings', ''
+in_fetched:
+        Push [reg2]
+        EA_GetNamedMember 'FlowMgr'
+        StoreRegister 4
+        Pop
+        Push [reg4]
+        EA_GetNamedMember 'SR_OrigCppShowPopup'
+        op_76
+        Equals2
+        Not
+        If in_haveorig
+        Push [reg4]
+        EA_PushConstByte 'SR_OrigCppShowPopup'
+        Push [reg4]
+        EA_GetNamedMember 'CppShowPopup'
+        SetMember
+in_haveorig:
+        Push [reg4]
+        EA_PushConstByte 'CppShowPopup'
+        Push [reg1]
+        EA_GetNamedMember 'CppShowPopupHook'
+        SetMember
+        Push [reg4]
+        EA_PushConstByte 'SR_PopupHookOwner'
+        EA_PushConstByte 'fe'
+        SetMember
+        EA_PushZero
+        Push [reg1]
+        EA_CallNamedMethodPop 'FetchModOptions'
+        Push [reg1]
+        EA_PushConstByte 'screen'
+        Push [reg3]
+        SetMember
+        Push [reg1]
+        EA_GetNamedMember 'inSettings'
+        If in_resume
+        Push [reg1]
+        EA_PushConstByte 'pendingId'
+        op_76
+        SetMember
+        op_74
+        Return
+in_resume:
+        Push [reg1]
+        EA_PushConstByte 'inSettings'
+        op_74
+        SetMember
+        Push [reg1]
+        EA_GetNamedMember 'pendingId'
+        op_76
+        Equals2
+        Not
+        Return
+    .end
+    SetMember
+
+; fe.Uninstall(): undo everything Install / OnReady installed.
+;   var fm = _global.FlowMgr;
+;   if (fm.SR_OrigCppShowPopup != undefined) {
+;     fm.CppShowPopup = fm.SR_OrigCppShowPopup; delete fm.SR_OrigCppShowPopup; }
+;   delete fm.SR_OnHostSettings;
+;   var p = _global.ScrGenPop.prototype;
+;   if (p.SR_OrigHandleInput != undefined) {
+;     p.HandleInput = p.SR_OrigHandleInput; delete p.SR_OrigHandleInput; }
+;   if (this.deferId != undefined) { clearInterval(this.deferId); this.deferId = undefined; }
+;   this.screen = undefined;
+;   if (!this.inSettings) this.pendingId = undefined;
+    Push [reg1]
+    EA_PushConstByte 'Uninstall'
+    .func2 ''() flags=0x50129
+        GetURL 'FSCommand:SR_Log', 'uninstall'
+        Push [reg2]
+        EA_GetNamedMember 'FlowMgr'
+        StoreRegister 3
+        Pop
+        Push [reg3]
+        EA_GetNamedMember 'SR_PopupHookOwner'
+        EA_PushConstByte 'fe'
+        Equals2
+        Not
+        If un_nohook
+        Push [reg3]
+        EA_PushConstByte 'CppShowPopup'
+        Push [reg3]
+        EA_GetNamedMember 'SR_OrigCppShowPopup'
+        SetMember
+        Push [reg3]
+        EA_PushConstByte 'SR_OrigCppShowPopup'
+        Delete
+        Pop
+        Push [reg3]
+        EA_PushConstByte 'SR_PopupHookOwner'
+        Delete
+        Pop
+un_nohook:
+        Push [reg3]
+        EA_PushConstByte 'SR_OnHostSettings'
+        Delete
+        Pop
+        Push [reg2]
+        EA_GetNamedMember 'ScrGenPop'
+        EA_GetNamedMember 'prototype'
+        StoreRegister 4
+        Pop
+        Push [reg4]
+        EA_GetNamedMember 'SR_OrigHandleInput'
+        op_76
+        Equals2
+        If un_noinput
+        Push [reg4]
+        EA_PushConstByte 'HandleInput'
+        Push [reg4]
+        EA_GetNamedMember 'SR_OrigHandleInput'
+        SetMember
+        Push [reg4]
+        EA_PushConstByte 'SR_OrigHandleInput'
+        Delete
+        Pop
+un_noinput:
+        Push [reg1]
+        EA_GetNamedMember 'deferId'
+        op_76
+        Equals2
+        If un_nodefer
+        Push [reg1]
+        EA_GetNamedMember 'deferId'
+        EA_PushOne
+        EA_PushConstByte 'clearInterval'
+        CallFunction
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'deferId'
+        op_76
+        SetMember
+un_nodefer:
+        Push [reg1]
+        EA_PushConstByte 'screen'
+        op_76
+        SetMember
+        Push [reg1]
+        EA_GetNamedMember 'inSettings'
+        If un_keep
+        Push [reg1]
+        EA_PushConstByte 'pendingId'
+        op_76
+        SetMember
+un_keep:
+    .end
+    SetMember
+
+; fe.CppShowPopupHook(t, b, n, def, opts, can, close, col, cppId, delay): installed as
+; _global.FlowMgr.CppShowPopup (same 10 arguments, MainLib.as 0x2345). The C++ reaches
+; it by name each call (sub_822B15F8 -> AptExecutor vt+32). Claims only the 2-button
+; LoadCreate popup; everything else goes to the game's own function unchanged.
+;   var fe = _global.SRFrontEnd;
+;   if (n == 2 && fe.IsLoadCreate(t, opts)) {
+;     fe.pendingId = cppId; fscommand("SR_Log", "claim LoadCreate cppId=" + cppId);
+;     fe.ApplyStore(0);   // the universal options win over the sign-in applyOptions
+;     fe.ShowMenu(0); return;
+;   }
+;   _global.FlowMgr.SR_OrigCppShowPopup(t, b, n, def, opts, can, close, col, cppId, delay);
+    Push [reg1]
+    EA_PushConstByte 'CppShowPopupHook'
+    .func2 ''(r3 't', r4 'b', r5 'n', r6 'def', r7 'opts', r8 'can', r9 'close', r10 'col', r11 'cppId', r12 'delay') flags=0xE0129
+        Push [reg2]
+        EA_GetNamedMember 'SRFrontEnd'
+        StoreRegister 13
+        Pop
+        Push [reg5]
+        EA_PushByte 2
+        Equals2
+        Not
+        If hk_pass
+        Push [reg7]
+        Push [reg3]
+        EA_PushByte 2
+        Push [reg13]
+        EA_PushConstByte 'IsLoadCreate'
+        CallMethod
+        Not
+        If hk_pass
+        Push [reg13]
+        EA_PushConstByte 'pendingId'
+        Push [reg11]
+        SetMember
+        EA_PushConstByte 'FSCommand:SR_Log'
+        EA_PushConstByte 'claim LoadCreate cppId='
+        Push [reg11]
+        Add2
+        GetURL2
+        EA_PushZero
+        EA_PushOne
+        Push [reg13]
+        EA_CallNamedMethodPop 'ApplyStore'
+        EA_PushZero
+        EA_PushOne
+        Push [reg13]
+        EA_CallNamedMethodPop 'ShowMenu'
+        op_76
+        Return
+hk_pass:
+        Push [reg12]
+        Push [reg11]
+        Push [reg10]
+        Push [reg9]
+        Push [reg8]
+        Push [reg7]
+        Push [reg6]
+        Push [reg5]
+        Push [reg4]
+        Push [reg3]
+        EA_PushByte 10
+        Push [reg2]
+        EA_GetNamedMember 'FlowMgr'
+        EA_CallNamedMethodPop 'SR_OrigCppShowPopup'
+    .end
+    SetMember
+
+; fe.IsLoadCreate(t, opts): structural marker = the game's own text keys, raw or localized
+; (sub_822B4C50 passes LoadCreate_Profile_Title / [LoadCreate_Create_Btn, _Load_Btn]).
+; The title alone is NOT enough: PromptIGLoad_Title (sub_822B4ED8, also 2 buttons, colour
+; 29153, buttons off_82913818 = [PromptIGLoad_Load_Btn, _Cancel_Btn]) reads "LOAD A GAME?"
+; too, so the title AND the first button must both be LoadCreate's.
+;   var L = _global.LocalizationAdapter; var o = opts[0];
+;   return (t == "LoadCreate_Profile_Title" || t == L.GetLocalizedText("LoadCreate_Profile_Title"))
+;       && (o == "LoadCreate_Create_Btn"    || o == L.GetLocalizedText("LoadCreate_Create_Btn"));
+    Push [reg1]
+    EA_PushConstByte 'IsLoadCreate'
+    .func2 ''(r3 't', r4 'opts') flags=0x70129
+        Push [reg2]
+        EA_GetNamedMember 'LocalizationAdapter'
+        StoreRegister 5
+        Pop
+        Push [reg4]
+        EA_PushZero
+        GetMember
+        StoreRegister 6
+        Pop
+        Push [reg3]
+        EA_PushConstByte 'LoadCreate_Profile_Title'
+        Equals2
+        If lc_title
+        Push [reg3]
+        EA_PushConstByte 'LoadCreate_Profile_Title'
+        EA_PushOne
+        Push [reg5]
+        EA_PushConstByte 'GetLocalizedText'
+        CallMethod
+        Equals2
+        If lc_title
+        op_74
+        Return
+lc_title:
+        Push [reg6]
+        EA_PushConstByte 'LoadCreate_Create_Btn'
+        Equals2
+        If lc_yes
+        Push [reg6]
+        EA_PushConstByte 'LoadCreate_Create_Btn'
+        EA_PushOne
+        Push [reg5]
+        EA_PushConstByte 'GetLocalizedText'
+        CallMethod
+        Equals2
+        If lc_yes
+        op_74
+        Return
+lc_yes:
+        op_73
+        Return
+    .end
+    SetMember
+
+; fe.ShowMenu(defBtn): the game's own popup helper, the same chrome as LOAD A GAME?
+;   _global.FlowMgr.ShowGenPop("MAIN MENU", "SUPERMAN RETURNS: THE VIDEOGAME", 5, defBtn,
+;       ["NEW GAME", "LOAD GAME", "SETTINGS", "MODS", "EXIT"], this.OnMenu, this.OnReady, this,
+;       true /*canCancel*/, true /*closeOnPress*/, 29153 /*GENPOP_BLUE*/);
+;   (iter-464 modmenu: MODS = row 3, EXIT moved to row 4; 5 = ScrGenPop's MAXNUMBUTTONS)
+;   (lane E E4, owner Q4 (b) 2026-10-23: B on the MAIN MENU asks QUIT TO DESKTOP?, the PC convention - canCancel, and
+;    OnMenu treats the cancel (-1) as EXIT; the game's popup then shows "B BACK", 60_genpop_hints.patch)
+    Push [reg1]
+    EA_PushConstByte 'ShowMenu'
+    .func2 ''(r3 'defBtn') flags=0x40129
+        EA_PushShort 29153
+        op_73
+        op_73
+        Push [reg1]
+        Push [reg1]
+        EA_GetNamedMember 'OnReady'
+        Push [reg1]
+        EA_GetNamedMember 'OnMenu'
+        EA_PushConstByte 'EXIT'
+        EA_PushConstByte 'MODS'
+        EA_PushConstByte 'OPTIONS'
+        EA_PushConstByte 'LOAD GAME'
+        EA_PushConstByte 'NEW GAME'
+        EA_PushByte 5
+        InitArray
+        Push [reg3]
+        EA_PushByte 5
+        EA_PushConstByte 'SUPERMAN RETURNS: THE VIDEOGAME'
+        EA_PushConstByte 'MAIN MENU'
+        EA_PushByte 11
+        Push [reg2]
+        EA_GetNamedMember 'FlowMgr'
+        EA_CallNamedMethodPop 'ShowGenPop'
+    .end
+    SetMember
+
+; fe.OnReady(): ScrGenPop.PopupInit's readyCallBack (context = fe). Stamps the time the
+; panel came up and wraps ScrGenPop.prototype.HandleInput once (the class exists by now).
+;   this.shownAt = getTimer();
+;   var p = _global.ScrGenPop.prototype;
+;   if (p.SR_OrigHandleInput == undefined) {
+;     p.SR_OrigHandleInput = p.HandleInput; p.HandleInput = this.GenPopInputHook; }
+    Push [reg1]
+    EA_PushConstByte 'OnReady'
+    .func2 ''() flags=0x40129
+        Push [reg1]
+        EA_PushConstByte 'shownAt'
+        GetTime
+        SetMember
+        Push [reg2]
+        EA_GetNamedMember 'ScrGenPop'
+        EA_GetNamedMember 'prototype'
+        StoreRegister 3
+        Pop
+        Push [reg3]
+        EA_GetNamedMember 'SR_OrigHandleInput'
+        op_76
+        Equals2
+        Not
+        If rd_done
+        Push [reg3]
+        EA_PushConstByte 'SR_OrigHandleInput'
+        Push [reg3]
+        EA_GetNamedMember 'HandleInput'
+        SetMember
+        Push [reg3]
+        EA_PushConstByte 'HandleInput'
+        Push [reg1]
+        EA_GetNamedMember 'GenPopInputHook'
+        SetMember
+rd_done:
+    .end
+    SetMember
+
+; fe.GenPopInputHook(keyCode, controllerId, ascii): ScrGenPop.prototype.HandleInput while
+; ScrPressStart is loaded; this = the popup. Only OUR popups (context == fe) are touched:
+; the keyboard's Enter (pad START) selects like A once the panel has been up 400 ms (the
+; press that started the boot flow must not pick NEW GAME), and Esc/Backspace (pad BACK =
+; INPUTCODE.SELECT) backs out like B. Every other popup runs the original unchanged.
+;   var fe = _global.SRFrontEnd;
+;   if (this.mParams.context == fe) {
+;     fscommand("SR_Log", "menu key=" + keyCode);
+;     if (keyCode == INPUTCODE.START) {
+;       if (!(getTimer() - fe.shownAt > 400)) return false;
+;       keyCode = INPUTCODE.CROSS;
+;     } else if (keyCode == INPUTCODE.SELECT) keyCode = INPUTCODE.TRIANGLE;
+;   }
+;   return this.SR_OrigHandleInput(keyCode, controllerId, ascii);
+    Push [reg1]
+    EA_PushConstByte 'GenPopInputHook'
+    .func2 ''(r3 'keyCode', r4 'controllerId', r5 'ascii') flags=0x70129
+        Push [reg2]
+        EA_GetNamedMember 'SRFrontEnd'
+        StoreRegister 6
+        Pop
+        Push [reg1]
+        EA_GetNamedMember 'mParams'
+        EA_GetNamedMember 'context'
+        Push [reg6]
+        Equals2
+        Not
+        If gk_notfe
+        EA_PushConstByte 'FSCommand:SR_Log'
+        EA_PushConstByte 'menu key='
+        Push [reg3]
+        Add2
+        GetURL2
+        Push [reg3]
+        Push [reg2]
+        EA_GetNamedMember 'INPUTCODE'
+        EA_GetNamedMember 'START'
+        Equals2
+        Not
+        If gk_notstart
+        GetTime
+        Push [reg6]
+        EA_GetNamedMember 'shownAt'
+        Subtract
+        EA_PushShort 400
+        Greater
+        If gk_start_ok
+        op_74
+        Return
+gk_start_ok:
+        Push [reg2]
+        EA_GetNamedMember 'INPUTCODE'
+        EA_GetNamedMember 'CROSS'
+        StoreRegister 3
+        Pop
+        Jump gk_orig
+gk_notstart:
+        Push [reg3]
+        Push [reg2]
+        EA_GetNamedMember 'INPUTCODE'
+        EA_GetNamedMember 'SELECT'
+        Equals2
+        Not
+        If gk_orig
+        Push [reg2]
+        EA_GetNamedMember 'INPUTCODE'
+        EA_GetNamedMember 'TRIANGLE'
+        StoreRegister 3
+        Pop
+        Jump gk_orig
+gk_notfe:
+        Push [reg1]
+        EA_GetNamedMember 'mParams'
+        EA_GetNamedMember 'context'
+        Push [reg2]
+        EA_GetNamedMember 'SRDevTools'
+        Equals2
+        Not
+        If gk_orig
+        Push [reg3]
+        Push [reg1]
+        EA_PushByte 2
+        Push [reg2]
+        EA_GetNamedMember 'SRDevTools'
+        EA_PushConstByte 'PopupKey'
+        CallMethod
+        StoreRegister 3
+        Pop
+        Push [reg3]
+        EA_PushZero
+        Less2
+        Not
+        If gk_orig
+        op_74
+        Return
+gk_orig:
+        Push [reg5]
+        Push [reg4]
+        Push [reg3]
+        EA_PushByte 3
+        Push [reg1]
+        EA_PushConstByte 'SR_OrigHandleInput'
+        CallMethod
+        Return
+    .end
+    SetMember
+
+; fe.OnMenu(popup, button): the menu's selectedCallback (context = fe).
+;   fscommand("SR_Log", "menu button=" + button);
+;   if (button == 0 || button == 1) {                 // NEW GAME / LOAD GAME
+;     var id = this.pendingId;
+;     if (id == undefined) { this.Defer("ShowMenu", button); return; }   // nothing to answer
+;     this.pendingId = undefined; this.lastAnswer = button;   // LoadComplete: 0 new, 1 load
+;     fscommand("SR_Log", "answer cppId=" + id + " button=" + button);
+;     _global.GlobalAdapter.CppPopupComplete(id, button);   // the game's own answer path
+;   } else if (button == 2) this.Defer("ShowSettings", 0);   // SETTINGS (step 7)
+;   else if (button == 3) this.Defer("OpenMods", 3);          // MODS (iter-464 modmenu)
+;   else if (button == 4 || button < 0) this.Defer("ShowExitConfirm");   // EXIT, or B (lane E E4, Q4 (b))
+    Push [reg1]
+    EA_PushConstByte 'OnMenu'
+    .func2 ''(r3 'popup', r4 'button') flags=0x60129
+        EA_PushConstByte 'FSCommand:SR_Log'
+        EA_PushConstByte 'menu button='
+        Push [reg4]
+        Add2
+        GetURL2
+        Push [reg4]
+        EA_PushZero
+        Equals2
+        If mn_answer
+        Push [reg4]
+        EA_PushOne
+        Equals2
+        If mn_answer
+        Push [reg4]
+        EA_PushByte 2
+        Equals2
+        Not
+        If mn_notsettings
+        EA_PushByte 2
+        EA_PushConstByte 'OpenOptions'
+        EA_PushByte 2
+        Push [reg1]
+        EA_CallNamedMethodPop 'Defer'
+        op_76
+        Return
+mn_notsettings:
+        Push [reg4]
+        EA_PushByte 3
+        Equals2
+        Not
+        If mn_notmods
+        EA_PushByte 3
+        EA_PushConstByte 'OpenMods'
+        EA_PushByte 2
+        Push [reg1]
+        EA_CallNamedMethodPop 'Defer'
+        op_76
+        Return
+mn_notmods:
+        Push [reg4]
+        EA_PushByte 4
+        Equals2
+        If mn_exit
+        Push [reg4]
+        EA_PushZero
+        Less2
+        Not
+        If mn_end
+mn_exit:
+        op_76
+        EA_PushConstByte 'ShowExitConfirm'
+        EA_PushByte 2
+        Push [reg1]
+        EA_CallNamedMethodPop 'Defer'
+        op_76
+        Return
+mn_answer:
+        Push [reg1]
+        EA_GetNamedMember 'pendingId'
+        StoreRegister 5
+        Pop
+        Push [reg5]
+        op_76
+        Equals2
+        Not
+        If mn_have
+        Push [reg4]
+        EA_PushConstByte 'ShowMenu'
+        EA_PushByte 2
+        Push [reg1]
+        EA_CallNamedMethodPop 'Defer'
+        op_76
+        Return
+mn_have:
+        Push [reg1]
+        EA_PushConstByte 'pendingId'
+        op_76
+        SetMember
+        Push [reg1]
+        EA_PushConstByte 'lastAnswer'
+        Push [reg4]
+        SetMember
+        EA_PushConstByte 'FSCommand:SR_Log'
+        EA_PushConstByte 'answer cppId='
+        Push [reg5]
+        Add2
+        EA_PushConstByte ' button='
+        Add2
+        Push [reg4]
+        Add2
+        GetURL2
+        Push [reg4]
+        Push [reg5]
+        EA_PushByte 2
+        Push [reg2]
+        EA_GetNamedMember 'GlobalAdapter'
+        EA_CallNamedMethodPop 'CppPopupComplete'
+mn_end:
+    .end
+    SetMember
+
+; fe.ShowExitConfirm(): the same shape as ScrPauseMenu.showWarning (0x0E8C-0x1048).
+;   var L = _global.LocalizationAdapter;
+;   _global.FlowMgr.ShowGenPop(L.GetLocalizedText("Generic_WARNING"), "QUIT TO DESKTOP?", 2, 0,
+;       [L.GetLocalizedText("Generic_NO"), L.GetLocalizedText("Generic_YES")],
+;       this.OnExit, this.OnReady, this, true /*B = NO*/, true, 29153);
+    Push [reg1]
+    EA_PushConstByte 'ShowExitConfirm'
+    .func2 ''() flags=0x40129
+        Push [reg2]
+        EA_GetNamedMember 'LocalizationAdapter'
+        StoreRegister 3
+        Pop
+        EA_PushShort 29153
+        op_73
+        op_73
+        Push [reg1]
+        Push [reg1]
+        EA_GetNamedMember 'OnReady'
+        Push [reg1]
+        EA_GetNamedMember 'OnExit'
+        EA_PushConstByte 'Generic_YES'
+        EA_PushOne
+        Push [reg3]
+        EA_PushConstByte 'GetLocalizedText'
+        CallMethod
+        EA_PushConstByte 'Generic_NO'
+        EA_PushOne
+        Push [reg3]
+        EA_PushConstByte 'GetLocalizedText'
+        CallMethod
+        EA_PushByte 2
+        InitArray
+        EA_PushZero
+        EA_PushByte 2
+        EA_PushConstByte 'QUIT TO DESKTOP?'
+        EA_PushConstByte 'Generic_WARNING'
+        EA_PushOne
+        Push [reg3]
+        EA_PushConstByte 'GetLocalizedText'
+        CallMethod
+        EA_PushByte 11
+        Push [reg2]
+        EA_GetNamedMember 'FlowMgr'
+        EA_CallNamedMethodPop 'ShowGenPop'
+    .end
+    SetMember
+
+; fe.OnExit(popup, button): YES (1) quits through the host bridge; NO (0) or B (-1)
+; returns to the menu with EXIT focused.
+;   if (button == 1) fscommand("SR_Quit", ""); else this.Defer("ShowMenu", 4);
+    Push [reg1]
+    EA_PushConstByte 'OnExit'
+    .func2 ''(r3 'popup', r4 'button') flags=0x50129
+        Push [reg4]
+        EA_PushOne
+        Equals2
+        Not
+        If ex_back
+        GetURL 'FSCommand:SR_Quit', ''
+        op_76
+        Return
+ex_back:
+        EA_PushByte 4
+        EA_PushConstByte 'ShowMenu'
+        EA_PushByte 2
+        Push [reg1]
+        EA_CallNamedMethodPop 'Defer'
+    .end
+    SetMember
+
+; fe.Defer(fn, arg): a popup callback runs BEFORE ScrGenPop closes its own popup
+; (ScrGenPop.HandleInput: selectedCallback.call(...) then gPopupMgr.ClosePopup(this)), so
+; a popup shown from inside the callback is lost (roll loadexit1: no APT_REQ, no panel).
+; The game defers popups the same way: FlowMgr.CppShowPopup(bDelayBeforeShowing) ->
+; setInterval(FlowMgr, "ShowPopupDelayed", 20, ...) (MainLib.as 0x2270-0x2344).
+;   if (this.deferId != undefined) clearInterval(this.deferId);
+;   this.deferFn = fn; this.deferArg = arg;
+;   this.deferId = setInterval(this, "RunDeferred", 20);
+    Push [reg1]
+    EA_PushConstByte 'Defer'
+    .func2 ''(r3 'fn', r4 'arg') flags=0x50129
+        Push [reg1]
+        EA_GetNamedMember 'deferId'
+        op_76
+        Equals2
+        If df_clear
+        Push [reg1]
+        EA_GetNamedMember 'deferId'
+        EA_PushOne
+        EA_PushConstByte 'clearInterval'
+        CallFunction
+        Pop
+df_clear:
+        Push [reg1]
+        EA_PushConstByte 'deferFn'
+        Push [reg3]
+        SetMember
+        Push [reg1]
+        EA_PushConstByte 'deferArg'
+        Push [reg4]
+        SetMember
+        Push [reg1]
+        EA_PushConstByte 'deferId'
+        EA_PushByte 20
+        EA_PushConstByte 'RunDeferred'
+        Push [reg1]
+        EA_PushByte 3
+        EA_PushConstByte 'setInterval'
+        CallFunction
+        SetMember
+    .end
+    SetMember
+
+; fe.RunDeferred(): the interval fires once.
+;   clearInterval(this.deferId); this.deferId = undefined;
+;   if (this.screen != undefined) this[this.deferFn](this.deferArg);   // ScrPressStart still up
+    Push [reg1]
+    EA_PushConstByte 'RunDeferred'
+    .func2 ''() flags=0x30129
+        Push [reg1]
+        EA_GetNamedMember 'deferId'
+        EA_PushOne
+        EA_PushConstByte 'clearInterval'
+        CallFunction
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'deferId'
+        op_76
+        SetMember
+        Push [reg1]
+        EA_GetNamedMember 'screen'
+        op_76
+        Equals2
+        If rn_end
+        Push [reg1]
+        EA_GetNamedMember 'deferArg'
+        EA_PushOne
+        Push [reg1]
+        Push [reg1]
+        EA_GetNamedMember 'deferFn'
+        CallMethod
+        Pop
+rn_end:
+    .end
+    SetMember
+
+; ---- step 7: SETTINGS and the universal options (docs/CUSTOM_FRONTEND.md section 0) ----
+
+; fe.ApplyStore(why): the universal store through the game's own SettingsAdapter setters
+; (apply_store_fn.aptasm; the ScrSaveLoad patch splices its own copy of the same function).
+    Push [reg1]
+    EA_PushConstByte 'ApplyStore'
+.include 'apply_store_fn.aptasm'
+    SetMember
+
+; fe.ShowSettings(defBtn): a second panel in the same chrome, the game's own screen names.
+;   var L = _global.LocalizationAdapter;
+;   _global.FlowMgr.ShowGenPop("SETTINGS", "SUPERMAN RETURNS: THE VIDEOGAME", 3, defBtn,
+;       [L.GetLocalizedText("Label_ScrGameplayOpt"), L.GetLocalizedText("Label_ScrControllerOpt"),
+;        L.GetLocalizedText("Label_ScrAudioOpt")],
+;       this.OnSettings, this.OnReady, this, true /*B = back*/, true, 29153);
+    Push [reg1]
+    EA_PushConstByte 'ShowSettings'
+    .func2 ''(r3 'defBtn') flags=0x50129
+        Push [reg2]
+        EA_GetNamedMember 'LocalizationAdapter'
+        StoreRegister 4
+        Pop
+        EA_PushShort 29153
+        op_73
+        op_73
+        Push [reg1]
+        Push [reg1]
+        EA_GetNamedMember 'OnReady'
+        Push [reg1]
+        EA_GetNamedMember 'OnSettings'
+        EA_PushConstByte 'MORE OPTIONS'
+        EA_PushConstByte 'DISPLAY OPTIONS'
+        EA_PushConstByte 'Label_ScrAudioOpt'
+        EA_PushOne
+        Push [reg4]
+        EA_PushConstByte 'GetLocalizedText'
+        CallMethod
+        EA_PushConstByte 'Label_ScrControllerOpt'
+        EA_PushOne
+        Push [reg4]
+        EA_PushConstByte 'GetLocalizedText'
+        CallMethod
+        EA_PushConstByte 'Label_ScrGameplayOpt'
+        EA_PushOne
+        Push [reg4]
+        EA_PushConstByte 'GetLocalizedText'
+        CallMethod
+        EA_PushByte 5
+        InitArray
+        Push [reg3]
+        EA_PushByte 5
+        EA_PushConstByte 'SUPERMAN RETURNS: THE VIDEOGAME'
+        EA_PushConstByte 'SETTINGS'
+        EA_PushByte 11
+        Push [reg2]
+        EA_GetNamedMember 'FlowMgr'
+        EA_CallNamedMethodPop 'ShowGenPop'
+    .end
+    SetMember
+
+; fe.OnSettings(popup, button): B (-1) -> the 4-button menu (SETTINGS focused); a row ->
+; open that options screen (deferred, like every chained popup / switch here).
+;   fscommand("SR_Log", "settings button=" + button);
+;   if (button < 0) this.Defer("ShowMenu", 2); else this.Defer("GoSettings", button);
+    Push [reg1]
+    EA_PushConstByte 'OnSettings'
+    .func2 ''(r3 'popup', r4 'button') flags=0x50129
+        EA_PushConstByte 'FSCommand:SR_Log'
+        EA_PushConstByte 'settings button='
+        Push [reg4]
+        Add2
+        GetURL2
+        Push [reg4]
+        EA_PushZero
+        Less2
+        Not
+        If os_open
+        EA_PushByte 2
+        EA_PushConstByte 'ShowMenu'
+        EA_PushByte 2
+        Push [reg1]
+        EA_CallNamedMethodPop 'Defer'
+        op_76
+        Return
+os_open:
+        Push [reg4]
+        EA_PushByte 3
+        Equals2
+        Not
+        If os_n3
+        EA_PushByte 3
+        EA_PushConstByte 'OpenDisplay'
+        EA_PushByte 2
+        Push [reg1]
+        EA_CallNamedMethodPop 'Defer'
+        op_76
+        Return
+os_n3:
+        Push [reg4]
+        EA_PushByte 4
+        Equals2
+        Not
+        If os_n4
+        EA_PushZero
+        EA_PushConstByte 'ShowMore'
+        EA_PushByte 2
+        Push [reg1]
+        EA_CallNamedMethodPop 'Defer'
+        op_76
+        Return
+os_n4:
+        Push [reg4]
+        EA_PushConstByte 'GoSettings'
+        EA_PushByte 2
+        Push [reg1]
+        EA_CallNamedMethodPop 'Defer'
+    .end
+    SetMember
+
+; fe.GoSettings(i): opens the game's options screen as an OVERLAY screen at depth 60
+; (between LEVELS.MAIN 50 and FOREGROUND 75; MainLib: FlowMgr.SwitchLevel("NONE", id, lvl)
+; -> gSM.LoadOverlayScreen), so ScrPressStart stays loaded underneath. The screen manager
+; hands input to the top of its screen stack first, and the options screens return false
+; (consumed), so ScrPressStart does not see it. Not SwitchScreen at MAIN (what ScrPauseMenu
+; does): rolls settings/set1, set2 and back1 showed that a ScrPressStart reloaded in the
+; same session runs onLoad but never reaches InitGui (no 'initgui'/'install', its slot
+; picker left visible, input locked). Cause found later: the .const walk order broke the
+; runtime's unload renumbering (docs/CUSTOM_FRONTEND.md 5.4 item 4, fixed in the toolchain);
+; the overlay stays until a live roll shows the reload working.
+; The options screens' HandleInput patch (20_settings.patch) unloads the overlay on B /
+; Esc / START and re-shows the menu.
+;   var S = _global.SCREEN, id = S.GAMEPLAY_OPT;
+;   if (i == 1) id = S.CONTROLLER_OPT; if (i == 2) id = S.AUDIO_OPT;
+;   this.inSettings = true; fscommand("SR_Log", "settings open " + id);
+;   this.settingsScreen = id;
+;   _global.SetFortressDisplayWell(true);          // the panel + title (review finding 5)
+;   _global.FlowMgr.SwitchLevel("NONE", id, 60);   // an OVERLAY screen at depth 60
+; SetFortressDisplayWell(true): the DisplayWell panel and the screen title the Audio and
+; Controller screens show outside the pause menu (their InitGui calls it there; ScrAudioOpt
+; 0x0052C). ScrGameplayOpt's InitGui never does (retail opens it only from the pause menu,
+; which draws its own well), so without it its rows and title-less hints floated over the
+; flyby (roll settings/reboot1 frames 133-142). The call is the game's own ScrBackground_IG
+; helper (visible + title position 60; it never clears the title when true), idempotent for
+; the two screens that call it themselves; the options HandleInput patch hides it on back.
+    Push [reg1]
+    EA_PushConstByte 'GoSettings'
+    .func2 ''(r3 'i') flags=0x60129
+        Push [reg2]
+        EA_GetNamedMember 'SCREEN'
+        StoreRegister 4
+        Pop
+        Push [reg4]
+        EA_GetNamedMember 'GAMEPLAY_OPT'
+        StoreRegister 5
+        Pop
+        Push [reg3]
+        EA_PushOne
+        Equals2
+        Not
+        If gs_n1
+        Push [reg4]
+        EA_GetNamedMember 'CONTROLLER_OPT'
+        StoreRegister 5
+        Pop
+gs_n1:
+        Push [reg3]
+        EA_PushByte 2
+        Equals2
+        Not
+        If gs_n2
+        Push [reg4]
+        EA_GetNamedMember 'AUDIO_OPT'
+        StoreRegister 5
+        Pop
+gs_n2:
+        Push [reg1]
+        EA_PushConstByte 'inSettings'
+        op_73
+        SetMember
+        EA_PushConstByte 'FSCommand:SR_Log'
+        EA_PushConstByte 'settings open '
+        Push [reg5]
+        Add2
+        GetURL2
+        Push [reg1]
+        EA_PushConstByte 'settingsScreen'
+        Push [reg5]
+        SetMember
+        op_73
+        EA_PushOne
+        Push [reg2]
+        EA_CallNamedMethodPop 'SetFortressDisplayWell'
+        EA_PushByte 60
+        Push [reg5]
+        EA_PushConstByte 'NONE'
+        EA_PushByte 3
+        Push [reg2]
+        EA_GetNamedMember 'FlowMgr'
+        EA_CallNamedMethodPop 'SwitchLevel'
+    .end
+    SetMember
+
+; ---- iter-464: DEV TOOLS from the SETTINGS panel, and the shared mod-option methods ----
+
+; fe.OpenDevTools(defBtn): the Dev Tools pages (devtools_ui.aptasm, bound by this movie's
+; BistroBaseScreen InitAction); B on its first page comes back to MORE OPTIONS with DEV TOOLS
+; focused (iter-465 polish; before: SETTINGS row 4).
+;   _global.SRDevTools.Open("main", "FE", this, "ShowMore", 1);
+    Push [reg1]
+    EA_PushConstByte 'OpenDevTools'
+    .func2 ''(r3 'defBtn') flags=0x40129
+        EA_PushOne
+        EA_PushConstByte 'ShowMore'
+        Push [reg1]
+        EA_PushConstByte 'FE'
+        EA_PushConstByte 'main'
+        EA_PushByte 5
+        Push [reg2]
+        EA_GetNamedMember 'SRDevTools'
+        EA_CallNamedMethodPop 'Open'
+    .end
+    SetMember
+
+; ---- iter-465 polish: DISPLAY OPTIONS and the MORE OPTIONS panel ----
+
+; fe.OpenDisplay(defBtn): the DISPLAY OPTIONS page (kernel/display_menu.cpp builds it; the same
+; renderer as the Dev Tools and MODS pages); B comes back to SETTINGS with DISPLAY focused.
+;   _global.SRDevTools.Open("display", "FE", this, "ShowSettings", 3);
+    Push [reg1]
+    EA_PushConstByte 'OpenDisplay'
+    .func2 ''(r3 'defBtn') flags=0x40129
+        EA_PushByte 3
+        EA_PushConstByte 'ShowSettings'
+        Push [reg1]
+        EA_PushConstByte 'FE'
+        EA_PushConstByte 'display'
+        EA_PushByte 5
+        Push [reg2]
+        EA_GetNamedMember 'SRDevTools'
+        EA_CallNamedMethodPop 'Open'
+    .end
+    SetMember
+
+; fe.ShowMore(defBtn): MORE OPTIONS, in the same chrome (the pause menu has the same panel):
+;   _global.FlowMgr.ShowGenPop("MORE OPTIONS", "Options of the PC version of the game.", 2,
+;       defBtn, [this.AutosaveLabel(), "DEV TOOLS"], this.OnMore, this.OnReady, this, true,
+;       true, 29153);
+    Push [reg1]
+    EA_PushConstByte 'ShowMore'
+    .func2 ''(r3 'defBtn') flags=0x40129
+        EA_PushShort 29153
+        op_73
+        op_73
+        Push [reg1]
+        Push [reg1]
+        EA_GetNamedMember 'OnReady'
+        Push [reg1]
+        EA_GetNamedMember 'OnMore'
+        EA_PushConstByte 'DEV TOOLS'
+        EA_PushZero
+        Push [reg1]
+        EA_PushConstByte 'AutosaveLabel'
+        CallMethod
+        EA_PushByte 2
+        InitArray
+        Push [reg3]
+        EA_PushByte 2
+        EA_PushConstByte 'Options of the PC version of the game.'
+        EA_PushConstByte 'MORE OPTIONS'
+        EA_PushByte 11
+        Push [reg2]
+        EA_GetNamedMember 'FlowMgr'
+        EA_CallNamedMethodPop 'ShowGenPop'
+    .end
+    SetMember
+
+; fe.OnMore(popup, button): B -> SETTINGS (MORE OPTIONS focused); 0 -> flip AUTOSAVE WITHOUT
+; ASKING (the host stores it) and show the panel again; 1 -> the Dev Tools pages.
+;   fscommand("SR_Log", "more button=" + button);
+;   if (button < 0) this.Defer("ShowSettings", 4);
+;   else if (button == 0) { this.ToggleAutosave(); this.Defer("ShowMore", 0); }
+;   else this.Defer("OpenDevTools", 1);
+    Push [reg1]
+    EA_PushConstByte 'OnMore'
+    .func2 ''(r3 'popup', r4 'button') flags=0x50129
+        EA_PushConstByte 'FSCommand:SR_Log'
+        EA_PushConstByte 'more button='
+        Push [reg4]
+        Add2
+        GetURL2
+        Push [reg4]
+        EA_PushZero
+        Less2
+        Not
+        If om_open
+        EA_PushByte 4
+        EA_PushConstByte 'ShowSettings'
+        EA_PushByte 2
+        Push [reg1]
+        EA_CallNamedMethodPop 'Defer'
+        op_76
+        Return
+om_open:
+        Push [reg4]
+        EA_PushZero
+        Equals2
+        Not
+        If om_n0
+        EA_PushZero
+        Push [reg1]
+        EA_CallNamedMethodPop 'ToggleAutosave'
+        EA_PushZero
+        EA_PushConstByte 'ShowMore'
+        EA_PushByte 2
+        Push [reg1]
+        EA_CallNamedMethodPop 'Defer'
+        op_76
+        Return
+om_n0:
+        EA_PushOne
+        EA_PushConstByte 'OpenDevTools'
+        EA_PushByte 2
+        Push [reg1]
+        EA_CallNamedMethodPop 'Defer'
+    .end
+    SetMember
+
+; fe.OpenMods(defBtn): the MODS pages (iter-464 modmenu; the same renderer as the Dev Tools
+; pages, kernel/mod_menu.cpp builds them); B on the first page comes back to the MAIN MENU with
+; MODS focused.
+;   _global.SRDevTools.Open("mods", "FE", this, "ShowMenu", 3);
+    Push [reg1]
+    EA_PushConstByte 'OpenMods'
+    .func2 ''(r3 'defBtn') flags=0x40129
+        EA_PushByte 3
+        EA_PushConstByte 'ShowMenu'
+        Push [reg1]
+        EA_PushConstByte 'FE'
+        EA_PushConstByte 'mods'
+        EA_PushByte 5
+        Push [reg2]
+        EA_GetNamedMember 'SRDevTools'
+        EA_CallNamedMethodPop 'Open'
+    .end
+    SetMember
+
+; ---- lane E L-b (step 5, STEP5_PLAN 10): OPTIONS, one screen (the PC SETTINGS host screen, its GAME tab first) ----
+; fe.OpenOptions(defBtn): the MAIN MENU's OPTIONS row. The game's own options as its getters return them go to the
+; host first (fscommand SR_GameOptionsLive, kernel/game_options.hpp: the GAME tab shows them), then the open
+; request (kernel/display_menu.cpp hands "display" to the OPTIONS overlay); the menu comes back under it with
+; OPTIONS focused.
+;   fscommand("SR_GameOptionsLive", "FE " + <snapshot>);
+;   _global.SRDevTools.Open("display", "FE", this, "ShowMenu", 2);
+    Push [reg1]
+    EA_PushConstByte 'OpenOptions'
+    .func2 ''(r3 'defBtn') flags=0x40129
+        EA_PushConstByte 'FSCommand:SR_GameOptionsLive'
+        EA_PushConstByte 'FE '
+.include 'snapshot_expr.aptasm'
+        Add2
+        GetURL2
+        EA_PushByte 2
+        EA_PushConstByte 'ShowMenu'
+        Push [reg1]
+        EA_PushConstByte 'FE'
+        EA_PushConstByte 'display'
+        EA_PushByte 5
+        Push [reg2]
+        EA_GetNamedMember 'SRDevTools'
+        EA_CallNamedMethodPop 'Open'
+    .end
+    SetMember
+
+; fe.SR_GameOptions(p, s): the host's call while OPTIONS is open (game_options_fn.aptasm; this.ApplyStore above).
+    Push [reg1]
+    EA_PushConstByte 'SR_GameOptions'
+.include 'game_options_fn.aptasm'
+    SetMember
+
+; fe.SR_OptionsClosed(what): the host's call once the OPTIONS screen is gone (kernel/game_options.hpp; the open hands
+; the screen over with SR_DTEnd action 3, so nothing of ours was shown under it).
+;   if (what == 1) { this.GoSettings(1); return; }   // VIEW PAD LAYOUT: the game's own CONTROLLER OPTIONS screen (its
+;                                                    // pad diagrams; Y = AIR / GROUND); its back -> the menu (20_settings)
+;   if (what == 2) { _global.SRDevTools.Open("main", "FE", this, "ShowMenu", 2); return; }   // DEV TOOLS (dev builds)
+;   this.ShowMenu(2);                                // the MAIN MENU, OPTIONS focused
+    Push [reg1]
+    EA_PushConstByte 'SR_OptionsClosed'
+    .func2 ''(r3 'what') flags=0x40129
+        Push [reg3]
+        EA_PushOne
+        Equals2
+        Not
+        If oc_n1
+        EA_PushOne
+        EA_PushOne
+        Push [reg1]
+        EA_CallNamedMethodPop 'GoSettings'
+        op_76
+        Return
+oc_n1:
+        Push [reg3]
+        EA_PushByte 2
+        Equals2
+        Not
+        If oc_n2
+        EA_PushByte 2
+        EA_PushConstByte 'ShowMenu'
+        Push [reg1]
+        EA_PushConstByte 'FE'
+        EA_PushConstByte 'main'
+        EA_PushByte 5
+        Push [reg2]
+        EA_GetNamedMember 'SRDevTools'
+        EA_CallNamedMethodPop 'Open'
+        op_76
+        Return
+oc_n2:
+        EA_PushByte 2
+        EA_PushOne
+        Push [reg1]
+        EA_CallNamedMethodPop 'ShowMenu'
+    .end
+    SetMember
+
+.include 'modopts_methods.aptasm'
+
+; FlowMgr.SR_OnHostSettings(p): the host's reply to SR_GetSettings (bound here, on every
+; load, before Install sends the command; Uninstall removes it again).
+    op_71
+    EA_GetNamedMember 'FlowMgr'
+    EA_PushConstByte 'SR_OnHostSettings'
+.include 'host_settings_fn.aptasm'
+    SetMember

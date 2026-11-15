@@ -1,0 +1,98 @@
+{
+  "name": "save-load-portfeat",
+  "purpose": "iter-465 save lane: LOAD GAME from the custom MAIN MENU with a save made by an earlier roll (requires.contentSeed: -Gates SR_CONTENT_DIR=<that roll's content root>), PORT FEATURES ON. MAIN MENU -> DOWN, A = LOAD GAME -> the game's slot picker (FillSlotInfo; LOAD mode focuses the first in-use slot) -> A -> LoadTask -> LoadComplete(true) -> the host slot tracker holds the slot -> the loaded game (first hour: straight into main_hud; past it: the METROPOLIS / FORTRESS menu). SR_DEVTOOLS=objstate (read-only) reports the restored chapter and objective bits. -Gates SR_PORT_FEATURES=1,SR_CONTENT_DIR=<seed>,SR_DEVTOOLS=objstate. -TimeoutSeconds 480.",
+  "gates": "SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=30,SR_PRESENT_DUMP_SPARSE_CAP=900",
+  "requires": {
+    "contentSeed": true
+  },
+  "steps": [
+    {
+      "name": "fe-alive",
+      "await": "\\[NAT_FE\\] #1 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "settle-title",
+      "await": "\\[NAT_FE\\] #256 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "press-start",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 4,
+      "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)",
+      "expectMs": 90000
+    },
+    {
+      "name": "title-ui-tail",
+      "await": "\\[APT_REQ\\] #15 path='\\.\\./common/ButtonHints/XBox360/HintB'",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "title-visible",
+      "requireVisibleMs": 8000,
+      "visibleTimeoutMs": 200000,
+      "dwellMs": 6000
+    },
+    {
+      "name": "start-bootflow",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 10000,
+      "expect": "\\[SR_FSCMD\\].*claim LoadCreate",
+      "expectMs": 30000
+    },
+    {
+      "name": "menu-visible",
+      "dwellMs": 4000
+    },
+    {
+      "name": "down-to-load",
+      "key": "DOWN",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "dwellMs": 1500
+    },
+    {
+      "name": "load-game",
+      "key": "A",
+      "holdMs": 1000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*answer cppId=\\S+ button=1",
+      "expectMs": 15000
+    },
+    {
+      "name": "slots-filled",
+      "purpose": "the slot picker's in-use slot is filled: its save image is requested (FillSlotInfo; the old [PATH_RESOLVE] marker cannot fire since iter-464's skip_lr). Counted only after LOAD GAME was entered",
+      "expect": "\\[APT_REQ\\] #\\d+ path='artassets/SaveImages/SaveImage_\\d+'",
+      "expectSince": "load-game",
+      "expectMs": 30000,
+      "dwellMs": 4000
+    },
+    {
+      "name": "load-slot",
+      "key": "A",
+      "holdMs": 1000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*SR_SaveEvent 'load' saveFlow\\+0x54=\\d -> slot \\d",
+      "expectMs": 30000
+    },
+    {
+      "name": "load-lands",
+      "purpose": "the loaded game's first screen: main_hud (first hour) or ScrMainMenu (past it); not expectFresh - LoadComplete requests it inside the same call (natural_load.json)",
+      "expect": "\\[APT_SCREEN\\] path='screens/(hud/main_hud|frontend/ScrMainMenu)'",
+      "expectMs": 120000
+    },
+    {
+      "name": "observe-after",
+      "dwellMs": 45000
+    }
+  ]
+}

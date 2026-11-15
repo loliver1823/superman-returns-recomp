@@ -1,0 +1,100 @@
+{
+  "name": "frontend-navigate",
+  "purpose": "Past the storage dialog, try to actually LEAVE the front end. The mode-select page renders no item text (known atlas defect, C-450UB/UC), so this navigates blind on purpose: text legibility is not required to find out whether the game can enter a mode at all. Answers the top backlog question - is there a blocker between the front end and gameplay?",
+  "gates": "SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1",
+  "steps": [
+    {
+      "name": "fe-alive",
+      "await": "\\[NAT_FE\\] #1 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "settle-title",
+      "await": "\\[NAT_FE\\] #256 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "press-start",
+      "key": "ENTER",
+      "holdMs": 250,
+      "maxPulses": 4,
+      "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)",
+      "expectMs": 90000
+    },
+    {
+      "name": "first-screen",
+      "expect": "\\[FE_SETSCREEN\\] #1 ",
+      "expectMs": 60000
+    },
+    {
+      "name": "clear-dialog",
+      "purpose": "Accept the storage dialog. Confirmed when the guest opens the device blade, which is the guest's own decision and therefore a real transition, not a guess.",
+      "key": "A",
+      "holdMs": 4000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 6,
+      "gapMs": 5000,
+      "expect": "XamShowDeviceSelectorUI\\(user=",
+      "expectMs": 60000
+    },
+    {
+      "name": "settle-modepage",
+      "purpose": "Let the mode-select page finish coming up before navigating it.",
+      "dwellMs": 60000
+    },
+    {
+      "name": "select-mode",
+      "purpose": "Press A on whatever is focused. Blind by necessity - the item text does not render.",
+      "key": "A",
+      "holdMs": 3000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 8000,
+      "optional": true
+    },
+    {
+      "name": "nav-down",
+      "purpose": "Move the selection. DOWN is an EXTENDED key - without KEYEVENTF_EXTENDEDKEY the guest never sees it (iter-450V).",
+      "key": "DOWN",
+      "holdMs": 3000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 4000,
+      "optional": true
+    },
+    {
+      "name": "select-again",
+      "key": "A",
+      "holdMs": 3000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 8000,
+      "optional": true
+    },
+    {
+      "name": "nav-up-select",
+      "purpose": "And the other direction, in case the first item was the wrong one.",
+      "key": "UP",
+      "holdMs": 3000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 2,
+      "gapMs": 4000,
+      "optional": true
+    },
+    {
+      "name": "select-third",
+      "key": "A",
+      "holdMs": 3000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 8000,
+      "optional": true
+    },
+    {
+      "name": "observe-gameplay",
+      "purpose": "THE MEASUREMENT. Four minutes to see whether anything leaves the front end.",
+      "dwellMs": 240000
+    }
+  ]
+}

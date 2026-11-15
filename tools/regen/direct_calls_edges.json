@@ -1,0 +1,209 @@
+{
+ "source": "archive/v1_gc3/cm8_prof/perf",
+ "thread": "slot17",
+ "files": [
+  14,
+  22
+ ],
+ "rule": "callee_bytes <= 2048, edge_self_pct >= 0.02, neither end overridden",
+ "edges": [
+  {
+   "caller": "sub_822E9260",
+   "callee": "sub_82782188",
+   "edge_self_pct": 1.445,
+   "callee_bytes": 416
+  },
+  {
+   "caller": "sub_82306248",
+   "callee": "sub_822E9260",
+   "edge_self_pct": 1.349,
+   "callee_bytes": 862
+  },
+  {
+   "caller": "sub_8261B050",
+   "callee": "sub_8260B800",
+   "edge_self_pct": 1.015,
+   "callee_bytes": 620
+  },
+  {
+   "caller": "sub_82614A08",
+   "callee": "sub_82608FC0",
+   "edge_self_pct": 0.919,
+   "callee_bytes": 1353
+  },
+  {
+   "caller": "sub_82614A08",
+   "callee": "sub_82611710",
+   "edge_self_pct": 0.907,
+   "callee_bytes": 957
+  },
+  {
+   "caller": "sub_8261B050",
+   "callee": "sub_8260B898",
+   "edge_self_pct": 0.478,
+   "callee_bytes": 620
+  },
+  {
+   "caller": "sub_82614A08",
+   "callee": "sub_826090E8",
+   "edge_self_pct": 0.43,
+   "callee_bytes": 807
+  },
+  {
+   "caller": "sub_82316958",
+   "callee": "sub_82318E28",
+   "edge_self_pct": 0.394,
+   "callee_bytes": 1009
+  },
+  {
+   "caller": "sub_826148B0",
+   "callee": "sub_826090E8",
+   "edge_self_pct": 0.275,
+   "callee_bytes": 807
+  },
+  {
+   "caller": "sub_826148B0",
+   "callee": "sub_82608FC0",
+   "edge_self_pct": 0.227,
+   "callee_bytes": 1353
+  },
+  {
+   "caller": "sub_820F33E8",
+   "callee": "sub_82468EF8",
+   "edge_self_pct": 0.215,
+   "callee_bytes": 137
+  },
+  {
+   "caller": "sub_8261B610",
+   "callee": "sub_82612ED8",
+   "edge_self_pct": 0.203,
+   "callee_bytes": 2038
+  },
+  {
+   "caller": "sub_822E9FA8",
+   "callee": "sub_822E9260",
+   "edge_self_pct": 0.119,
+   "callee_bytes": 862
+  },
+  {
+   "caller": "sub_822FC7C0",
+   "callee": "sub_822E5AD0",
+   "edge_self_pct": 0.096,
+   "callee_bytes": 1664
+  },
+  {
+   "caller": "sub_82306248",
+   "callee": "sub_827877A8",
+   "edge_self_pct": 0.084,
+   "callee_bytes": 1129
+  },
+  {
+   "caller": "sub_82617AE8",
+   "callee": "sub_8260B800",
+   "edge_self_pct": 0.06,
+   "callee_bytes": 620
+  },
+  {
+   "caller": "sub_826148B0",
+   "callee": "sub_82611710",
+   "edge_self_pct": 0.06,
+   "callee_bytes": 957
+  },
+  {
+   "caller": "sub_82316958",
+   "callee": "sub_822FEBF0",
+   "edge_self_pct": 0.048,
+   "callee_bytes": 1257
+  },
+  {
+   "caller": "sub_82301150",
+   "callee": "sub_825F4648",
+   "edge_self_pct": 0.048,
+   "callee_bytes": 1644
+  },
+  {
+   "caller": "sub_82300328",
+   "callee": "sub_82609500",
+   "edge_self_pct": 0.048,
+   "callee_bytes": 770
+  },
+  {
+   "caller": "sub_82614A08",
+   "callee": "sub_826146B0",
+   "edge_self_pct": 0.036,
+   "callee_bytes": 437
+  },
+  {
+   "caller": "sub_82783B48",
+   "callee": "sub_8279A888",
+   "edge_self_pct": 0.036,
+   "callee_bytes": 1943
+  },
+  {
+   "caller": "sub_826169E0",
+   "callee": "sub_82609DF0",
+   "edge_self_pct": 0.036,
+   "callee_bytes": 669
+  },
+  {
+   "caller": "sub_82612A38",
+   "callee": "sub_82617AE8",
+   "edge_self_pct": 0.024,
+   "callee_bytes": 417
+  },
+  {
+   "caller": "sub_82617AE8",
+   "callee": "sub_8260B898",
+   "edge_self_pct": 0.024,
+   "callee_bytes": 620
+  },
+  {
+   "caller": "sub_823086C8",
+   "callee": "sub_822E9FA8",
+   "edge_self_pct": 0.024,
+   "callee_bytes": 1168
+  },
+  {
+   "caller": "sub_82614758",
+   "callee": "sub_826146B0",
+   "edge_self_pct": 0.024,
+   "callee_bytes": 437
+  },
+  {
+   "caller": "sub_82614758",
+   "callee": "sub_82608FC0",
+   "edge_self_pct": 0.024,
+   "callee_bytes": 1353
+  },
+  {
+   "caller": "sub_822E6700",
+   "callee": "sub_82782188",
+   "edge_self_pct": 0.024,
+   "callee_bytes": 416
+  },
+  {
+   "caller": "sub_82318718",
+   "callee": "sub_82775BF0",
+   "edge_self_pct": 0.024,
+   "callee_bytes": 291
+  },
+  {
+   "caller": "sub_822FEBF0",
+   "callee": "sub_827877A8",
+   "edge_self_pct": 0.024,
+   "callee_bytes": 1129
+  },
+  {
+   "caller": "sub_82753668",
+   "callee": "sub_827263E0",
+   "edge_self_pct": 0.024,
+   "callee_bytes": 1266
+  },
+  {
+   "caller": "sub_82602968",
+   "callee": "sub_825F9848",
+   "edge_self_pct": 0.024,
+   "callee_bytes": 165
+  }
+ ]
+}

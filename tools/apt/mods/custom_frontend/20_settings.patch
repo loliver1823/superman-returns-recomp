@@ -1,0 +1,35 @@
+# custom_frontend step 7 (docs/CUSTOM_FRONTEND.md sections 0, 5.2): the game's own three
+# options screens, opened from the menu's SETTINGS panel (srfrontend.aptasm GoSettings).
+#
+# HandleInput prepend: while the custom front end opened the screen and the game is in its
+# front end, B / Esc / START go back to the menu (the game's own Back goes to CONTROL_ROOM
+# or nowhere outside the pause menu). The pause menu's use of the same screens is untouched.
+#
+# ExitScreen append: capture the game's live options (after the game's own ExitScreen
+# applied them) into _global.SRSettings and the host store (fscommand SR_SetSettings), in
+# the front end AND in game - that is how pause-menu changes reach the menu next time.
+movie SCRGAMEPLAYOPT
+prepend-to function HandleInput in ScrGameplayOpt file=options_input_head.aptasm
+append-to function ExitScreen in ScrGameplayOpt
+.const TAG = 'ScrGameplayOpt '
+.include 'options_exit_tail.aptasm'
+end
+
+movie SCRCONTROLLEROPT
+prepend-to function HandleInput in ScrControllerOpt file=options_input_head.aptasm
+append-to function ExitScreen in ScrControllerOpt
+.const TAG = 'ScrControllerOpt '
+.include 'options_exit_tail.aptasm'
+end
+
+movie SCRAUDIOOPT
+prepend-to function HandleInput in ScrAudioOpt file=options_input_head.aptasm
+append-to function ExitScreen in ScrAudioOpt
+.const TAG = 'ScrAudioOpt '
+.include 'options_exit_tail.aptasm'
+end
+
+# An in-game LOAD (pause menu SAVE/LOAD screen): re-apply the store after the save's own
+# options were restored (apply_to_loaded_saves).
+movie SCRSAVELOAD
+prepend-to function LoadComplete in ScrSaveLoad file=saveload_loadcomplete_head.aptasm

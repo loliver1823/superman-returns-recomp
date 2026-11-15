@@ -1,0 +1,15 @@
+[
+  {
+    "guest_va": "0x8279e494",
+    "fn": "sub_8279E494",
+    "case_id": "bctr_inrange",
+    "inputs": {
+      "regs": {
+        "r4": "0x82670774"
+      },
+      "mem": {}
+    },
+    "oracle": "hand",
+    "status": "faulted"
+  }
+]

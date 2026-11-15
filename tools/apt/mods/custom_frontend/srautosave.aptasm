@@ -1,0 +1,952 @@
+; iter-464 "Autosave without asking" (docs/CUSTOM_FRONTEND.md 5.6): appended to MAIN_HUD's
+; BistroBaseScreen class InitAction (sprite 64, its own 11-entry ConstantPool: Main_Hud's
+; class block already holds 243 of the 256 one-byte pool slots), after its guarded class
+; body, so it runs on every load of the HUD. Pseudo-AS:
+;
+;   if (_global.SRAutoSave == undefined) _global.SRAutoSave = new Object();   // plain state lives on
+;   var sa = _global.SRAutoSave;                                              // methods: re-bound per load
+;   sa.Hud(ev, hud, arg)   the entry HudLoaded calls (ev 1; iter-465: ev 3/4 are no longer sent - a call
+;                          from a C++-called Main_Hud function never runs, 30_autosave.patch):
+;                          1 HudLoaded -> Install(hud)
+;                          (true = handled); 3 SaveComplete(arg) / 4 LoadComplete(arg) -> the host's
+;                          current-slot tracker (fscommand SR_SaveEvent)
+;   sa.Install(hud)        FlowMgr.CppShowPopup = CppShowPopupHook (owner "hud"; the shared
+;                          SR_OrigCppShowPopup slot keeps the game's own function), fetch the options
+;   sa.Teardown()          restore + delete every method but Teardown (Main_Hud.ExitScreen deletes
+;                          Teardown after it returned: no function object of MAIN_HUD outlives it)
+;   sa.CppShowPopupHook    the game's popups while in game; three are save-flow popups:
+;                          PromptInGameSave (k 1), SaveLoad_SaveMessage = overwrite? (k 2),
+;                          SaveSuccessful (k 3). With the setting on, k 1 starts an autosave and
+;                          is answered "Save Game" (button 0); while that autosave runs, k 2 is
+;                          answered "Yes" (0) and k 3 "OK" (0): the game's own answers, through
+;                          GlobalAdapter.CppPopupComplete, exactly as a player's A press would
+;                          (deferred: the C++ stores the popup id after this call returns).
+;                          The popup is never shown. Everything else goes to the game unchanged.
+;   sa.PrepSlots()         the autosave answered Save Game: before the game opens its slot picker
+;                          (ShowSaveSlots, from C++), its FillSlotInfo and Show become ours (hidden)
+;   sa.HiddenShow()        the picker's own Show, then _visible = false
+;   sa.FillHook(pArray)    (this = the picker) the slot: the current one (the host's tracker:
+;                          loaded from / last saved), else the first EMPTY one; none = the
+;                          picker is shown and the player chooses (no silent overwrite)
+;   sa.PressSlot()         the picker's own A press on that slot (HandleInput CROSS -> SaveTask)
+; Methods bound below must be deleted in Teardown (build_custom_frontend checks the list).
+    op_71
+    EA_GetNamedMember 'SRAutoSave'
+    op_76
+    Equals2
+    Not
+    If sa_have
+    op_71
+    EA_PushConstByte 'SRAutoSave'
+    EA_PushZero
+    EA_PushConstByte 'Object'
+    NewObject
+    SetMember
+sa_have:
+    op_71
+    EA_GetNamedMember 'SRAutoSave'
+    StoreRegister 1
+    Pop
+
+; Hud(ev, hud, arg)
+    Push [reg1]
+    EA_PushConstByte 'Hud'
+    .func2 ''(r3 'ev', r4 'hud', r5 'arg') flags=0x60129
+        EA_PushConstByte 'FSCommand:SR_Log'
+        EA_PushConstByte 'autosave hud ev='
+        Push [reg3]
+        Add2
+        EA_PushConstByte ' active='
+        Add2
+        Push [reg1]
+        EA_GetNamedMember 'active'
+        Add2
+        GetURL2
+        Push [reg3]
+        EA_PushOne
+        Equals2
+        Not
+        If hd_n1
+        Push [reg4]
+        EA_PushOne
+        Push [reg1]
+        EA_CallNamedMethodPop 'Install'
+        op_76
+        Return
+hd_n1:
+        Push [reg3]
+        EA_PushByte 3
+        Equals2
+        Not
+        If hd_n3
+        EA_PushConstByte 'FSCommand:SR_Log'
+        EA_PushConstByte 'autosave save complete ok='
+        Push [reg5]
+        Add2
+        EA_PushConstByte ' auto='
+        Add2
+        Push [reg1]
+        EA_GetNamedMember 'active'
+        Add2
+        GetURL2
+        Push [reg5]
+        Not
+        If hd_sfail
+        GetURL 'FSCommand:SR_SaveEvent', 'save'
+        Jump hd_sdone
+hd_sfail:
+        ; a failed autosave: Main_Hud.SaveComplete(false) raises the game's CancelInGameSave
+        ; next (HudAdapter.CanceledSaveGame); answer it Continue (skipNext), never show it
+        Push [reg1]
+        EA_GetNamedMember 'active'
+        Not
+        If hd_sdone
+        Push [reg1]
+        EA_PushConstByte 'skipNext'
+        op_73
+        SetMember
+hd_sdone:
+        Push [reg1]
+        EA_PushConstByte 'active'
+        op_74
+        SetMember
+        op_76
+        Return
+hd_n3:
+        Push [reg3]
+        EA_PushByte 4
+        Equals2
+        Not
+        If hd_end
+        Push [reg5]
+        Not
+        If hd_end
+        GetURL 'FSCommand:SR_SaveEvent', 'load'
+hd_end:
+    .end
+    SetMember
+
+; Install(hud)
+    Push [reg1]
+    EA_PushConstByte 'Install'
+    .func2 ''(r3 'hud') flags=0x50129
+        GetURL 'FSCommand:SR_Log', 'autosave install'
+        Push [reg1]
+        EA_PushConstByte 'hud'
+        Push [reg3]
+        SetMember
+        Push [reg2]
+        EA_GetNamedMember 'FlowMgr'
+        StoreRegister 4
+        Pop
+        Push [reg4]
+        EA_GetNamedMember 'SR_OrigCppShowPopup'
+        op_76
+        Equals2
+        Not
+        If in_haveorig
+        Push [reg4]
+        EA_PushConstByte 'SR_OrigCppShowPopup'
+        Push [reg4]
+        EA_GetNamedMember 'CppShowPopup'
+        SetMember
+in_haveorig:
+        Push [reg4]
+        EA_PushConstByte 'CppShowPopup'
+        Push [reg1]
+        EA_GetNamedMember 'CppShowPopupHook'
+        SetMember
+        Push [reg4]
+        EA_PushConstByte 'SR_PopupHookOwner'
+        EA_PushConstByte 'hud'
+        SetMember
+        EA_PushZero
+        Push [reg1]
+        EA_CallNamedMethodPop 'FetchModOptions'
+    .end
+    SetMember
+
+; CppShowPopupHook(t, b, n, def, opts, can, close, col, cppId, delay): same 10 arguments as
+; FlowMgr.CppShowPopup (MainLib.as 0x2345); reg13 = SRAutoSave, reg14 = k.
+    Push [reg1]
+    EA_PushConstByte 'CppShowPopupHook'
+    .func2 ''(r3 't', r4 'b', r5 'n', r6 'def', r7 'opts', r8 'can', r9 'close', r10 'col', r11 'cppId', r12 'delay') flags=0xF0129
+        Push [reg2]
+        EA_GetNamedMember 'SRAutoSave'
+        StoreRegister 13
+        Pop
+        EA_PushZero
+        StoreRegister 14
+        Pop
+        EA_PushConstByte 'PromptInGameSave_Title'
+        Push [reg3]
+        EA_PushByte 2
+        Push [reg13]
+        EA_PushConstByte 'IsTitle'
+        CallMethod
+        Not
+        If ch_n1
+        EA_PushOne
+        StoreRegister 14
+        Pop
+        Jump ch_k
+ch_n1:
+        EA_PushConstByte 'SaveLoad_SaveMessage_Title'
+        Push [reg3]
+        EA_PushByte 2
+        Push [reg13]
+        EA_PushConstByte 'IsTitle'
+        CallMethod
+        Not
+        If ch_n2
+        EA_PushByte 2
+        StoreRegister 14
+        Pop
+        Jump ch_k
+ch_n2:
+        EA_PushConstByte 'SaveSuccessful_Title'
+        Push [reg3]
+        EA_PushByte 2
+        Push [reg13]
+        EA_PushConstByte 'IsTitle'
+        CallMethod
+        Not
+        If ch_n3
+        EA_PushByte 3
+        StoreRegister 14
+        Pop
+        Jump ch_k
+ch_n3:
+        EA_PushConstByte 'CancelInGameSave_Title'
+        Push [reg3]
+        EA_PushByte 2
+        Push [reg13]
+        EA_PushConstByte 'IsTitle'
+        CallMethod
+        Not
+        If ch_k
+        EA_PushByte 4
+        StoreRegister 14
+        Pop
+ch_k:
+        Push [reg14]
+        EA_PushZero
+        Equals2
+        If ch_pass
+        EA_PushConstByte 'FSCommand:SR_Log'
+        EA_PushConstByte 'save popup k='
+        Push [reg14]
+        Add2
+        EA_PushConstByte ' cppId='
+        Add2
+        Push [reg11]
+        Add2
+        EA_PushConstByte ' active='
+        Add2
+        Push [reg13]
+        EA_GetNamedMember 'active'
+        Add2
+        GetURL2
+        Push [reg14]
+        EA_PushByte 2
+        Equals2
+        Not
+        If ch_nlatch
+        GetURL 'FSCommand:SR_SaveEvent', 'overwrite'
+ch_nlatch:
+        Push [reg14]
+        EA_PushOne
+        Equals2
+        Not
+        If ch_nprompt
+        ; the prompt: the options fresh from the host (the pause menu may have changed them);
+        ; setting OFF = the game asks, as on a console (the popup is shown, nothing answered)
+        EA_PushZero
+        Push [reg13]
+        EA_CallNamedMethodPop 'FetchModOptions'
+        EA_PushZero
+        Push [reg13]
+        EA_PushConstByte 'AutosaveOn'
+        CallMethod
+        Not
+        If ch_pass
+        ; setting ON while a level skip is armed or running (host bit 10): the plan's own answer,
+        ; Continue Without Saving (button 1) - a dev-tool run never writes the player's save slots
+        Push [reg2]
+        EA_GetNamedMember 'SRModOptions'
+        EA_PushShort 1024
+        BitAnd
+        EA_PushZero
+        Equals2
+        If ch_nskip
+        GetURL 'FSCommand:SR_Log', 'level skip active: continue without saving'
+        EA_PushOne
+        Push [reg11]
+        EA_PushByte 2
+        Push [reg13]
+        EA_CallNamedMethodPop 'Answer'
+        op_76
+        Return
+ch_nskip:
+        Push [reg13]
+        EA_PushConstByte 'active'
+        op_73
+        SetMember
+        EA_PushZero
+        Push [reg13]
+        EA_CallNamedMethodPop 'PrepSlots'
+        Jump ch_answer
+ch_nprompt:
+        Push [reg14]
+        EA_PushByte 4
+        Equals2
+        Not
+        If ch_nk4
+        Push [reg13]
+        EA_GetNamedMember 'skipNext'
+        Push [reg13]
+        EA_GetNamedMember 'active'
+        Or
+        Not
+        If ch_pass
+        Push [reg13]
+        EA_PushConstByte 'skipNext'
+        op_74
+        SetMember
+        Push [reg13]
+        EA_PushConstByte 'active'
+        op_74
+        SetMember
+        Jump ch_answer
+ch_nk4:
+        Push [reg13]
+        EA_GetNamedMember 'active'
+        Not
+        If ch_pass
+        Push [reg14]
+        EA_PushByte 3
+        Equals2
+        Not
+        If ch_answer
+        GetURL 'FSCommand:SR_Log', 'autosave saved (SAVE SUCCESSFUL answered OK)'
+        GetURL 'FSCommand:SR_SaveEvent', 'save'
+        Push [reg13]
+        EA_PushConstByte 'active'
+        op_74
+        SetMember
+ch_answer:
+        EA_PushZero
+        Push [reg11]
+        EA_PushByte 2
+        Push [reg13]
+        EA_CallNamedMethodPop 'Answer'
+        op_76
+        Return
+ch_pass:
+        Push [reg12]
+        Push [reg11]
+        Push [reg10]
+        Push [reg9]
+        Push [reg8]
+        Push [reg7]
+        Push [reg6]
+        Push [reg5]
+        Push [reg4]
+        Push [reg3]
+        EA_PushByte 10
+        Push [reg2]
+        EA_GetNamedMember 'FlowMgr'
+        EA_CallNamedMethodPop 'SR_OrigCppShowPopup'
+    .end
+    SetMember
+
+; IsTitle(t, key): t is the key itself (sub_822B15F8 passes the title as a literal) or its text
+    Push [reg1]
+    EA_PushConstByte 'IsTitle'
+    .func2 ''(r3 't', r4 'key') flags=0x50129
+        Push [reg3]
+        Push [reg4]
+        Equals2
+        Not
+        If it_loc
+        op_73
+        Return
+it_loc:
+        Push [reg3]
+        Push [reg4]
+        EA_PushOne
+        Push [reg2]
+        EA_GetNamedMember 'LocalizationAdapter'
+        EA_PushConstByte 'GetLocalizedText'
+        CallMethod
+        Equals2
+        Return
+    .end
+    SetMember
+
+; Answer(id, button): the game's own answer path, deferred one interval
+    Push [reg1]
+    EA_PushConstByte 'Answer'
+    .func2 ''(r3 'id', r4 'button') flags=0x50129
+        EA_PushConstByte 'FSCommand:SR_Log'
+        EA_PushConstByte 'autosave answer cppId='
+        Push [reg3]
+        Add2
+        EA_PushConstByte ' button='
+        Add2
+        Push [reg4]
+        Add2
+        GetURL2
+        Push [reg1]
+        EA_PushConstByte 'ansId'
+        Push [reg3]
+        SetMember
+        Push [reg1]
+        EA_PushConstByte 'ansBtn'
+        Push [reg4]
+        SetMember
+        EA_PushConstByte 'RunAnswer'
+        EA_PushOne
+        Push [reg1]
+        EA_CallNamedMethodPop 'Defer'
+    .end
+    SetMember
+
+    Push [reg1]
+    EA_PushConstByte 'RunAnswer'
+    .func2 ''() flags=0x30129
+        Push [reg1]
+        EA_GetNamedMember 'ansBtn'
+        Push [reg1]
+        EA_GetNamedMember 'ansId'
+        EA_PushByte 2
+        Push [reg2]
+        EA_GetNamedMember 'GlobalAdapter'
+        EA_CallNamedMethodPop 'CppPopupComplete'
+    .end
+    SetMember
+
+; Defer(fn) / RunDeferred(): setInterval(this, "RunDeferred", 20), fired once (the game's own
+; ShowPopupDelayed pattern; srfrontend.aptasm Defer)
+    Push [reg1]
+    EA_PushConstByte 'Defer'
+    .func2 ''(r3 'fn') flags=0x40129
+        Push [reg1]
+        EA_GetNamedMember 'deferId'
+        op_76
+        Equals2
+        If df_clear
+        Push [reg1]
+        EA_GetNamedMember 'deferId'
+        EA_PushOne
+        EA_PushConstByte 'clearInterval'
+        CallFunction
+        Pop
+df_clear:
+        Push [reg1]
+        EA_PushConstByte 'deferFn'
+        Push [reg3]
+        SetMember
+        Push [reg1]
+        EA_PushConstByte 'deferId'
+        EA_PushByte 20
+        EA_PushConstByte 'RunDeferred'
+        Push [reg1]
+        EA_PushByte 3
+        EA_PushConstByte 'setInterval'
+        CallFunction
+        SetMember
+    .end
+    SetMember
+
+    Push [reg1]
+    EA_PushConstByte 'RunDeferred'
+    .func2 ''() flags=0x30129
+        Push [reg1]
+        EA_GetNamedMember 'deferId'
+        EA_PushOne
+        EA_PushConstByte 'clearInterval'
+        CallFunction
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'deferId'
+        op_76
+        SetMember
+        Push [reg1]
+        EA_GetNamedMember 'hud'
+        op_76
+        Equals2
+        If rd_end
+        EA_PushZero
+        Push [reg1]
+        Push [reg1]
+        EA_GetNamedMember 'deferFn'
+        CallMethod
+        Pop
+rd_end:
+    .end
+    SetMember
+
+; PrepSlots(): called by the hook when the autosave answers Save Game, BEFORE the game opens its
+; slot picker (Main_Hud.ShowSaveSlots = RegisterListener(this); mSlots.Start(0), which ends in
+; this.Show()). Instance members over the SaveLoadSlots prototype: Show keeps the picker hidden,
+; FillSlotInfo (the game's slot info, from C++) picks the slot. (iter-465: a prepend on
+; ShowSaveSlots - a function the C++ calls - never reached SRAutoSave, archive/v1_save/rolls/p1.)
+    Push [reg1]
+    EA_PushConstByte 'PrepSlots'
+    .func2 ''() flags=0x40129
+        EA_PushZero
+        Push [reg1]
+        EA_CallNamedMethodPop 'Refresh'
+        Push [reg1]
+        EA_GetNamedMember 'hud'
+        EA_GetNamedMember 'mSlots'
+        StoreRegister 3
+        Pop
+        Push [reg3]
+        EA_PushConstByte 'SR_OrigFill'
+        Push [reg3]
+        EA_GetNamedMember 'FillSlotInfo'
+        SetMember
+        Push [reg3]
+        EA_PushConstByte 'FillSlotInfo'
+        Push [reg1]
+        EA_GetNamedMember 'FillHook'
+        SetMember
+        Push [reg3]
+        EA_PushConstByte 'SR_OrigShow'
+        Push [reg3]
+        EA_GetNamedMember 'Show'
+        SetMember
+        Push [reg3]
+        EA_PushConstByte 'Show'
+        Push [reg1]
+        EA_GetNamedMember 'HiddenShow'
+        SetMember
+        EA_PushConstByte 'FSCommand:SR_Log'
+        EA_PushConstByte 'autosave slots (hidden) current='
+        Push [reg1]
+        EA_GetNamedMember 'slot'
+        Add2
+        GetURL2
+    .end
+    SetMember
+; HiddenShow(): this = the HUD's SaveLoadSlots; the game's own Show, then hidden
+    Push [reg1]
+    EA_PushConstByte 'HiddenShow'
+    .func2 ''() flags=0x20129
+        EA_PushZero
+        Push [reg1]
+        EA_CallNamedMethodPop 'SR_OrigShow'
+        Push [reg1]
+        EA_PushConstByte '_visible'
+        op_74
+        SetMember
+    .end
+    SetMember
+
+; Refresh(): the current slot from the host (reply FlowMgr.SR_OnHostSlot, bound only around it)
+    Push [reg1]
+    EA_PushConstByte 'Refresh'
+    .func2 ''() flags=0x40129
+        Push [reg2]
+        EA_GetNamedMember 'FlowMgr'
+        StoreRegister 3
+        Pop
+        Push [reg3]
+        EA_PushConstByte 'SR_OnHostSlot'
+        Push [reg1]
+        EA_GetNamedMember 'OnSlot'
+        SetMember
+        GetURL 'FSCommand:SR_SaveEvent', 'query'
+        Push [reg3]
+        EA_PushConstByte 'SR_OnHostSlot'
+        Delete
+        Pop
+    .end
+    SetMember
+
+; OnSlot(s): invoked as FlowMgr.SR_OnHostSlot (this = FlowMgr)
+    Push [reg1]
+    EA_PushConstByte 'OnSlot'
+    .func2 ''(r3 's') flags=0x40129
+        Push [reg2]
+        EA_GetNamedMember 'SRAutoSave'
+        EA_PushConstByte 'slot'
+        Push [reg3]
+        SetMember
+    .end
+    SetMember
+
+; FillHook(pArray): this = the HUD's SaveLoadSlots (an instance member over the prototype's)
+    Push [reg1]
+    EA_PushConstByte 'FillHook'
+    .func2 ''(r3 'pArray') flags=0x60129
+        Push [reg2]
+        EA_GetNamedMember 'SRAutoSave'
+        StoreRegister 4
+        Pop
+        Push [reg3]
+        EA_PushOne
+        Push [reg1]
+        EA_CallNamedMethodPop 'SR_OrigFill'
+        Push [reg4]
+        EA_GetNamedMember 'active'
+        If fh_active
+        op_76
+        Return
+fh_active:
+        Push [reg4]
+        EA_GetNamedMember 'slot'
+        StoreRegister 5
+        Pop
+        Push [reg5]
+        op_76
+        Equals2
+        If fh_empty
+        Push [reg5]
+        EA_PushZero
+        Less2
+        If fh_empty
+        Push [reg5]
+        EA_PushByte 2
+        Greater
+        If fh_empty
+        Jump fh_pick
+fh_empty:
+        EA_PushZero
+        EA_PushOne
+        Subtract
+        StoreRegister 5
+        Pop
+        Push [reg3]
+        EA_PushByte 2
+        GetMember
+        EA_GetNamedMember 'IsSlotInUse'
+        If fh_e1
+        EA_PushByte 2
+        StoreRegister 5
+        Pop
+fh_e1:
+        Push [reg3]
+        EA_PushOne
+        GetMember
+        EA_GetNamedMember 'IsSlotInUse'
+        If fh_e0
+        EA_PushOne
+        StoreRegister 5
+        Pop
+fh_e0:
+        Push [reg3]
+        EA_PushZero
+        GetMember
+        EA_GetNamedMember 'IsSlotInUse'
+        If fh_pick
+        EA_PushZero
+        StoreRegister 5
+        Pop
+fh_pick:
+        EA_PushConstByte 'FSCommand:SR_Log'
+        EA_PushConstByte 'autosave pick slot='
+        Push [reg5]
+        Add2
+        EA_PushConstByte ' current='
+        Add2
+        Push [reg4]
+        EA_GetNamedMember 'slot'
+        Add2
+        GetURL2
+        Push [reg5]
+        EA_PushZero
+        Less2
+        Not
+        If fh_go
+        GetURL 'FSCommand:SR_Log', 'autosave: no current or empty slot - continue without saving'
+        Push [reg4]
+        EA_PushConstByte 'skipNext'
+        op_73
+        SetMember
+        EA_PushConstByte 'CancelSlots'
+        EA_PushOne
+        Push [reg4]
+        EA_CallNamedMethodPop 'Defer'
+        op_76
+        Return
+fh_go:
+        Push [reg1]
+        EA_PushConstByte 'btn'
+        Push [reg5]
+        EA_PushOne
+        Add2
+        Add2
+        GetMember
+        EA_PushOne
+        Push [reg1]
+        EA_GetNamedMember 'mFM'
+        EA_CallNamedMethodPop 'selectItem'
+        Push [reg4]
+        EA_PushConstByte 'target'
+        Push [reg5]
+        SetMember
+        EA_PushConstByte 'PressSlot'
+        EA_PushOne
+        Push [reg4]
+        EA_CallNamedMethodPop 'Defer'
+    .end
+    SetMember
+
+; PressSlot(): the picker's own A on the chosen slot -> SaveLoadAdapter.SaveTask(slot)
+    Push [reg1]
+    EA_PushConstByte 'PressSlot'
+    .func2 ''() flags=0x40129
+        Push [reg1]
+        EA_GetNamedMember 'hud'
+        EA_GetNamedMember 'mSlots'
+        StoreRegister 3
+        Pop
+        Push [reg3]
+        EA_PushConstByte 'FillSlotInfo'
+        Delete
+        Pop
+        Push [reg3]
+        EA_PushConstByte 'SR_OrigFill'
+        Delete
+        Pop
+        Push [reg3]
+        EA_PushConstByte 'Show'
+        Delete
+        Pop
+        Push [reg3]
+        EA_PushConstByte 'SR_OrigShow'
+        Delete
+        Pop
+        EA_PushConstByte 'FSCommand:SR_Log'
+        EA_PushConstByte 'autosave press slot='
+        Push [reg1]
+        EA_GetNamedMember 'target'
+        Add2
+        GetURL2
+        EA_PushZero
+        EA_PushZero
+        Push [reg2]
+        EA_GetNamedMember 'INPUTCODE'
+        EA_GetNamedMember 'CROSS'
+        EA_PushByte 3
+        Push [reg3]
+        EA_PushConstByte 'HandleInput'
+        CallMethod
+        Pop
+    .end
+    SetMember
+
+; CancelSlots(): the picker's own B (Main_Hud.HandleInput TRIANGLE: HideSaveSlots;
+; HudAdapter.CanceledSaveGame) - the game then raises CancelInGameSave, answered Continue (k 4)
+    Push [reg1]
+    EA_PushConstByte 'CancelSlots'
+    .func2 ''() flags=0x40129
+        Push [reg1]
+        EA_GetNamedMember 'hud'
+        StoreRegister 3
+        Pop
+        Push [reg3]
+        EA_GetNamedMember 'mSlots'
+        EA_PushConstByte 'FillSlotInfo'
+        Delete
+        Pop
+        Push [reg3]
+        EA_GetNamedMember 'mSlots'
+        EA_PushConstByte 'SR_OrigFill'
+        Delete
+        Pop
+        Push [reg3]
+        EA_GetNamedMember 'mSlots'
+        EA_PushConstByte 'Show'
+        Delete
+        Pop
+        Push [reg3]
+        EA_GetNamedMember 'mSlots'
+        EA_PushConstByte 'SR_OrigShow'
+        Delete
+        Pop
+        EA_PushZero
+        Push [reg3]
+        EA_CallNamedMethodPop 'HideSaveSlots'
+        EA_PushZero
+        Push [reg2]
+        EA_GetNamedMember 'HudAdapter'
+        EA_CallNamedMethodPop 'CanceledSaveGame'
+    .end
+    SetMember
+; the shared option methods (AutosaveOn, AutosaveLabel, OnModOptions, FetchModOptions,
+; ToggleAutosave)
+.include 'modopts_methods.aptasm'
+
+; Teardown(): Main_Hud.ExitScreen; restores what Install changed and deletes every other method
+    Push [reg1]
+    EA_PushConstByte 'Teardown'
+    .func2 ''() flags=0x40129
+        GetURL 'FSCommand:SR_Log', 'autosave teardown'
+        Push [reg2]
+        EA_GetNamedMember 'FlowMgr'
+        StoreRegister 3
+        Pop
+        Push [reg3]
+        EA_GetNamedMember 'SR_PopupHookOwner'
+        EA_PushConstByte 'hud'
+        Equals2
+        Not
+        If td_nothook
+        Push [reg3]
+        EA_PushConstByte 'CppShowPopup'
+        Push [reg3]
+        EA_GetNamedMember 'SR_OrigCppShowPopup'
+        SetMember
+        Push [reg3]
+        EA_PushConstByte 'SR_OrigCppShowPopup'
+        Delete
+        Pop
+        Push [reg3]
+        EA_PushConstByte 'SR_PopupHookOwner'
+        Delete
+        Pop
+td_nothook:
+        Push [reg1]
+        EA_GetNamedMember 'deferId'
+        op_76
+        Equals2
+        If td_nodefer
+        Push [reg1]
+        EA_GetNamedMember 'deferId'
+        EA_PushOne
+        EA_PushConstByte 'clearInterval'
+        CallFunction
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'deferId'
+        op_76
+        SetMember
+td_nodefer:
+        Push [reg1]
+        EA_GetNamedMember 'hud'
+        op_76
+        Equals2
+        If td_nohud
+        Push [reg1]
+        EA_GetNamedMember 'hud'
+        EA_GetNamedMember 'mSlots'
+        EA_PushConstByte 'FillSlotInfo'
+        Delete
+        Pop
+        Push [reg1]
+        EA_GetNamedMember 'hud'
+        EA_GetNamedMember 'mSlots'
+        EA_PushConstByte 'SR_OrigFill'
+        Delete
+        Pop
+        Push [reg1]
+        EA_GetNamedMember 'hud'
+        EA_GetNamedMember 'mSlots'
+        EA_PushConstByte 'Show'
+        Delete
+        Pop
+        Push [reg1]
+        EA_GetNamedMember 'hud'
+        EA_GetNamedMember 'mSlots'
+        EA_PushConstByte 'SR_OrigShow'
+        Delete
+        Pop
+td_nohud:
+        Push [reg1]
+        EA_PushConstByte 'hud'
+        op_76
+        SetMember
+        Push [reg1]
+        EA_PushConstByte 'active'
+        op_74
+        SetMember
+        Push [reg1]
+        EA_PushConstByte 'Hud'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'Install'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'CppShowPopupHook'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'IsTitle'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'Answer'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'RunAnswer'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'Defer'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'RunDeferred'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'PrepSlots'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'HiddenShow'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'Refresh'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'OnSlot'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'FillHook'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'PressSlot'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'CancelSlots'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'skipNext'
+        op_74
+        SetMember
+        Push [reg1]
+        EA_PushConstByte 'AutosaveOn'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'AutosaveLabel'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'OnModOptions'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'FetchModOptions'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'ToggleAutosave'
+        Delete
+        Pop
+    .end
+    SetMember

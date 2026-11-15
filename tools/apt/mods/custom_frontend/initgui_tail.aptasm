@@ -1,0 +1,40 @@
+; Appended to ScrPressStart.InitGui (after RegisterListener(this), so LoadComplete and
+; ShowSlotSelector keep reaching the live instance). reg1 = this, reg2 = _global.
+;   if (_global.SRFrontEnd.Install(this)) {        // true only when back from SETTINGS
+;     this.mcStartText._visible = false; this.mcLogo._visible = false;
+;     this.mcTitle._visible = false; this.mInBootflow = true;
+;     _global.SRFrontEnd.ShowMenu(2);
+;   }
+    Push [reg1]
+    EA_PushOne
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'Install'
+    CallMethod
+    Not
+    If sr_ig_done
+    Push [reg1]
+    EA_GetNamedMember 'mcStartText'
+    EA_PushConstByte '_visible'
+    op_74
+    SetMember
+    Push [reg1]
+    EA_GetNamedMember 'mcLogo'
+    EA_PushConstByte '_visible'
+    op_74
+    SetMember
+    Push [reg1]
+    EA_GetNamedMember 'mcTitle'
+    EA_PushConstByte '_visible'
+    op_74
+    SetMember
+    Push [reg1]
+    EA_PushConstByte 'mInBootflow'
+    op_73
+    SetMember
+    EA_PushByte 2
+    EA_PushOne
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_CallNamedMethodPop 'ShowMenu'
+sr_ig_done:

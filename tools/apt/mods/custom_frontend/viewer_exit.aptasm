@@ -1,0 +1,13 @@
+; _global.SRViewer.Close(this), then delete it (the movie's functions must not outlive it)
+    Push [reg1]
+    EA_PushOne
+    Push [reg2]
+    Push ['SRViewer']
+    GetMember
+    Push ['Close']
+    CallMethod
+    Pop
+    Push [reg2]
+    Push ['SRViewer']
+    Delete
+    Pop

@@ -1,0 +1,55 @@
+{
+  "name": "devtools-freecam",
+  "purpose": "iter-464 DT-2 free camera (docs/DEVTOOLS.md 6.4; DEV-TOOL run, not natural): natural_new.json to gameplay, then F8 = infinite_stamina on, F6 = freecam on (the retail debug camera at camera mgr +0x1150), fly it with the keyboard on guest controller 2 (W forward, I look up, R up), F7 = warp Superman to the camera, F6 = freecam off, F8 = infinite_stamina off, then W walks Superman again (the pad is back on controller 1). Evidence: the [DEVTOOL] act=freecam lines (write and call lists), the frame dumps before / during / after, and runClass dev-tool-assisted. -TimeoutSeconds 480.",
+  "gates": "SR_MODS=0,SR_DEVTOOLS=freecam+cheats,SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=6,SR_PRESENT_DUMP_SPARSE_CAP=900,SDL_AUDIODRIVER=disk",
+  "steps": [
+    { "name": "fe-alive", "await": "\\[NAT_FE\\] #1 natural FE master tick", "timeoutMs": 180000 },
+    { "name": "settle-title", "await": "\\[NAT_FE\\] #256 natural FE master tick", "timeoutMs": 180000 },
+    {
+      "name": "press-start", "key": "ENTER", "holdMs": 250, "maxPulses": 4, "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)", "expectMs": 90000
+    },
+    { "name": "title-ui-tail", "await": "\\[APT_REQ\\] #15 path='\\.\\./common/ButtonHints/XBox360/HintB'", "timeoutMs": 240000 },
+    { "name": "title-visible", "requireVisibleMs": 8000, "visibleTimeoutMs": 200000, "dwellMs": 6000 },
+    {
+      "name": "start-bootflow", "key": "ENTER", "holdMs": 250, "maxPulses": 1,
+      "expect": "\\[APT_REQ\\] #\\d+ path='screens/misc/ScrGenPop'", "expectMs": 30000
+    },
+    { "name": "popup-visible", "dwellMs": 6000 },
+    {
+      "name": "start-new-game", "key": "A", "holdMs": 250, "maxPulses": 1,
+      "expect": "\\[APT_REQ\\] #\\d+ path='screens/hud/main_hud'", "expectMs": 120000
+    },
+    { "name": "world-ticking", "purpose": "The drain point runs (the active-world tick).", "await": "\\[DEVTOOL\\] first hooked tick", "timeoutMs": 240000 },
+    { "name": "settle-gameplay", "dwellMs": 75000 },
+    {
+      "name": "stamina-on", "purpose": "F8 = infinite_stamina on (StaminaInfinite owned + ApplyPowerups).", "key": "F8", "holdMs": 300, "maxPulses": 1,
+      "expect": "\\[DEVTOOL\\] (act=cheats\\.infinite_stamina args=on|refused act=cheats\\.infinite_stamina)", "expectMs": 20000
+    },
+    {
+      "name": "freecam-on", "key": "F6", "holdMs": 300, "maxPulses": 1,
+      "expect": "\\[DEVTOOL\\] (act=freecam\\.freecam args=on|refused act=freecam\\.freecam)", "expectMs": 20000
+    },
+    { "name": "freecam-settle", "dwellMs": 4000 },
+    { "name": "fly-forward", "key": "KEY_W", "holdMs": 3000, "maxPulses": 1 },
+    { "name": "look-up", "key": "KEY_I", "holdMs": 1500, "maxPulses": 1 },
+    { "name": "rise", "key": "KEY_R", "holdMs": 1500, "maxPulses": 1 },
+    { "name": "freecam-hold", "dwellMs": 4000 },
+    {
+      "name": "warp-to-camera", "purpose": "F7 = warp camera: Superman to the free camera's position (sub_821AA218).", "key": "F7", "holdMs": 300, "maxPulses": 1,
+      "expect": "\\[DEVTOOL\\] (act=cheats\\.warp args=camera|refused act=cheats\\.warp)", "expectMs": 20000
+    },
+    { "name": "warp-settle", "dwellMs": 4000 },
+    {
+      "name": "freecam-off", "key": "F6", "holdMs": 300, "maxPulses": 1,
+      "expect": "\\[DEVTOOL\\] (act=freecam\\.freecam args=off|refused act=freecam\\.freecam)", "expectMs": 20000
+    },
+    { "name": "game-camera-back", "dwellMs": 6000 },
+    {
+      "name": "stamina-off", "key": "F8", "holdMs": 300, "maxPulses": 1,
+      "expect": "\\[DEVTOOL\\] (act=cheats\\.infinite_stamina args=off|refused act=cheats\\.infinite_stamina)", "expectMs": 20000
+    },
+    { "name": "superman-walks", "key": "KEY_W", "holdMs": 2000, "maxPulses": 1 },
+    { "name": "observe-after", "dwellMs": 8000 }
+  ]
+}

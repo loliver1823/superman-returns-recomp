@@ -1,0 +1,105 @@
+L9-A (rich): per-guest-function-ENTRY trace via the x64 JIT prolog.
+
+Upgrades the L9-A golden oracle from the GuestFunction::Call C++ hook (which only
+fires on host->guest re-entries, ~5 distinct PCs) to a hook emitted at the prolog
+of EVERY JIT'd guest function, so guest->guest `bl` calls -- which jump directly
+between JIT'd functions and never re-enter through GuestFunction::Call -- are now
+captured too. Captured a Superman Returns boot with 2223 distinct guest PCs across
+all subsystems (vs ~5 before), same on-disk XENTRC01 / 32-byte format.
+
+HOW IT WORKS
+  - A file-local host trampoline XeTraceJitProlog(void* raw_context, uint64_t
+    guest_pc) reads lr / r3 / r1 / thread_id from the PPCContext (host-native /
+    already byte-swapped, the SAME values GuestFunction::Call samples) and calls
+    GuestTracer::EmitFuncEntry(). guest_pc is passed in (it is a compile-time
+    constant per function), so it is always correct regardless of register state.
+  - In X64Emitter::Emit(builder, func_info), right after the existing
+    kDebugInfoTraceFunctions prolog block (stack already set up & 16B aligned),
+    we emit a gated `CallNative(&XeTraceJitProlog, current_guest_function_)`.
+    CallNative routes through the standard guest->host thunk (CallNativeSafe),
+    which saves/restores volatile regs + MXCSR and passes the PPCContext as the
+    host fn's first arg, so it is fully ABI-safe and does not perturb guest state.
+  - The EMISSION is gated on GuestTracer::enabled() (the same XENIA_GUEST_TRACE
+    env, checked once at JIT time), so with tracing OFF the JIT'd code is
+    byte-for-byte identical to stock Xenia and pays zero per-call overhead.
+
+ON-DISK FORMAT IS UNCHANGED: same xenia_trace.h (XENTRC01 + 32-byte records), so
+scripts/l9/divergence_bisect.py reads it unmodified. Self-diff PASSES (strict and
+subsequence) on the captured rich trace.
+
+PERF NOTE (honest): this is a hot path. A ~70s boot produced ~349M records / 11GB
+(~100 MB/s). The boot stays healthy (reaches D3D12 + "Superman Returns" title), so
+it is usable, but the trace is large -- capture only as long as needed and analyze
+by streaming (do not load the whole file into RAM). The bisector loads traces into
+memory, so diff against a truncated prefix or a thread-filtered slice.
+
+Verified against xenia-canary @ 0b4e6c440e91f118b42a5e9e32a6b629ce4c387c
+(2026-06-24). Apply AFTER xenia_trace.patch (both touch different files; this one
+only touches x64_emitter.cc and requires src/xenia/cpu/xenia_trace.h to be present).
+
+TO APPLY (from the xenia-canary repo root, after xenia_trace.h is copied in and
+xenia_trace.patch is applied):
+    git apply ../../tools/xenia-trace/xenia_trace_jitprolog.patch
+
+---
+diff --git a/src/xenia/cpu/backend/x64/x64_emitter.cc b/src/xenia/cpu/backend/x64/x64_emitter.cc
+index ec49d34..47a2c56 100644
+--- a/src/xenia/cpu/backend/x64/x64_emitter.cc
++++ b/src/xenia/cpu/backend/x64/x64_emitter.cc
+@@ -38,6 +38,7 @@
+ #include "xenia/cpu/processor.h"
+ #include "xenia/cpu/symbol.h"
+ #include "xenia/cpu/thread_state.h"
++#include "xenia/cpu/xenia_trace.h"  // L9-A golden-oracle JIT-prolog trace
+ 
+ DEFINE_bool(debugprint_trap_log, false,
+             "Log debugprint traps to the active debugger", "CPU");
+@@ -74,6 +75,24 @@ using namespace xe::literals;
+ 
+ static constexpr size_t kMaxCodeSize = 1_MiB;
+ 
++// L9-A golden-oracle trace trampoline.
++// Called from every JIT'd guest-function PROLOG via CallNative (the guest->host
++// thunk), so it runs on EVERY guest function entry, including guest->guest bl
++// calls that never re-enter through GuestFunction::Call. The thunk passes the
++// PPCContext* as arg0 (rcx) and the guest function address as arg1 (rdx).
++// No-op (single env-gated branch) unless XENIA_GUEST_TRACE=1. The guest_pc is a
++// compile-time constant baked into the prolog, so it is always correct; the key
++// PPC regs are read from the (host-native / already byte-swapped) context, the
++// SAME values the GuestFunction::Call hook samples, so the on-disk format and
++// register semantics are unchanged.
++static uint64_t XeTraceJitProlog(void* raw_context, uint64_t guest_pc) {
++  auto* ctx = reinterpret_cast<ppc::PPCContext*>(raw_context);
++  xe::trace::GuestTracer::Get().EmitFuncEntry(
++      static_cast<uint32_t>(guest_pc), static_cast<uint32_t>(ctx->lr),
++      ctx->r[3], ctx->r[1], ctx->thread_id);
++  return 0;
++}
++
+ // static const size_t kStashOffsetHigh = 32 + 32;
+ 
+ constexpr uint32_t X64Emitter::gpr_reg_map_[X64Emitter::GPR_COUNT] = {
+@@ -264,6 +283,23 @@ bool X64Emitter::Emit(HIRBuilder* builder, EmitFunctionInfo& func_info) {
+     bts(qword[low_address(&trace_header->function_thread_use)], rax);
+   }
+ 
++  // L9-A: golden-oracle per-function-entry trace. Emit a gated host call at the
++  // prolog of EVERY JIT'd guest function (this fires on guest->guest bl calls
++  // too, unlike the GuestFunction::Call hook). guest_pc is the compile-time
++  // constant current_guest_function_, baked as an immediate (arg0), so it is
++  // always correct regardless of register state. The call routes through the
++  // standard guest->host thunk (CallNativeSafe) which saves/restores volatile
++  // regs + MXCSR and passes the PPCContext as the host fn's first arg, so it is
++  // fully ABI-safe and does not perturb guest state. The trace writer itself is
++  // a no-op (one env-gated branch) unless XENIA_GUEST_TRACE=1. We also gate the
++  // EMISSION itself on the same env var (checked once at JIT time) so that when
++  // tracing is off, JIT'd code is byte-for-byte identical to stock Xenia and
++  // pays zero per-call overhead.
++  if (xe::trace::GuestTracer::Get().enabled()) {
++    CallNative(&XeTraceJitProlog,
++               static_cast<uint64_t>(current_guest_function_));
++  }
++
+   // Load membase.
+   /*
+   * chrispy: removed this, as long as we load it in HostToGuestThunk we can

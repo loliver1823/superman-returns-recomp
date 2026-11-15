@@ -1,0 +1,24 @@
+{
+  "format": 1,
+  "id": "pause_map",
+  "name": "Useful pause map",
+  "description": "The pause map marks the current objective and the next story mission, the races and Bizarro statues (unlocked, completed, best time / score) and the kittens found, from the game's own state; mods add markers or maps (docs/MAP.md).",
+  "option": null,
+  "recipe": "tools/apt/mods/pause_map",
+  "base": {
+    "DATA/ui.AST": {
+      "size": 89595420,
+      "toc_sha256": "035c8facc80645f4ecd584c2db09089f0a11a1f32f8b5993b6549b8add7daaec"
+    }
+  },
+  "assets": [
+    {
+      "asset": "DATA/_workinprogress/pause_map/SCRMAP.ast",
+      "base": "DATA/ui.AST:SCRMAP",
+      "patch": "SCRMAP.srpatch"
+    }
+  ],
+  "assets_sha256": {
+    "DATA/_workinprogress/pause_map/SCRMAP.ast": "dcab0c68e20ef4aa495edc6fe0045e25b582fae98a02a22ba0a9a2be3f1b8642"
+  }
+}

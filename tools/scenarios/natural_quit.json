@@ -1,0 +1,52 @@
+{
+  "name": "natural-quit",
+  "purpose": "iter-463 settings review finding 4, the A/B for femenu_quit.json with NO mod (-Gates SR_MODS=0): title -> START -> the game's own LOAD A GAME? popup -> A = START NEW GAME -> main_hud -> in game: START = pause menu (pulsed every 10 s for up to 3 min until the pause screen's [APT_SCREEN] request appears: the scripted opening ignores START) -> DOWN x8 = QUIT GAME -> A -> the WARNING popup's [APT_SCREEN] request (NO default) -> DOWN, A = YES -> StateAdapter.QuitGame -> the game's own return to the front end -> the title again -> START -> the sign-in read (XAM_PROFILE #3) and the natural popup again. Frames decide whether the reloaded ScrPressStart works (no mod log lines exist here). -TimeoutSeconds 600.",
+  "gates": "SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=20,SR_PRESENT_DUMP_SPARSE_CAP=900",
+  "steps": [
+    { "name": "fe-alive", "await": "\\[NAT_FE\\] #1 natural FE master tick", "timeoutMs": 180000 },
+    { "name": "settle-title", "await": "\\[NAT_FE\\] #256 natural FE master tick", "timeoutMs": 180000 },
+    {
+      "name": "press-start", "key": "ENTER", "holdMs": 2000, "holdUntilConfirmed": true, "maxPulses": 4, "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)", "expectMs": 90000
+    },
+    { "name": "title-ui-tail", "await": "\\[APT_REQ\\] #15 path='\\.\\./common/ButtonHints/XBox360/HintB'", "timeoutMs": 240000 },
+    { "name": "title-visible", "requireVisibleMs": 8000, "visibleTimeoutMs": 200000, "dwellMs": 6000 },
+    {
+      "name": "start-bootflow", "key": "ENTER", "holdMs": 2000, "holdUntilConfirmed": true, "maxPulses": 3, "gapMs": 10000,
+      "expect": "\\[APT_REQ\\] #\\d+ path='screens/misc/ScrGenPop'", "expectMs": 30000
+    },
+    { "name": "popup-visible", "dwellMs": 6000 },
+    {
+      "name": "start-new-game", "key": "A", "holdMs": 2000, "holdUntilConfirmed": true, "maxPulses": 1,
+      "expect": "\\[APT_REQ\\] #\\d+ path='screens/hud/main_hud'", "expectMs": 120000
+    },
+    { "name": "play", "purpose": "Intro cinematic + first gameplay.", "dwellMs": 30000 },
+    {
+      "name": "pause", "key": "ENTER", "holdMs": 2000, "holdUntilConfirmed": true, "maxPulses": 18, "gapMs": 10000,
+      "purpose": "START until the pause menu's own screen request appears (the scripted opening ignores START; quit_renum2). A pulse only repeats while the marker is absent, so an open pause menu is never toggled shut.",
+      "expect": "\\[APT_SCREEN\\] path='screens/misc/ScrPauseMenu'", "expectFresh": true, "expectMs": 10000, "dwellMs": 3000
+    },
+    {
+      "name": "down-to-quit", "key": "DOWN", "holdMs": 2000, "holdUntilConfirmed": true, "maxPulses": 8, "gapMs": 900, "dwellMs": 2000,
+      "purpose": "Pause menu rows: RESUME, RESTART OBJECTIVE, SAVE/LOAD, STATISTICS, MOVES LIST, GAMEPLAY OPTIONS, CONTROLLER, AUDIO, QUIT GAME (btn9, 8 down)."
+    },
+    {
+      "name": "quit", "key": "A", "holdMs": 2000, "holdUntilConfirmed": true, "maxPulses": 3, "gapMs": 10000,
+      "purpose": "QUIT GAME -> ScrPauseMenu.showWarning -> FlowMgr.ShowGenPop: the WARNING popup's own screen request (fresh: ScrGenPop was already requested at the title).",
+      "expect": "\\[APT_SCREEN\\] path='screens/misc/ScrGenPop'", "expectFresh": true, "expectMs": 10000, "dwellMs": 3000
+    },
+    { "name": "down-to-yes", "key": "DOWN", "holdMs": 2000, "holdUntilConfirmed": true, "maxPulses": 1, "dwellMs": 2000 },
+    {
+      "name": "yes-quit", "key": "A", "holdMs": 2000, "holdUntilConfirmed": true, "maxPulses": 1,
+      "purpose": "YES -> StateAdapter.QuitGame -> the game's own return to the front end: the title screen's own request again (roll quit_verify/discover_natural1: seen=2 ~1 s after YES). Absent = quit signature A (no reload request).",
+      "expect": "\\[APT_SCREEN\\] path='screens/bootflow/ScrPressStart'", "expectFresh": true, "expectMs": 30000, "dwellMs": 2000
+    },
+    { "name": "title-again", "purpose": "Capture window: whatever the game shows after QUIT GAME.", "dwellMs": 40000 },
+    {
+      "name": "start-again", "key": "ENTER", "holdMs": 2000, "holdUntilConfirmed": true, "maxPulses": 3, "gapMs": 10000,
+      "purpose": "START on the reloaded title: the sign-in read (XAM_PROFILE #3) proves the reloaded ScrPressStart takes input.",
+      "expect": "\\[XAM_PROFILE\\] #3 ", "expectMs": 30000
+    },
+    { "name": "popup-again", "purpose": "Capture window: the natural LOAD A GAME? popup after QUIT GAME.", "dwellMs": 10000 }
+  ]
+}

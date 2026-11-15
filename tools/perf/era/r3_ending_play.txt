@@ -1,0 +1,58 @@
+# era matrix R3 (tools/perf/era_matrix.py): THE ENDING and the POST-GAME, DEV-TOOL ASSISTED, from the CHAPTER-17 seed
+# (archive/saves/17_ch17). perf_run --scenario gameplay --config port --from-save <dev>/archive/saves/17_ch17 with
+# SR_DEVTOOLS=levelskip, SR_DEVTOOLS_CMDS=tools/perf/era/r3_empty_plan.txt, SR_DEVTOOLS_OUT=<roll>/devtools.
+# Adopted from Codex's final-acceptance template (dev archive/milestone2_20261016/final_native_acceptance_20261016/
+# final_native_acceptance_census2_r3_ending_play.txt, itself emu-stage1 archive/s1/census2/census2_r3_ending_play.txt) and
+# its R3 route pilot (final_native_acceptance_r3_pilot_20261016/ending_play.txt: a timeout never completes a ticket).
+# WHY SEED 17 (s1c1's R3 from seed 18 never reached the ending): seed 17 is the start of make2_ch1-19's ticket 16, the
+# ticket that played the ending; ticket 1 from it replays that ticket (make2 22:45:30-22:52:16): xp_to_cap, metro event
+# ME44Type01 (268) reached and passed, CinematicSupesDecides ('1800', EOM ~78 s), the chapter boundary's autosave,
+# TWSobj04 passed, the ending CinematicLexIsland ('2600', EOM frames=7156 media=245.80 s), "done chapter 17 -> 18";
+# a second SKIP CHAPTER takes 18 to 19 (make2's ticket 17: ME16Type01 passed, the autosave, "done chapter 18 -> 19",
+# ~50 s) - the post-game evidence tools/perf/era_census.py requires (the CinematicLexIsland EOM, a "done ... -> 19" after
+# it, the roll's own chapter >= 19 save, a gameplay context with a mode after the movie).
+# The load lands on the METROPOLIS / FORTRESS carousel; perf_run's drive presses A = METROPOLIS until the HUD. Then
+# ~60 s in Metropolis, a net-zero look on the PLAYER keymap, a take-off only if the look logs no mode (the ingame era's
+# witness: a gameplay context WITH a
+# mode - the load's own context line reads `mode -` and an idle Superman logs no other: lane E pilot r3p1 2026-10-17,
+# 75 s idle, no mode line), ONE SKIP CHAPTER (F11 on the legacy keymap, as tools/devtools/chapter_seeds.py make taps it),
+# the ending, a second SKIP CHAPTER, then the same look (+ take-off) in the post-game (era_census's post_game starts at the
+# first gameplay context with a mode after the ending: r3p1 logged only `mode -` after it). No key while a movie can
+# play: A / START would skip an FMV. Every route witness is an `expect` (a miss is recorded in play.jsonl; the graders
+# decide: a timeout, a stop or a missing ending is INCOMPLETE/FAIL, never DONE). The tape waits on the TICKET's end, not
+# on [MOVIE_PACE] (the release exe compiles MOVIE_PACE out: an expect on it would consume the log past the ticket's end).
+# The roll's end is perf_run's --dwell (era_matrix: 900 s); the tape needs ~600 s after the gameplay context (r3p1: F11
+# 07:11:25, the ending EOM 07:17:41, done 17 -> 18 07:17:43; make2: ticket 16 406 s, ticket 17 50 s).
+# (no '#' inside a command: harness_play.py strips everything after one - hence movie. not movie# below)
+await \[SR_FSCMD\].*answer cppId=\S+ button=1 1500
+await \[APT_(REQ|SCREEN)\].*path='screens/hud/main_hud' 900
+await \[PC_CONTROLS\] context gameplay 240
+wait 60000
+keymap player
+sample chapter17
+mouse 400 0 800
+mouse -400 0 800
+expect \[PC_CONTROLS\] context gameplay .*mode [a-z] 15
+ifmiss tap Space 200
+ifmiss expect \[PC_CONTROLS\] context gameplay .*mode [a-z] 20
+wait 6000
+releaseall
+keymap legacy
+wait 3000
+tap F11 300
+expect \[DEVTOOL\] skip_chapter ticket=1 start chapter=17 60
+expect \[DEVTOOL\] skip_chapter ticket=1 (done|timeout|stop) 1300
+sample after-ending
+wait 20000
+tap F11 300
+expect \[DEVTOOL\] skip_chapter ticket=2 (done|timeout|stop) 400
+wait 5000
+keymap player
+sample post-game
+mouse 400 0 800
+mouse -400 0 800
+expect \[PC_CONTROLS\] context gameplay .*mode [a-z] 15
+ifmiss tap Space 200
+ifmiss expect \[PC_CONTROLS\] context gameplay .*mode [a-z] 20
+wait 30000
+releaseall

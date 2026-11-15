@@ -1,0 +1,184 @@
+# playthrough lane v2: fly Superman away from a FastFlyer carrier's start DURING the race (the plan holds
+# its pass 20 s), and again once free roam returns, so the repeatable race does not re-engage.
+await \[APT_REQ\] .*path='screens/hud/main_hud' 1500
+keymap player
+await \[DEVTOOL\] act=levelskip\.reach args=9[567] FastFlyer 3600
+wait 4000
+wait 2500
+down W
+wait 300
+tap Space 150
+wait 9000
+up W
+sample race_away0
+await \[DEVTOOL\] act=levelskip\.pass args=9[567] FastFlyer 600
+wait 8000
+down W
+wait 6000
+up W
+sample moved0
+await \[DEVTOOL\] act=levelskip\.reach args=9[567] FastFlyer 3600
+wait 4000
+wait 2500
+down W
+wait 300
+tap Space 150
+wait 9000
+up W
+sample race_away1
+await \[DEVTOOL\] act=levelskip\.pass args=9[567] FastFlyer 600
+wait 8000
+down W
+wait 6000
+up W
+sample moved1
+await \[DEVTOOL\] act=levelskip\.reach args=9[567] FastFlyer 3600
+wait 4000
+wait 2500
+down W
+wait 300
+tap Space 150
+wait 9000
+up W
+sample race_away2
+await \[DEVTOOL\] act=levelskip\.pass args=9[567] FastFlyer 600
+wait 8000
+down W
+wait 6000
+up W
+sample moved2
+await \[DEVTOOL\] act=levelskip\.reach args=9[567] FastFlyer 3600
+wait 4000
+wait 2500
+down W
+wait 300
+tap Space 150
+wait 9000
+up W
+sample race_away3
+await \[DEVTOOL\] act=levelskip\.pass args=9[567] FastFlyer 600
+wait 8000
+down W
+wait 6000
+up W
+sample moved3
+await \[DEVTOOL\] act=levelskip\.reach args=9[567] FastFlyer 3600
+wait 4000
+wait 2500
+down W
+wait 300
+tap Space 150
+wait 9000
+up W
+sample race_away4
+await \[DEVTOOL\] act=levelskip\.pass args=9[567] FastFlyer 600
+wait 8000
+down W
+wait 6000
+up W
+sample moved4
+await \[DEVTOOL\] act=levelskip\.reach args=9[567] FastFlyer 3600
+wait 4000
+wait 2500
+down W
+wait 300
+tap Space 150
+wait 9000
+up W
+sample race_away5
+await \[DEVTOOL\] act=levelskip\.pass args=9[567] FastFlyer 600
+wait 8000
+down W
+wait 6000
+up W
+sample moved5
+await \[DEVTOOL\] act=levelskip\.reach args=9[567] FastFlyer 3600
+wait 4000
+wait 2500
+down W
+wait 300
+tap Space 150
+wait 9000
+up W
+sample race_away6
+await \[DEVTOOL\] act=levelskip\.pass args=9[567] FastFlyer 600
+wait 8000
+down W
+wait 6000
+up W
+sample moved6
+await \[DEVTOOL\] act=levelskip\.reach args=9[567] FastFlyer 3600
+wait 4000
+wait 2500
+down W
+wait 300
+tap Space 150
+wait 9000
+up W
+sample race_away7
+await \[DEVTOOL\] act=levelskip\.pass args=9[567] FastFlyer 600
+wait 8000
+down W
+wait 6000
+up W
+sample moved7
+await \[DEVTOOL\] act=levelskip\.reach args=9[567] FastFlyer 3600
+wait 4000
+wait 2500
+down W
+wait 300
+tap Space 150
+wait 9000
+up W
+sample race_away8
+await \[DEVTOOL\] act=levelskip\.pass args=9[567] FastFlyer 600
+wait 8000
+down W
+wait 6000
+up W
+sample moved8
+await \[DEVTOOL\] act=levelskip\.reach args=9[567] FastFlyer 3600
+wait 4000
+wait 2500
+down W
+wait 300
+tap Space 150
+wait 9000
+up W
+sample race_away9
+await \[DEVTOOL\] act=levelskip\.pass args=9[567] FastFlyer 600
+wait 8000
+down W
+wait 6000
+up W
+sample moved9
+await \[DEVTOOL\] act=levelskip\.reach args=9[567] FastFlyer 3600
+wait 4000
+wait 2500
+down W
+wait 300
+tap Space 150
+wait 9000
+up W
+sample race_away10
+await \[DEVTOOL\] act=levelskip\.pass args=9[567] FastFlyer 600
+wait 8000
+down W
+wait 6000
+up W
+sample moved10
+await \[DEVTOOL\] act=levelskip\.reach args=9[567] FastFlyer 3600
+wait 4000
+wait 2500
+down W
+wait 300
+tap Space 150
+wait 9000
+up W
+sample race_away11
+await \[DEVTOOL\] act=levelskip\.pass args=9[567] FastFlyer 600
+wait 8000
+down W
+wait 6000
+up W
+sample moved11

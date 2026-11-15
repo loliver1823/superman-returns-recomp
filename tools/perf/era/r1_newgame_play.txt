@@ -1,0 +1,61 @@
+# era matrix R1 (tools/perf/era_matrix.py): empty-save NEW GAME, the opening FMV in full, the tutorial, a pause round trip.
+# Copied from Codex final_native_acceptance_census_r1_play.txt (sha256 bf3eb520..., = emu-stage1 archive/s1/census/census_r1_play.txt).
+# s1 census R1 (DRAFT, archive/s1/census; the lane copies it to tools/perf/ if adopted): the NEW GAME roll with the
+# opening FMV NOT skipped (perf_run --gates ...,SR_DRIVE_SKIP_CUTSCENES=0 turns off perf_player_gameplay.json's
+# skip-opening-movie step, tools/sr_drive_core.ps1 Resolve-SrCutsceneSkip). = tools/perf/flicker_play.txt (no key until
+# Superman is on foot AFTER the opening FMV, so no input can skip it: the skip action is A / START, event 187) without its
+# dump mark, plus tools/player/gameplay_play.txt's pause round trip at the end (the pause menu over the world is a menu era).
+# (no '#' inside a command: harness_play.py strips everything after one as a comment)
+# era matrix (lane E): APT_(REQ|SCREEN) - [APT_REQ] stops logging after request 24 (a new game's HUD is #17)
+await \[APT_(REQ|SCREEN)\].*path='screens/hud/main_hud' 1500
+await \[PC_CONTROLS\] context gameplay .*mode on-foot camera 240
+wait 3000
+keymap player
+sample play
+down W
+watch 1500 walk
+wait 1500
+up W
+mouse 900 0 1500
+watch 1500 look-right
+sample walk-done
+mouse -900 0 1500
+mouse 0 -250 800
+watch 1500 look-back
+down W
+down Left Shift
+wait 2500
+up Left Shift
+up W
+sample sprint-done
+tap Space 200
+wait 3000
+sample takeoff
+down W
+watch 2000 fly
+mouse 1200 0 2500
+wait 2000
+up W
+sample fly-done
+mouse 0 300 1000
+wait 3000
+down Left Ctrl
+wait 1000
+up Left Ctrl
+click left 150
+wait 800
+click left 150
+sample actions
+tap Space 1500
+wait 5000
+mouse -600 0 3000
+wait 2000
+sample before-pause
+hold_ctx Escape 1
+await \[APT_SCREEN\] path='screens/misc/ScrPauseMenu' 120
+wait 8000
+sample paused
+hold_ctx Escape 2
+wait 4000
+sample resumed
+releaseall

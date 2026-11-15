@@ -1,0 +1,102 @@
+diff --git a/XenonRecomp/recompiler.cpp b/XenonRecomp/recompiler.cpp
+index a792ce7..8bc3b34 100644
+--- a/XenonRecomp/recompiler.cpp
++++ b/XenonRecomp/recompiler.cpp
+@@ -252,6 +252,97 @@ void Recompiler::Analyse()
+     }
+ 
+     std::sort(functions.begin(), functions.end(), [](auto& lhs, auto& rhs) { return lhs.base < rhs.base; });
++
++    // Switch-hole fix: Function::Analyze follows only b/bc edges and truncates
++    // at discontinuities, so case blocks reachable exclusively through bctr
++    // jump tables fall outside their function's analyzed body and get carved
++    // into separate "orphan" functions by the linear section walk above. The
++    // emitter then sees the table labels outside [fn.base, fn.base + fn.size)
++    // and emits "// ERROR: 0x..." + bare return for those cases (2,476 sites
++    // across 111 functions in this XEX). The switch tables are already known
++    // here (config.switchTables is loaded before Analyse), so extend every
++    // function containing a jump table until all of that table's labels ? and
++    // the FULL orphan functions containing them, so intra-orphan fallthrough
++    // and branches stay in range ? land inside the function body. Run to a
++    // fixed point: a swallowed region can itself contain further jump tables.
++    // Orphan functions remain emitted standalone as well: harmless duplication
++    // that preserves their ppc_func_mapping entries for indirect dispatch.
++    if (!config.switchTables.empty())
++    {
++        auto functionEndContaining = [&](size_t address) -> size_t
++        {
++            // functions are sorted by base, but ranges can overlap once
++            // extension starts. Scan candidates with base <= address and take
++            // the furthest end that still contains the address.
++            size_t end = 0;
++            auto it = std::upper_bound(functions.begin(), functions.end(), address,
++                [](size_t lhs, const Function& rhs) { return lhs < rhs.base; });
++
++            while (it != functions.begin())
++            {
++                --it;
++                if (address >= it->base && address < it->base + it->size && it->base + it->size > end)
++                    end = it->base + it->size;
++
++                // Known holes are small (max observed gap 0x878); stop once
++                // bases fall far behind the address to keep this a bounded
++                // backwards window rather than a full scan.
++                if (address - it->base > 0x10000)
++                    break;
++            }
++
++            return end;
++        };
++
++        size_t extensionCount = 0;
++
++        for (bool changed = true; changed; )
++        {
++            changed = false;
++
++            for (auto& fn : functions)
++            {
++                if (fn.size == 0)
++                    continue;
++
++                for (const auto& [tableAddress, table] : config.switchTables)
++                {
++                    if (tableAddress < fn.base || tableAddress >= fn.base + fn.size)
++                        continue;
++
++                    for (auto label : table.labels)
++                    {
++                        if (label >= fn.base && label < fn.base + fn.size)
++                            continue;
++
++                        if (label < fn.base)
++                        {
++                            fmt::println("ERROR: Switch table at {:X} label {:X} lies before function {:X}; cannot extend backwards", tableAddress, label, fn.base);
++                            continue;
++                        }
++
++                        size_t newEnd = functionEndContaining(label);
++                        if (newEnd == 0)
++                        {
++                            // Label inside no discovered function: cover at least the label.
++                            fmt::println("WARNING: Switch table at {:X} label {:X} not contained in any function; extending {:X} to the label only", tableAddress, label, fn.base);
++                            newEnd = label + 4;
++                        }
++
++                        if (newEnd > fn.base + fn.size)
++                        {
++                            fn.size = newEnd - fn.base;
++                            changed = true;
++                            ++extensionCount;
++                        }
++                    }
++                }
++            }
++        }
++
++        if (extensionCount != 0)
++            fmt::println("Switch-hole fix: extended function bounds {} time(s) to cover jump table targets", extensionCount);
++    }
+ }
+ 
+ bool Recompiler::Recompile(

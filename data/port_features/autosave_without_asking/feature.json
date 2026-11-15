@@ -1,0 +1,24 @@
+{
+  "format": 1,
+  "id": "autosave_without_asking",
+  "name": "Autosave without asking",
+  "description": "The game's chapter-advance save request without its confirmation prompt.",
+  "option": "autosave_without_asking",
+  "recipe": "tools/apt/mods/custom_frontend/srautosave.aptasm",
+  "base": {
+    "DATA/baseworl.AST": {
+      "size": 6253440,
+      "toc_sha256": "a3b715ea9af2944045fb942d5a5d4ae671d036705f88418b1e74fe886c9e3f52"
+    }
+  },
+  "assets": [
+    {
+      "asset": "DATA/_workinprogress/autosave_without_asking/BASEWORLDFLOW_SCRIPT.ast",
+      "base": "DATA/baseworl.AST:BASEWORLDFLOW_SCRIPT",
+      "patch": "BASEWORLDFLOW_SCRIPT.srpatch"
+    }
+  ],
+  "assets_sha256": {
+    "DATA/_workinprogress/autosave_without_asking/BASEWORLDFLOW_SCRIPT.ast": "b2ccec0d33de3e812147884287d1e161dd64e7ef184cc1799b6495f960bacdc1"
+  }
+}

@@ -1,0 +1,25 @@
+# iter-465 playthrough lane: companion of skip_chapter_proof.json (tools/controls/harness_play.py).
+# F11 = SKIP CHAPTER (three times, each after the previous reports done); F10 = SKIP (the active mission)
+# once the game restarts the race the player chose in SIDE MISSIONS; then fly Superman out of its circle.
+await \[APT_REQ\] .*path='screens/hud/main_hud' 1500
+wait 30000
+tap F11 300
+await \[DEVTOOL\] skip_chapter ticket=1 (done|timeout) 1400
+wait 25000
+tap F11 300
+await \[DEVTOOL\] skip_chapter ticket=2 (done|timeout) 1400
+wait 25000
+tap F11 300
+await \[DEVTOOL\] skip_chapter ticket=3 (done|timeout) 1400
+await \[DEVTOOL\] act=levelskip\.pass args=95 FastFlyer tick= 900
+wait 20000
+tap F10 300
+await \[DEVTOOL\] skip_mission ticket=\d+ active|refused act=levelskip\.skip_mission 120
+keymap player
+down W
+wait 300
+tap Space 150
+wait 9000
+up W
+keymap legacy
+sample after_race_skip

@@ -1,0 +1,190 @@
+R1 batch 3 - L6 golden_call cases (archive/r1/l6/b3.script, 63 cases)
+Generated from fake objects; scratch window 0x70000000..0x70DFFFFF unless noted. Each case's
+fixture is written in full, so cases do not depend on each other. (Until phase 4 row 8 there was
+one exception: sub_82764348's cut counter was per thread and cumulative across calls, so the two
+gctm cases had to keep their order; the cut and its fire case are gone, see below.)
+The riskier cases (writes outside the scratch window, the real allocator, the CRT TLS path, a
+1 s wall-clock wait) are LAST, so a harness crash there cannot hide the earlier cases.
+
+Writes outside the scratch window (all restored by END):
+  0x822979C0      code bytes; zeroed only to make the dead store-if-zero of sub_82764760 /
+                  sub_82767DF0 fire (golden holds 4E800421 there, so it never fires otherwise).
+  0x82100000..    .text bytes used as a fake object at an address >= 0x82000000: the lua_State
+                  for pushstr/pushvfstring (their guard refuses every L below 0x82000000, which
+                  includes the whole scratch window) and the instruction node of the
+                  ExpandNativeAluOps normal case (same guard on node links).
+  0x829A93F0/24   DOGMA heap-range table count/pointer, redirected to a fake one-entry table so
+                  the heap lookup owns a scratch pointer (DogmaFree normal cases).
+  0x00000000..07  lgcmark fire case: after the splice zeroes the thread bounds, traversestack
+                  reads [4] and stores 0 to [0]; zeroed first so that walk is one word.
+  0x5E7A440C..13  typeerror key case: the operand itself is the key, and its tt is read at entry.
+Harmless vtable target used everywhere a dispatch is needed: sub_828CCE50 (returns [r3+8] & 1,
+reads only).
+
+Environment knobs: none. No splice in this batch reads getenv (checked over all 23 bodies in
+tools/regen/splice_bodies.json), so there is no "knob-off path = generated code (was a hand
+copy)" case here. All 23 splices were ungated, and so are their hooks.
+
+sub_82764348 luaC_callGCTM
+  gctm_normal_one_udata            one udata on G->tmudata, metatable flags say no __gc: one
+                                   loop pass, natural exit.
+  Retired (phase 4 row 8, docs/FORCING_RETIREMENT.md): gctm_fire_cyclic_tmudata (udata whose next
+  is itself and rootudata = itself) existed only to trip the cumulative 50,000-iteration cut
+  @0x82764384. With the cut deleted the generated `while (G->tmudata)` loop runs as on the console
+  and never leaves that (corrupt, unreachable from real Lua) list, so the case cannot terminate;
+  its last run is archive/v1_forcing/l6/row8/b3_percase.{old,new}.out (old: cut exit, new: timeout).
+sub_82764510 lgc_mark
+  lgcmark_normal_sane_bounds       full mark phase on a minimal Lua state (main thread = L,
+                                   empty stack, no roots, empty udata lists): guard does not fire.
+  lgcmark_fire_top_minus_stack_over_16MB  (LAST block) top - stack = 0x01000010: the four bound
+                                   words are zeroed, then markroot/traversestack run on them
+                                   (FIRES @0x82764528).
+sub_82764760 luaT_gettmbyobj
+  gettm_normal_number_default      number operand -> luaO_nilobject; store-if-zero does not fire.
+  gettm_normal_table_mt_getstr     table with a metatable -> tail call luaH_getstr (not found).
+  gettm_fire_table_no_mt           table, null metatable -> r3 = 0x822979C0 (FIRES @0x827647A8).
+  gettm_fire_udata_no_mt           userdata, null metatable (FIRES @0x8276479C).
+  gettm_fire_storeifzero_default   [0x822979C0] = 0, number operand: 6 stored (FIRES @0x82764790).
+  gettm_fire_table_no_mt_storeifzero  both the fake return and the store (FIRES @0x827647A8 x2).
+sub_827657C8 luaV_execute
+  vm_normal_100zeros_loadnil_100zeros_return  100 MOVE 0,0 words (counter reaches exactly 100),
+                                   LOADNIL 0..1 (guard passes, counter resets), 100 zeros,
+                                   RETURN B=1 -> returns ra = base. No hook fires.
+  vm_fire_101_zero_opcodes         the 101st zero word -> yield return 0, savedpc = pc-4
+                                   (FIRES @0x82765890).
+  vm_fire_loadnil_bad_range        LOADNIL A=1 B=0 (r11 < r31) -> yield return 0 (FIRES @0x827659FC).
+  vm_fire_entry_ci_null            L->ci = 0 -> entry guard returns 0 through loc_82766998
+                                   (FIRES @0x82765818).
+  vm_fire_entry_L_null             r3 = 0 (FIRES @0x82765818).
+  Not built: a nested luaV_execute (needs a metamethod/hook call chain); the per-frame counter
+  is what makes that case exact.
+sub_82766BE0 pushstr helper
+  pushstr_normal_L_high            fake L at 0x82100000, string "" already interned in a one-slot
+                                   string table: pushes it, top += 8.
+  pushstr_fire_L_low               L = 0x70040000 (< 0x82000000) -> r3 = 0, nothing pushed (FIRES).
+  pushstr_fire_L_F0000000          L = 0xF0000000 (FIRES).
+sub_82766C78 luaO_pushvfstring
+  pushvf_normal_empty_fmt          fmt "" with the fake high L: two pushes of "", luaV_concat
+                                   (empty second operand), returns the "" TString chars.
+  pushvf_fire_L_low / pushvf_fire_L_null  range guard -> return, r3 unchanged (FIRES).
+  The host-stack part of the guard (> 256 MB host stack) cannot be tripped standalone.
+sub_82767DF0 luaH_getstr
+  getstr_normal_found_head         key in the main-position node.
+  getstr_normal_found_third        found at step 2 (the slow pointer advances once, no match).
+  getstr_normal_notfound_chain     3-node chain, not found -> luaO_nilobject.
+  Retired (phase 4.3 batch Lua, docs/FORCING_RETIREMENT.md): getstr_fire_cycle_2 (node0 <-> node1) and getstr_fire_cycle_tail_3 (a
+  3-node cycle behind the head). The generated `do { ... n = n->next; } while (n)` never ends on a
+  cyclic chain. No reachable table has one: newkey links a colliding node into the chain of its main
+  position and moves a node only into a free slot taken from the top of the node array downwards
+  (getfreepos), so every chain is a path of distinct nodes ending in NULL; rehash rebuilds the chains
+  from scratch. Only memory corruption closes a chain.
+  getstr_fire_storeifzero_notfound [0x822979C0] = 0 (FIRES @0x82767E48).
+  Not built: the found-slot-at-0 fallback (@0x82767E50) needs a node at 0xFFFFFFF8, which wraps
+  the 4 GB space.
+sub_827684C0 ltable newkey (8-node table, boolean keys)
+  newkey_normal_move_colliding_node  mp = N1 holds a key whose main position is N2; chain
+                                   N2 -> N3 -> N1: one walk step, N1 moved to firstfree N7,
+                                   firstfree steps down to the free N6, returns N1+8.
+  Retired (phase 4.3 batch Lua, docs/FORCING_RETIREMENT.md): newkey_fire_cyclic_predecessor_walk (N2 <-> N3, mp = N1). The generated
+  `while (othern->next != mp) othern = othern->next` walks from the colliding node's main position to
+  mp; by construction mp is on that chain (it was linked there when the colliding key was inserted), so
+  the walk ends on every reachable table; the cyclic fixture is memory corruption, which the console
+  loops on.
+sub_82768878 luaZ_openspace
+  openspace_normal_fits            n <= buffsize: old buffer, hook not reached.
+  openspace_fire_over_16MB         n = 0x01000001 (FIRES).
+  openspace_fire_negative          n = 0x80000000 (FIRES).
+  openspace_normal_grow_via_allocator  (LAST block) empty buffer, n = 40: the hook passes and
+                                   luaM_realloc runs the game's Dogma pool allocator on the golden
+                                   heap (as core.script realloc_normal_small does).
+sub_8276A4B0 luaG_typeerror
+  typeerror_fire_ci_top_zero       ci->top = 0 -> r3 = 0, epilogue (FIRES @0x8276A4F0).
+  typeerror_fire_operand_outside   operand outside [base, top) -> r3 = L->ci (FIRES @0x8276A4F0).
+  typeerror_fire_operand_misaligned  operand base+4 (FIRES @0x8276A4F0).
+  typeerror_fire_key_5E7A440C      (LAST block) base > top != 0, operand 0x5E7A440C -> bge to
+                                   loc_8276A508 -> r3 = 0 (FIRES @0x8276A508).
+  No normal case: every non-forced path calls luaG_runerror -> luaD_throw, which never returns
+  to the caller (noreturn on the console).
+sub_82773958
+  singleton_normal_already_built   golden singleton 0x829A936C is set -> early return.
+  No fire case: the bctrl is reached only when the singleton is null, after the real allocator
+  and the constructor install a vtable inside .text; a target outside .text needs an
+  allocation failure, which cannot be arranged standalone.
+sub_82774230 EventListener_UnsubscribeAll
+  unsubscribe_normal_empty         count 0: hook passes, beq to the epilogue.
+  unsubscribe_fire_count_over_64k  count 0x10001 -> treated as 0, no walk, no free (FIRES).
+  Not built: a normal walk with entries ends in operator delete of the list (a real heap block).
+sub_82787468 RenderBeginPickBuffer
+  pickbuf_normal_one_ready_entry   entry in state 2: marked 1, sub_82787C20 fills its 4-word
+                                   buffer with -1, [this+80] = 0.
+  pickbuf_fire_no_ready_entry      entry in state 0 -> r31 = -1 (FIRES).
+  pickbuf_fire_empty_list          count 0 (FIRES; via the ble into the label).
+sub_8278D3C0 / sub_8278D400 DogmaFree
+  dogmafree_normal_null / dogmafree4_normal_null  null pointer: early return.
+  dogmafree_normal_owned_ptr / dogmafree4_normal_owned_ptr  redirected heap-range table owns
+                                   the pointer: vt[44] dispatched (to sub_828CCE50).
+  dogmafree_fire_unowned_ptr / dogmafree4_fire_unowned_ptr  golden table (11 ranges) does not
+                                   own 0x700B0040: lookup 0 -> no vt[44] call (FIRES).
+sub_8279EC60 memcpy
+  memcpy_normal_19_bytes           unaligned-length copy (head/tail paths).
+  memcpy_fire_over_16MB            n = 0x01000001: nothing copied, r3 = dst (FIRES).
+  The call may go through the existing strong def (native memcpy) in both builds; it hands
+  sizes > 16 MB to the guest body, where the hook sits.
+sub_827A1698 CrtDoexit
+  doexit_fire_retcaller1           _lock(8), forced jump to the unlock (FIRES @0x827A16C0),
+                                   retcaller 1 -> return.
+  doexit_fire_retcaller0_skip_bugcheck  retcaller 0: also skips KeBugCheck (FIRES @0x827A16C0
+                                   and @0x827A1788).
+  No normal case: the forced jump fires on every call. The isGuestVAInRange guards
+  (@0x827A16B0, @0x827A177C) stay false for any stack VA inside a full guest reservation.
+sub_827A55F8 Crt_getptd_noexit
+  getptd_noexit_standalone         (LAST block) one call. With a per-thread data block from
+                                   the harness TLS it is the normal path (depth 1 -> 0); if the
+                                   harness TLS/heap imports make calloc fail, the OOM recursion
+                                   (getptd -> calloc -> _errno -> getptd) reaches depth 3 and the
+                                   cap fires. Either way both builds take the same path.
+  A deliberate fire needs that OOM recursion; it cannot be forced from a fixture.
+sub_827AC358 _mtinitlocknum
+  mtinitlocknum_normal_lock8_exists  golden lock table slot 8 is set -> returns 1.
+  No fire case: the guard needs a host stack deeper than 256 MB.
+sub_8280DDC0 NewBackendExpandNativeAluOpsPass
+  aluops_normal_one_node_high      one block, one instruction node at 0x82100200 (opcode 0, end
+                                   link): hook passes on link 0x82100220, the node takes the
+                                   no-expansion path, walk ends, pass returns.
+  Retired (phase 4.3 batch 3, docs/FORCING_RETIREMENT.md): aluops_fire_link_below_82000000 (the block's first
+      instruction link 0x700D0320 points at zeroed memory, so that node's own next link is 0). The generated
+      walk follows tagged links (bit 0 = the end sentinel): a 0 link gives node = 0 - 32 = 0xFFFFFFE0 and
+      the walk reads kernel space (a fault on the console; the harness reads it as zero and loops on
+      0xFFFFFFE0 forever). No reachable list has it: NewBackendNewInstr / the insert helpers link every
+      node between its neighbours and close the list with the block head | 1; an unlinked node is never
+      reached from a block. The guard's premise (instruction nodes live above 0x82000000) was never true
+      of a heap-allocated list; it simply never ran on one (0 fires).
+sub_828CCE60 DOGMA queue drain
+  drain_normal_inactive            pending flag clear: lock, unlock, return 1.
+  drain_normal_both_queues_empty   both heads at their sentinels: loops skipped, tail stores.
+  Retired (phase 4.3 batch 3, docs/FORCING_RETIREMENT.md): drain_fire_queue1_head_stuck, drain_fire_queue2_head_stuck,
+      drain_fire_both_queues_stuck (a heap whose vtable 0x700E1000 is all zeros). The generated drains
+      `while (head != sentinel) dispatch(head)` rely on the dispatch to unlink: queue 1 calls vt[144] =
+      DogmaHeapFree_Function_828CF538 on the posted block (node - *node, user pointer +8), whose free
+      unlinks the block's +8/+12 links and merges it; queue 2 calls vt[188] = sub_828D0460, an
+      unconditional unlink of the node's +24/+28 links, then vt[164] (sub_828D08F8, the node's callback).
+      With a zero vtable the dispatch is a call to address 0 (a fault on the console; [ICALL_FAIL]
+      target=0 here) and the head never moves. No reachable heap has it: every registered heap carries its
+      class vtable (0x820B30F8 root, 0x8209A8D0 / 0x82005E90 derived, golden dumps), the drains allocate
+      nothing (frees and unlinks only), and the census drained the deferred queues every frame with 0
+      fires. Not built then and still not: a real dispatch that leaves the head.
+sub_828CF878 DOGMA heap realloc
+  dogmarealloc_normal_null_ptr     ptr 0 -> tail call vt[132] (sub_828CCE50).
+  dogmarealloc_normal_mmapped_fits mmapped chunk (flag 2) large enough -> returns ptr.
+  No fire case: the guard needs a host stack deeper than 128 MB.
+sub_828D0968 DOGMA heap list pass
+  listpass_normal_empty            list empty: returns 0.
+  listpass_normal_one_idle_node    one idle node (byte +13 = 0): one pass, returns 0.
+  Retired (phase 4.3 batch 4, docs/FORCING_RETIREMENT.md): listpass_fire_1s_deadline_self_loop (an idle node
+      0x700F1000 whose next link +24 is itself). The generated walk `for (n = heap+1124; n != heap+1100;
+      n = n->next)` under the heap lock never reaches the sentinel on a self-linked node (the console spins
+      the same). No reachable list has it: the queue-2 nodes are linked once by the heap's insert and
+      unlinked by vt[188] = sub_828D0460 (links +24/+28 kept consistent on both sides); a node that is its
+      own successor exists only through memory corruption, and the walk allocates nothing (not a
+      memory-pressure or long-session state). The 1 s host deadline (0x828D09A0) returned a partial total,
+      which is why the old body answered r3 = 0 here.

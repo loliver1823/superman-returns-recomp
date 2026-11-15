@@ -1,0 +1,5 @@
+[
+  { "case_id": "bctr_inrange", "va": "0x8279E494", "regs": { "r4": "0x82670774" },
+    "note": "NEGATIVE CASE. mtctr r4; bctr -> dispatches through the (null in difftest) g_dispatchTable -> access violation. Proves the SEH guard reports a clean 'faulted' verdict instead of crashing difftest.exe.",
+    "expect_status": "faulted" }
+]

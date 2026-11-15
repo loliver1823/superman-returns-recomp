@@ -1,0 +1,13 @@
+; ScrMap.SetSupermanIcon tail (r1 = this, r3 = xPos, r2 = yPos; _global is not preloaded here):
+; _global.SRMap.Tick(this, xPos, yPos) - the game calls SetSupermanIcon every pause-map tick
+    Push [reg2]
+    Push [reg3]
+    Push [reg1]
+    EA_PushByte 3
+    Push ['_global']
+    GetVariable
+    Push ['SRMap']
+    GetMember
+    Push ['Tick']
+    CallMethod
+    Pop

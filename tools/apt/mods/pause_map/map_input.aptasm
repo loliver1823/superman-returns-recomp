@@ -1,0 +1,15 @@
+; ScrMap.HandleInput head (r1 = this, r2 = _global, r4 = keyCode): _global.SRMap.Input(this, keyCode)
+; true = handled (the d-pad, LB / RB, X: keys the retail map never used)
+    Push [reg4]
+    Push [reg1]
+    EA_PushByte 2
+    Push [reg2]
+    Push ['SRMap']
+    GetMember
+    Push ['Input']
+    CallMethod
+    Not
+    If map_input_pass
+    op_74
+    Return
+map_input_pass:

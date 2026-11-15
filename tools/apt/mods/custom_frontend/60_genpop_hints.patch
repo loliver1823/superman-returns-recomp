@@ -1,0 +1,118 @@
+# Lane E (RELEASE_PLAN step 5, E4; coordinator F1 + owner Q4 (b), 2026-10-23): every BACK a popup takes is shown.
+# The game's popup chrome (SCRGENPOP, the class ScrGenPop) shows only "A SELECT", whatever canCancel says: its
+# PopupInit loads Generic_BACK and never shows it (dump: PopupInit 0x0D16-0x0D7E). Part of the custom_frontend port
+# feature (on for players, off on natural rolls: port features off = the disc's ui.AST).
+#   - A popup that B cancels (mParams.canCancel) shows "A SELECT  B BACK"; one with no buttons (nothing to select)
+#     that B still cancels shows "B BACK" alone (Astra E4 r1: HandleInput takes B without a button count).
+#   - An OK-only information popup (one button, not cancellable) takes B as OK (owner Q4 (b): "the PC convention"),
+#     so it shows "A SELECT  B BACK" too.
+#   - Every other non-cancellable popup (the save prompt, YES / NO questions) is unchanged: no BACK.
+# The class is patched in MAIN, not in SCRGENPOP (E3-E6 r3, the Ally roll of 2026-10-23): MAIN (_level0, loaded first)
+# exports __Packages.ScrGenPop and registers its copy first, so SCRGENPOP's own copy never runs (patch_movie.py, THE
+# FIRST-REGISTRAR RULE, refuses a SCRGENPOP target). MAIN's PopupInit / HandleInput are the same code (PopupInit
+# 1156 B, reg1 this, reg2 _global, reg9 / reg10 the two texts; HandleInput reg3 keyCode).
+movie MAIN
+# PopupInit(params) (reg1 this, reg2 _global): after the game's own ShowHints(Generic_SELECT, "A"), the same bar with
+# BACK when B does something. ShowHints clears the bar first (ButtonHints.ShowHints -> ClearHints), so this replaces it.
+#   var p = this.mParams;
+#   var L = _global.LocalizationAdapter;
+#   if (p.numButtons > 0) {
+#     if (p.canCancel == true || p.numButtons == 1)
+#       this.mDisplayWell.ShowHints(L.GetLocalizedText("Generic_SELECT"), "A", L.GetLocalizedText("Generic_BACK"), "B");
+#   } else if (p.canCancel == true) {
+#     this.mDisplayWell.ShowHints(L.GetLocalizedText("Generic_BACK"), "B");
+#   }
+append-to function PopupInit in ScrGenPop
+    Push [reg1]
+    EA_GetNamedMember 'mParams'
+    EA_GetNamedMember 'numButtons'
+    EA_PushZero
+    Greater
+    Not
+    If srgh_nobuttons
+    Push [reg1]
+    EA_GetNamedMember 'mParams'
+    EA_GetNamedMember 'canCancel'
+    op_73
+    Equals2
+    If srgh_show
+    Push [reg1]
+    EA_GetNamedMember 'mParams'
+    EA_GetNamedMember 'numButtons'
+    EA_PushOne
+    Equals2
+    Not
+    If srgh_done
+srgh_show:
+    EA_PushConstByte 'B'
+    EA_PushConstByte 'Generic_BACK'
+    EA_PushOne
+    Push [reg2]
+    EA_GetNamedMember 'LocalizationAdapter'
+    EA_PushConstByte 'GetLocalizedText'
+    CallMethod
+    EA_PushConstByte 'A'
+    EA_PushConstByte 'Generic_SELECT'
+    EA_PushOne
+    Push [reg2]
+    EA_GetNamedMember 'LocalizationAdapter'
+    EA_PushConstByte 'GetLocalizedText'
+    CallMethod
+    EA_PushByte 4
+    Push [reg1]
+    EA_GetNamedMember 'mDisplayWell'
+    EA_CallNamedMethodPop 'ShowHints'
+    Jump srgh_done
+srgh_nobuttons:
+    Push [reg1]
+    EA_GetNamedMember 'mParams'
+    EA_GetNamedMember 'canCancel'
+    op_73
+    Equals2
+    Not
+    If srgh_done
+    EA_PushConstByte 'B'
+    EA_PushConstByte 'Generic_BACK'
+    EA_PushOne
+    Push [reg2]
+    EA_GetNamedMember 'LocalizationAdapter'
+    EA_PushConstByte 'GetLocalizedText'
+    CallMethod
+    EA_PushByte 2
+    Push [reg1]
+    EA_GetNamedMember 'mDisplayWell'
+    EA_CallNamedMethodPop 'ShowHints'
+srgh_done:
+end
+# HandleInput(keyCode r3) (reg1 this, reg2 _global): B on an OK-only popup that B cannot cancel presses its one
+# button, exactly as A does (the game's own CROSS path below picks the focused button, the only one).
+#   var p = this.mParams;
+#   if (keyCode == INPUTCODE.TRIANGLE && p.canCancel != true && p.numButtons == 1) keyCode = INPUTCODE.CROSS;
+prepend-to function HandleInput in ScrGenPop
+    Push [reg3]
+    Push [reg2]
+    EA_GetNamedMember 'INPUTCODE'
+    EA_GetNamedMember 'TRIANGLE'
+    Equals2
+    Not
+    If srok_done
+    Push [reg1]
+    EA_GetNamedMember 'mParams'
+    EA_GetNamedMember 'canCancel'
+    op_73
+    Equals2
+    If srok_done
+    Push [reg1]
+    EA_GetNamedMember 'mParams'
+    EA_GetNamedMember 'numButtons'
+    EA_PushOne
+    Equals2
+    Not
+    If srok_done
+    Push [reg2]
+    EA_GetNamedMember 'INPUTCODE'
+    EA_GetNamedMember 'CROSS'
+    StoreRegister 3
+    Pop
+srok_done:
+end

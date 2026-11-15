@@ -1,0 +1,127 @@
+; iter-464 (.include, top level of a class InitAction, reg1 = the mod object being built):
+; binds the shared mod-option methods (kernel/mod_bridge.cpp SR_GetModOptions /
+; SR_SetModOption; packed: bit 0 autosave_without_asking, default 1):
+;   AutosaveOn()      _global.SRModOptions unknown (undefined / < 0) = ON (the default), else bit 0
+;   AutosaveLabel()   "AUTOSAVE WITHOUT ASKING: ON" / "...: OFF"
+;   OnModOptions(p)   the host's reply, invoked as FlowMgr.SR_OnHostModOptions (this = FlowMgr):
+;                     _global.SRModOptions = p
+;   FetchModOptions() / ToggleAutosave(): bind FlowMgr.SR_OnHostModOptions only around the
+;                     fscommand (the host answers synchronously), so the host never calls into a
+;                     movie that is not loaded and two loaded movies never share the member
+; Every movie that includes this deletes the five methods again when it unloads.
+    Push [reg1]
+    EA_PushConstByte 'AutosaveOn'
+    .func2 ''() flags=0x40129
+        Push [reg2]
+        EA_GetNamedMember 'SRModOptions'
+        StoreRegister 3
+        Pop
+        Push [reg3]
+        op_76
+        Equals2
+        If ao_def
+        Push [reg3]
+        EA_PushZero
+        Less2
+        If ao_def
+        Push [reg3]
+        EA_PushOne
+        BitAnd
+        EA_PushZero
+        Equals2
+        Not
+        Return
+ao_def:
+        op_73
+        Return
+    .end
+    SetMember
+
+    Push [reg1]
+    EA_PushConstByte 'AutosaveLabel'
+    .func2 ''() flags=0x30129
+        EA_PushZero
+        Push [reg1]
+        EA_PushConstByte 'AutosaveOn'
+        CallMethod
+        Not
+        If al_off
+        EA_PushConstByte 'AUTOSAVE WITHOUT ASKING: ON'
+        Return
+al_off:
+        EA_PushConstByte 'AUTOSAVE WITHOUT ASKING: OFF'
+        Return
+    .end
+    SetMember
+
+    Push [reg1]
+    EA_PushConstByte 'OnModOptions'
+    .func2 ''(r3 'p') flags=0x40129
+        EA_PushConstByte 'FSCommand:SR_Log'
+        EA_PushConstByte 'mod options '
+        Push [reg3]
+        Add2
+        GetURL2
+        Push [reg2]
+        EA_PushConstByte 'SRModOptions'
+        Push [reg3]
+        SetMember
+    .end
+    SetMember
+
+    Push [reg1]
+    EA_PushConstByte 'FetchModOptions'
+    .func2 ''() flags=0x40129
+        Push [reg2]
+        EA_GetNamedMember 'FlowMgr'
+        StoreRegister 3
+        Pop
+        Push [reg3]
+        EA_PushConstByte 'SR_OnHostModOptions'
+        Push [reg1]
+        EA_GetNamedMember 'OnModOptions'
+        SetMember
+        GetURL 'FSCommand:SR_GetModOptions', ''
+        Push [reg3]
+        EA_PushConstByte 'SR_OnHostModOptions'
+        Delete
+        Pop
+    .end
+    SetMember
+
+    Push [reg1]
+    EA_PushConstByte 'ToggleAutosave'
+    .func2 ''() flags=0x50129
+        EA_PushOne
+        StoreRegister 4
+        Pop
+        EA_PushZero
+        Push [reg1]
+        EA_PushConstByte 'AutosaveOn'
+        CallMethod
+        Not
+        If ta_set
+        EA_PushZero
+        StoreRegister 4
+        Pop
+ta_set:
+        Push [reg2]
+        EA_GetNamedMember 'FlowMgr'
+        StoreRegister 3
+        Pop
+        Push [reg3]
+        EA_PushConstByte 'SR_OnHostModOptions'
+        Push [reg1]
+        EA_GetNamedMember 'OnModOptions'
+        SetMember
+        EA_PushConstByte 'FSCommand:SR_SetModOption'
+        EA_PushConstByte 'autosave_without_asking '
+        Push [reg4]
+        Add2
+        GetURL2
+        Push [reg3]
+        EA_PushConstByte 'SR_OnHostModOptions'
+        Delete
+        Pop
+    .end
+    SetMember

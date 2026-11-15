@@ -1,0 +1,50 @@
+; lane E L-b (step 5; owner Q5 (b), STEP5_PLAN 10): Included expression (.include): pushes the
+; SR_GameOptions FUNCTION, bound by srfrontend.aptasm (SRFrontEnd) and srpause.aptasm (SRPause), the
+; two movies that open the OPTIONS screen. The host calls it on the Apt pump while that screen is
+; open (kernel/game_options.hpp: aptcall::callPath, the guest thread, the AS interpreter idle).
+;
+; SR_GameOptions(p, s): the game's own options := p (packed as kernel/mod_bridge.hpp; bits 14 / 15
+; the store's apply_to_loaded_saves / volumes known) through this object's ApplyStore - the game's
+; own SettingsAdapter setters, only where the live value differs; ApplyStore logs
+; "apply why=3 store=<p> now=<snapshot> match=<bool>". s = the value the host has just STORED
+; (the screen's APPLY; the host wrote settings/game_options.ini with the same function as an
+; options screen's capture, kernel/mod_bridge.cpp modSettingsSavePacked) - it becomes
+; _global.SRSettings, as the capture's reply would make it; s = -1 (a live preview, or the stored
+; value sent back by REVERT / a close without APPLY): the game's live options only, and
+; _global.SRSettings is put back. Pseudo-AS:
+;   var keep = _global.SRSettings;
+;   _global.SRSettings = p;
+;   this.ApplyStore(3);
+;   _global.SRSettings = (s < 0) ? keep : s;
+; reg1 = this, reg2 = _global, reg3 = p, reg4 = s, reg5 = keep. One label (go_stored): include
+; this file once per assembly body.
+    .func2 ''(r3 'p', r4 's') flags=0x60129
+        Push [reg2]
+        EA_GetNamedMember 'SRSettings'
+        StoreRegister 5
+        Pop
+        Push [reg2]
+        EA_PushConstByte 'SRSettings'
+        Push [reg3]
+        SetMember
+        EA_PushByte 3
+        EA_PushOne
+        Push [reg1]
+        EA_CallNamedMethodPop 'ApplyStore'
+        Push [reg4]
+        EA_PushZero
+        Less2
+        Not
+        If go_stored
+        Push [reg2]
+        EA_PushConstByte 'SRSettings'
+        Push [reg5]
+        SetMember
+        op_76
+        Return
+go_stored:
+        Push [reg2]
+        EA_PushConstByte 'SRSettings'
+        Push [reg4]
+        SetMember
+    .end

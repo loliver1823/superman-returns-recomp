@@ -1,0 +1,8 @@
+{
+  "_comment": "Regression floor for scripts/smoke_test.py (docs/TOOLING_PLAN.md L2). Tighten as milestones land. A run PASSES when it clears every assert below.",
+  "timeout_s": 90,
+  "min_present": 600,
+  "forbid_fatal_crash": true,
+  "require_walk_end": false,
+  "rtam": false
+}

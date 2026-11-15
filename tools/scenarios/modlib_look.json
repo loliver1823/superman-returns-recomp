@@ -1,0 +1,20 @@
+{
+  "name": "modlib-look",
+  "purpose": "iter-465 modlib: a quick LOOK roll of the mod library overlay (docs/MODS.md 'The mod library') without the menu path: SR_MOD_LIBRARY_AUTOOPEN opens it over whatever is on screen, F12 (SR_MOD_LIBRARY_SHOTS) captures the composited frame at each stop. Content root: tools/modlib/make_test_mods.py into <croot>/mods, exe snapshot as <croot>/bin. Gates (add yours): SR_INSTANCE_ID=modlib,SR_MODS=@player,SR_MODS_ALLOW_WRITE=1,SR_MOD_LIBRARY_AUTOOPEN=12,SR_MOD_LIBRARY_SHOTS=<dir>,SR_WINDOW_SIZE=1920x1080.",
+  "gates": "SR_KB_PAD_OBS=1",
+  "steps": [
+    { "name": "shown", "await": "\\[MODLIB\\] shown", "timeoutMs": 180000 },
+    { "name": "settle", "dwellMs": 3500 },
+    { "name": "shot-grid", "key": "F12", "holdMs": 150, "maxPulses": 1, "expect": "\\[MODLIB\\] shot", "expectMs": 8000, "dwellMs": 600 },
+    { "name": "right", "key": "RIGHT", "holdMs": 120, "maxPulses": 1, "dwellMs": 700 },
+    { "name": "shot-focus", "key": "F12", "holdMs": 150, "maxPulses": 1, "expect": "\\[MODLIB\\] shot", "expectFresh": true, "expectMs": 8000, "dwellMs": 600 },
+    { "name": "details", "key": "A", "holdMs": 150, "maxPulses": 1, "dwellMs": 2200 },
+    { "name": "shot-details", "key": "F12", "holdMs": 150, "maxPulses": 1, "expect": "\\[MODLIB\\] shot", "expectFresh": true, "expectMs": 8000, "dwellMs": 600 },
+    { "name": "details-back", "key": "B", "holdMs": 150, "maxPulses": 1, "dwellMs": 800 },
+    { "name": "tab-order", "key": "RB", "holdMs": 150, "maxPulses": 1, "dwellMs": 1500 },
+    { "name": "shot-order", "key": "F12", "holdMs": 150, "maxPulses": 1, "expect": "\\[MODLIB\\] shot", "expectFresh": true, "expectMs": 8000, "dwellMs": 600 },
+    { "name": "tab-more", "key": "RB", "holdMs": 150, "maxPulses": 1, "dwellMs": 1500 },
+    { "name": "shot-more", "key": "F12", "holdMs": 150, "maxPulses": 1, "expect": "\\[MODLIB\\] shot", "expectFresh": true, "expectMs": 8000, "dwellMs": 600 },
+    { "name": "close", "key": "B", "holdMs": 150, "maxPulses": 1, "expect": "\\[MODLIB\\] hidden", "expectMs": 8000, "dwellMs": 1500 }
+  ]
+}

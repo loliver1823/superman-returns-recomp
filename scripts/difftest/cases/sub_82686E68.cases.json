@@ -1,0 +1,7 @@
+[
+  { "case_id": "r3_zero",  "va": "0x82686E68", "regs": { "r3": "0x0", "r4": "0x5" },        "expect": { "r3": "0x0" } },
+  { "case_id": "add_pos",  "va": "0x82686E68", "regs": { "r3": "0xa", "r4": "0x3" },        "expect": { "r3": "0xd" } },
+  { "case_id": "wrap",     "va": "0x82686E68", "regs": { "r3": "0xffffffff", "r4": "0x1" }, "expect": { "r3": "0x0" } },
+  { "case_id": "r3_one",   "va": "0x82686E68", "regs": { "r3": "0x1", "r4": "0xffffffff" }, "expect": { "r3": "0x0" } },
+  { "case_id": "r4_zero",  "va": "0x82686E68", "regs": { "r3": "0x7", "r4": "0x0" },        "expect": { "r3": "0x7" } }
+]

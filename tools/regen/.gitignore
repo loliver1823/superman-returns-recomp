@@ -1,0 +1,7 @@
+# regeneration intermediates (large / fully derived)
+ppc_out/
+assembled/
+handedits/
+build_log.txt
+genuine_edits.txt
+ppc_out_*/

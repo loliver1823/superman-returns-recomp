@@ -1,0 +1,19 @@
+; After ThumbViewer.Create (the end of InitGui): the name line is ONE line, mGridWidth wide, font
+; 24 (ThumbViewer.CreateTextFields). When the host's catalog has a longer name it sends a smaller
+; font for the screen (SR_CostumeEnd count, nameFont); a name too long even for that arrives
+; truncated with "..." and its full text opens the description. r1=this, r2=_global.
+    Push [reg2]
+    EA_GetNamedMember 'SRCostumes'
+    EA_GetNamedMember 'nameFont'
+    op_76
+    Equals2
+    If costume_font_done
+    Push [reg2]
+    EA_GetNamedMember 'SRCostumes'
+    EA_GetNamedMember 'nameFont'
+    EA_PushOne
+    Push [reg1]
+    EA_GetNamedMember 'mThumbViewer'
+    EA_GetNamedMember 'mThumbNameTxt'
+    EA_CallNamedMethodPop 'SetFontSize'
+costume_font_done:

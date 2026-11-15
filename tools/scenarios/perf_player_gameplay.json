@@ -1,0 +1,79 @@
+{
+  "name": "perf-player-gameplay",
+  "purpose": "iter-465 perf lane (tools/perf/perf_run.py --scenario gameplay): the player's path WITHOUT the MODS restart (player_wholerun.json's child half): boot -> intro movies -> title -> custom MAIN MENU -> NEW GAME (cursor click) -> the opening FMV -> the tutorial in Metropolis with the HUD, then a long gameplay window (tools/player/gameplay_play.txt drives keyboard + mouse-look through the harness channel). Only milestone lines are awaited, so it also runs under SR_LOG=player. Run with SR_PORT_FEATURES=1 for the player's configuration (natural=false).",
+  "gates": "SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=300,SR_PRESENT_DUMP_SPARSE_CAP=200",
+  "steps": [
+    {
+      "name": "fe-alive",
+      "await": "\\[NAT_FE\\] #1 natural FE master tick",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "settle-title",
+      "await": "\\[NAT_FE\\] #256 natural FE master tick",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "press-start",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 4,
+      "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)",
+      "expectMs": 90000
+    },
+    {
+      "name": "title-ui-tail",
+      "await": "\\[APT_REQ\\] #\\d+ path='\\.\\./common/ButtonHints/XBox360/HintB'",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "title-settle",
+      "purpose": "The title era (fps sample) before START.",
+      "dwellMs": 20000
+    },
+    {
+      "name": "start-bootflow",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 10000,
+      "expect": "\\[SR_FSCMD\\].*claim LoadCreate",
+      "expectMs": 30000
+    },
+    {
+      "name": "menu-settle",
+      "purpose": "The MAIN MENU era fps sample (no mouse: the focus stays on NEW GAME, row 0).",
+      "dwellMs": 15000
+    },
+    {
+      "name": "new-game",
+      "purpose": "ENTER (= A) on NEW GAME (the default focus, row 0).",
+      "key": "ENTER",
+      "holdMs": 300,
+      "maxPulses": 3,
+      "gapMs": 8000,
+      "expect": "\\[SR_FSCMD\\].*answer cppId=\\S+ button=0",
+      "expectMs": 30000
+    },
+    {
+      "name": "game-starts",
+      "expect": "\\[APT_REQ\\] #\\d+ path='screens/hud/main_hud'",
+      "expectMs": 240000
+    },
+    {
+      "name": "skip-opening-movie", "cutsceneSkip": true,
+      "purpose": "iter-467 cutscene skip (owner 2026-10-11: a natural player action, not forcing; sr_drive -SkipCutscenes / SR_DRIVE_SKIP_CUTSCENES=0 turns it off): A pulses during the new game's opening FMV (the skip-movie action, event 187: A (alt) / START in the gameplay contexts, docs/PC_CONTROLS.md) until the movie is over: the player's first gameplay MODE ([PC_CONTROLS] context gameplay ... mode on-foot camera; the merge-ready gate showed pad A killing the opening FMV with NO [EV187] accept line), an [EV187] ... ACCEPTED-KILL edge, or the movie's own EOM if it ends first. The gate's in-game start takes either (tools/perf/perf_report.py MOVIE_SKIP). Optional: a missed skip only costs the movie's 30 s.",
+      "key": "A", "holdMs": 400, "holdUntilConfirmed": true, "maxPulses": 15, "gapMs": 2000, "optional": true,
+      "expect": "\\[EV187\\] #\\d+ slot=\\d+ rc=01 ACCEPTED-KILL|\\[MOVIE_PACE\\] movie#\\d+ EOM wall=[\\d.]+s frames=(?:[2-9]|[1-9]\\d+)\\b|\\[PC_CONTROLS\\] context gameplay \\(igc type \\d+\\) config \\S+ invX=\\d+ invY=\\d+ mode [a-z]",
+      "expectFresh": true, "expectMs": 60000
+    },
+    {
+      "name": "gameplay",
+      "purpose": "Gameplay window (the tutorial): gameplay_play.txt walks, looks, takes off and flies meanwhile.",
+      "dwellMs": 150000
+    }
+  ]
+}

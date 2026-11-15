@@ -1,0 +1,26 @@
+# iter-465 playthrough lane: companion of devtools_skip_menu.json (tools/controls/harness_play.py).
+# After the menu's SKIP and after SKIP CHAPTER's race, fly Superman out of the minigame's start radius
+# (player keymap: W = forward, Space = take off), then give the keys back to sr_drive (legacy keymap).
+# A repeatable minigame (race, Bizarro rampage) restarts by itself while the player stands in its radius.
+await \[APT_REQ\] .*path='screens/hud/main_hud' 1500
+await \[DEVTOOL\] act=levelskip\.pass args=\d+ \S+ ticket= 3600
+keymap player
+down W
+wait 300
+tap Space 150
+wait 6000
+tap Space 150
+wait 6000
+up W
+keymap legacy
+sample after_skip
+await \[DEVTOOL\] levelskip armed plan=.*menu_skip_chapter 3600
+await \[DEVTOOL\] act=levelskip\.pass args=95 FastFlyer tick= 900
+keymap player
+down W
+wait 300
+tap Space 150
+wait 9000
+up W
+keymap legacy
+sample after_chapter

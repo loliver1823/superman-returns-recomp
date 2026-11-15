@@ -1,0 +1,57 @@
+{
+  "name": "mod-title-capture",
+  "purpose": "iter-463 mods/ overlay experiment E1 (docs/CUSTOM_FRONTEND.md 7.2, docs/MODS.md). Reaches the PRESS START title exactly as title_readiness_start.json does, requires a visible title, dwells 20 s on it (the capture window for the press-start text), sends ONE START and dwells 25 s on whatever the boot flow raises (LOAD A GAME? with the XAM fix). Run the same scenario with and without a mod (-Gates SR_MODS=<name>) and compare the APT_REQ order, the [MOD] lines and the frames. -TimeoutSeconds 360.",
+  "gates": "SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=30,SR_PRESENT_DUMP_SPARSE_CAP=400",
+  "steps": [
+    {
+      "name": "fe-alive",
+      "await": "\\[NAT_FE\\] #1 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "settle-title",
+      "await": "\\[NAT_FE\\] #256 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "press-start",
+      "key": "ENTER",
+      "holdMs": 250,
+      "maxPulses": 4,
+      "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)",
+      "expectMs": 90000
+    },
+    {
+      "name": "first-screen",
+      "expect": "\\[FE_SETSCREEN\\] #1 ",
+      "expectMs": 60000
+    },
+    {
+      "name": "title-ui-tail",
+      "await": "\\[APT_REQ\\] #15 path='\\.\\./common/ButtonHints/XBox360/HintB'",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "title-visible",
+      "purpose": "Post-entry presented frames non-black for 8 s, then a 20 s capture window on the title (the press-start text).",
+      "requireVisibleMs": 8000,
+      "visibleTimeoutMs": 200000,
+      "dwellMs": 20000
+    },
+    {
+      "name": "start-once",
+      "key": "ENTER",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "XamShowDeviceSelectorUI\\(user=|\\[APT_REQ\\] #\\d+ path='screens/misc/ScrGenPop'",
+      "expectMs": 30000,
+      "optional": true
+    },
+    {
+      "name": "observe-bootflow",
+      "purpose": "Capture window for the boot-flow popup.",
+      "dwellMs": 25000
+    }
+  ]
+}

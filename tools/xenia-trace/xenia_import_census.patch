@@ -1,0 +1,48 @@
+superman-recomp logic audit (docs/LOGIC_AUDIT.md 2.0c): the per-export import census of a Xenia build -
+RECORDS ONLY (entries / returns / caller lr / results / the first calls), the oracle half of SR_AUDIT_IMPORTS.
+Base: xenia-canary 0bd090dbe979bc64959efe519aa320db8e3eb467 (the oracle). Off unless XENIA_IMPORT_CENSUS=<path.json>.
+
+TO APPLY (from the 0bd090dbe source root):
+    cp <repo>/tools/xenia-trace/sr_import_census.h src/xenia/kernel/util/sr_import_census.h
+    git apply --whitespace=nowarn --ignore-whitespace <repo>/tools/xenia-trace/xenia_import_census.patch
+BUILD: tools/xenia-trace/build_import_census.ps1 on the cloud worker (an agent-owned output folder).
+---
+diff --git a/src/xenia/kernel/util/shim_utils.h b/src/xenia/kernel/util/shim_utils.h
+index a0415b0..5792655 100644
+--- a/src/xenia/kernel/util/shim_utils.h
++++ b/src/xenia/kernel/util/shim_utils.h
+@@ -22,6 +22,7 @@
+ #include "xenia/cpu/ppc/ppc_context.h"
+ #include "xenia/kernel/kernel_flags.h"
+ #include "xenia/kernel/kernel_state.h"
++#include "xenia/kernel/util/sr_import_census.h"  // superman-recomp logic audit (records only)
+ 
+ namespace xe {
+ namespace kernel {
+@@ -544,6 +545,10 @@ struct ExportRegistrerHelper {
+         new cpu::Export(ORDINAL, xe::cpu::Export::Type::kFunction, name, TAGS);
+     struct X {
+       static void Trampoline(PPCContext* ppc_context) {
++        // superman-recomp logic audit (sr_import_census.h): records only; null unless XENIA_IMPORT_CENSUS is set.
++        xe::sr_census::Slot* const sr_slot =
++            xe::sr_census::SlotFor<static_cast<uint32_t>(MODULE), ORDINAL>(export_entry->name);
++        const int sr_first = sr_slot ? xe::sr_census::Enter(sr_slot, ppc_context) : -1;
+         Param::Init init = {
+             ppc_context,
+             0,
+@@ -567,11 +572,15 @@ struct ExportRegistrerHelper {
+         if constexpr (std::is_void<R>::value) {
+           KernelTrampoline(fn, std::forward<std::tuple<Ps...>>(params),
+                            std::make_index_sequence<sizeof...(Ps)>());
++          if (sr_slot) xe::sr_census::Leave(sr_slot, sr_first, 0, false);
+         } else {
+           auto result =
+               KernelTrampoline(fn, std::forward<std::tuple<Ps...>>(params),
+                                std::make_index_sequence<sizeof...(Ps)>());
+           result.Store(ppc_context);
++          if (sr_slot)
++            xe::sr_census::Leave(sr_slot, sr_first,
++                                 static_cast<uint32_t>(ppc_context->r[3]), true);
+           if (TAGS &
+               (xe::cpu::ExportTag::kLog | xe::cpu::ExportTag::kLogResult)) {
+             // TODO(benvanik): log result.

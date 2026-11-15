@@ -1,0 +1,125 @@
+superman-recomp L9-A oracle trace, v2 (iter-463 burndown) - against xenia-canary-oracle
+(canary_experimental @ 0bd090dbe979bc64959efe519aa320db8e3eb467).
+
+Supersedes xenia_trace.patch + xenia_trace_jitprolog.patch for the ORACLE tree (those two
+remain for reference/xenia-canary @ 0b4e6c4). Adds, on top of the v1 hooks:
+  - XENIA_GUEST_TRACE_VAS: JIT-time function-entry filter (only listed functions get the
+    prolog call; everything else is stock code), so a whole boot-to-gameplay run is cheap;
+  - XENIA_GUEST_TRACE_ICALL_FUNCS / XENIA_GUEST_TRACE_ICALL_BAD: an X64Emitter::CallIndirect
+    call-site hook that records indirect-call targets (tag 2 = from a listed function,
+    tag 3 = target outside [0x820F0000,0x8290F5B8) or misaligned, i.e. exactly our
+    PPC_CALL_INDIRECT_FUNC "out-of-range" condition).
+Record format unchanged (XENTRC01 + 32-byte records). Unit test: test_xenia_trace.cpp.
+
+TO APPLY (from reference/xenia-canary-oracle):
+    cp ../../tools/xenia-trace/xenia_trace.h src/xenia/cpu/xenia_trace.h
+    git apply ../../tools/xenia-trace/xenia_trace_oracle.patch
+BUILD (separate output dir; never touches the user's Xenia install):
+    see tools/xenia-trace/README.md "Oracle v2 build".
+---
+diff --git a/src/xenia/cpu/backend/x64/x64_emitter.cc b/src/xenia/cpu/backend/x64/x64_emitter.cc
+index 694c92b..f28ada5 100644
+--- a/src/xenia/cpu/backend/x64/x64_emitter.cc
++++ b/src/xenia/cpu/backend/x64/x64_emitter.cc
+@@ -38,6 +38,7 @@
+ #include "xenia/cpu/processor.h"
+ #include "xenia/cpu/symbol.h"
+ #include "xenia/cpu/thread_state.h"
++#include "xenia/cpu/xenia_trace.h"  // superman-recomp L9-A oracle trace
+ 
+ DEFINE_bool(debugprint_trap_log, false,
+             "Log debugprint traps to the active debugger", "CPU");
+@@ -74,6 +75,32 @@ using namespace xe::literals;
+ 
+ static constexpr size_t kMaxCodeSize = 1_MiB;
+ 
++// superman-recomp L9-A oracle trace trampolines (tools/xenia-trace/README.md).
++// Reached through CallNative -> guest_to_host_thunk, which saves/restores the
++// volatile registers and MXCSR and passes the PPCContext* first. Only emitted
++// when XENIA_GUEST_TRACE=1 (and the VA filters select the function), so with
++// tracing off the JIT output is stock.
++//
++// Prolog hook: guest_pc is the JIT-time constant function address.
++static uint64_t XeTraceJitProlog(void* raw_context, uint64_t guest_pc) {
++  auto* ctx = reinterpret_cast<ppc::PPCContext*>(raw_context);
++  xe::trace::GuestTracer::Get().EmitFuncEntry(
++      static_cast<uint32_t>(guest_pc), static_cast<uint32_t>(ctx->lr),
++      ctx->r[3], ctx->r[1], ctx->thread_id);
++  return 0;
++}
++// Call-site hook: the target was parked in ctx->scratch by the emitted code;
++// ctx->lr already holds the call-site return address (the frontend's StoreLR
++// precedes the CALL_INDIRECT, and calls are volatile so the store is not
++// eliminated). arg0 = the calling function's entry VA (JIT-time constant).
++static uint64_t XeTraceIndirectCall(void* raw_context, uint64_t fn_va) {
++  auto* ctx = reinterpret_cast<ppc::PPCContext*>(raw_context);
++  xe::trace::GuestTracer::Get().EmitIndirectCall(
++      static_cast<uint32_t>(fn_va), static_cast<uint32_t>(ctx->scratch),
++      static_cast<uint32_t>(ctx->lr), ctx->r[3], ctx->r[1], ctx->thread_id);
++  return 0;
++}
++
+ // static const size_t kStashOffsetHigh = 32 + 32;
+ 
+ constexpr uint32_t X64Emitter::gpr_reg_map_[X64Emitter::GPR_COUNT] = {
+@@ -264,6 +291,14 @@ bool X64Emitter::Emit(HIRBuilder* builder, EmitFunctionInfo& func_info) {
+     bts(qword[low_address(&trace_header->function_thread_use)], rax);
+   }
+ 
++  // superman-recomp L9-A oracle: per-function-entry trace, emitted only for the
++  // functions XENIA_GUEST_TRACE_VAS selects (all when unset). Fires on guest->guest
++  // bl calls too, unlike the GuestFunction::Call hook.
++  if (xe::trace::GuestTracer::Get().WantProlog(current_guest_function_)) {
++    CallNative(&XeTraceJitProlog,
++               static_cast<uint64_t>(current_guest_function_));
++  }
++
+   // Load membase.
+   /*
+   * chrispy: removed this, as long as we load it in HostToGuestThunk we can
+@@ -748,6 +783,16 @@ void X64Emitter::CallIndirect(const hir::Instr* instr,
+     je(epilog_label(), CodeGenerator::T_NEAR);
+   }
+ 
++  // superman-recomp L9-A oracle: indirect-call hook (XENIA_GUEST_TRACE_ICALL_FUNCS
++  // / _ICALL_BAD). Park the target in ctx->scratch (CallNative clobbers rcx/rdx/rax
++  // before the thunk saves registers), record, then reload it into `reg`.
++  if (xe::trace::GuestTracer::Get().WantIcall(current_guest_function_)) {
++    mov(qword[GetContextReg() + offsetof(ppc::PPCContext, scratch)], reg);
++    CallNative(&XeTraceIndirectCall,
++               static_cast<uint64_t>(current_guest_function_));
++    mov(reg, qword[GetContextReg() + offsetof(ppc::PPCContext, scratch)]);
++  }
++
+   // Load the pointer to the indirection table maintained in X64CodeCache.
+   // The target dword will either contain the address of the generated code
+   // or a thunk to ResolveAddress.
+diff --git a/src/xenia/cpu/function.cc b/src/xenia/cpu/function.cc
+index c2dcf52..c8e2a8c 100644
+--- a/src/xenia/cpu/function.cc
++++ b/src/xenia/cpu/function.cc
+@@ -12,6 +12,7 @@
+ #include "xenia/base/logging.h"
+ #include "xenia/cpu/symbol.h"
+ #include "xenia/cpu/thread_state.h"
++#include "xenia/cpu/xenia_trace.h"  // superman-recomp L9-A oracle trace
+ 
+ namespace xe {
+ namespace cpu {
+@@ -132,6 +133,16 @@ uint32_t GuestFunction::MapMachineCodeToGuestAddress(
+ bool GuestFunction::Call(ThreadState* thread_state, uint32_t return_address) {
+   // SCOPE_profile_cpu_f("cpu");
+ 
++  // superman-recomp L9-A oracle (tools/xenia-trace, BSD-3 upstream untouched
++  // otherwise): record host->guest re-entries. No-op unless XENIA_GUEST_TRACE=1;
++  // honours the XENIA_GUEST_TRACE_VAS entry filter.
++  if (xe::trace::GuestTracer::Get().WantProlog(address())) {
++    auto* ctx = thread_state->context();
++    xe::trace::GuestTracer::Get().EmitFuncEntry(
++        address(), static_cast<uint32_t>(ctx->lr), ctx->r[3], ctx->r[1],
++        thread_state->thread_id());
++  }
++
+   ThreadState* original_thread_state = ThreadState::Get();
+   if (original_thread_state != thread_state) {
+     ThreadState::Bind(thread_state);

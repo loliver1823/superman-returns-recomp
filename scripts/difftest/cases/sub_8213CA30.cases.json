@@ -1,0 +1,16 @@
+[
+  { "case_id": "incr_basic",    "va": "0x8213CA30", "regs": { "r3": "0x82F00000" },
+    "mem":   { "0x82F00000": "00000010" },
+    "watch": [ { "addr": "0x82F00000", "size": 4 } ],
+    "expect_mem": { "0x82F00003": "11" } },
+
+  { "case_id": "incr_wrap",     "va": "0x8213CA30", "regs": { "r3": "0x82F00000" },
+    "mem":   { "0x82F00000": "ffffffff" },
+    "watch": [ { "addr": "0x82F00000", "size": 4 } ],
+    "expect_mem": { "0x82F00000": "00000000" } },
+
+  { "case_id": "incr_be_carry", "va": "0x8213CA30", "regs": { "r3": "0x82F00000" },
+    "mem":   { "0x82F00000": "000000ff" },
+    "watch": [ { "addr": "0x82F00000", "size": 4 } ],
+    "expect_mem": { "0x82F00002": "0100" } }
+]

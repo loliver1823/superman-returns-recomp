@@ -1,0 +1,39 @@
+From a02579baddb4bf31593a5f91f94202f1fa3324f8 Mon Sep 17 00:00:00 2001
+From: Lachlan Oliver <151630620+loliver1823@users.noreply.github.com>
+Date: Thu, 1 Oct 2026 03:35:47 +1000
+Subject: [PATCH] vcmpgtub./vcmpgtuh.: emit the record-form CR6 update
+
+Every other vcmp record form calls cr6.setFromMask; these two emitted only the
+compare, so mfocrf/bc on cr6 after them read a stale field (6 vcmpgtuh. sites
+in Superman Returns' VC-1 decoder).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ XenonRecomp/recompiler.cpp | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/XenonRecomp/recompiler.cpp b/XenonRecomp/recompiler.cpp
+index a501c4d..dff4ff1 100644
+--- a/XenonRecomp/recompiler.cpp
++++ b/XenonRecomp/recompiler.cpp
+@@ -2030,10 +2030,17 @@ bool Recompiler::Recompile(
+ 
+     case PPC_INST_VCMPGTUB:
+         println("\tsimde_mm_store_si128((simde__m128i*){}.u8, simde_mm_cmpgt_epu8(simde_mm_load_si128((simde__m128i*){}.u8), simde_mm_load_si128((simde__m128i*){}.u8)));", v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]));
++        // Record form vcmpgtub. sets CR6 = all_true | 0 | none_true | 0, like every other vcmp.
++        if (strchr(insn.opcode->name, '.'))
++            println("\t{}.setFromMask(simde_mm_load_si128((simde__m128i*){}.u8), 0xFFFF);", cr(6), v(insn.operands[0]));
+         break;
+ 
+     case PPC_INST_VCMPGTUH:
+         println("\tsimde_mm_store_si128((simde__m128i*){}.u8, simde_mm_cmpgt_epu16(simde_mm_load_si128((simde__m128i*){}.u16), simde_mm_load_si128((simde__m128i*){}.u16)));", v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]));
++        // Record form vcmpgtuh. (6 sites in the VC-1 decoder, each read by mfocrf cr6): halfword
++        // lanes of all-ones set both bytes, so the byte movemask is 0xFFFF iff every lane is true.
++        if (strchr(insn.opcode->name, '.'))
++            println("\t{}.setFromMask(simde_mm_load_si128((simde__m128i*){}.u8), 0xFFFF);", cr(6), v(insn.operands[0]));
+         break;
+ 
+     case PPC_INST_VEXPTEFP:
+-- 
+2.43.0.windows.1
+

@@ -1,0 +1,41 @@
+# iter-463: the shader cache is byte-exact data. The runtime translator compares a cached
+# .vs.vfetch with its own LF output, and core.autocrlf=true would check it out CRLF.
+data/shader_cache/** -text
+
+# iter-466: the asset tools run under Git Bash; CRLF breaks `set -euo pipefail`.
+tools/assets/**/*.sh text eol=lf
+
+# iter-467: Git Bash tools in tools/ (a CRLF checkout breaks every line in bash).
+tools/*.sh text eol=lf
+
+# iter-467: tools/regen/regen.py stamps guest/ppc with the hash of its inputs' BYTES (the tomls,
+# patches, hand headers, regen.py, assemble.py, flag_transform.py, abi_bridge.json), and
+# core.autocrlf=true checked them out CRLF: a CRLF and an LF checkout of the same commit wanted
+# different stamps (one regenerated for nothing), and a worktree whose tools rewrote some of
+# them LF matched neither. LF everywhere; text=auto leaves any binary alone. (git apply takes
+# the LF patches on the CRLF export of XenonRecomp that regen.py makes on such a machine.)
+tools/regen/** text=auto eol=lf
+
+# iter-467 forcing: assemble.py copies the (LF) hand stub file into guest/ppc at regen; the copy is
+# tracked, so it needs the same rule or every regen leaves it "modified" on a core.autocrlf checkout.
+guest/ppc/ppc_missing_recomp_stubs.cpp text eol=lf
+
+# Native transport defect controls edit exact source bytes and multiline anchors.
+# Keep the reviewed LF source identical on core.autocrlf Windows checkouts.
+kernel/native_transport.cpp text eol=lf
+
+# Xenia's shader sources (cmake/xenia_shaders.cmake), vendored as the upstream blobs byte for byte:
+# tools/vendor_xenia_shaders.py --check compares their SHA-256 with SOURCES.txt.
+third_party/xenia-shaders/src/** -text
+third_party/xenia-shaders/third_party/** -text
+third_party/xenia-shaders/LICENSE -text
+
+# The DXC release zip's MIT notice, kept as the zip's bytes (CRLF) on every checkout.
+tools/xenosrecomp/LICENSE-DXC-MIT.txt -text
+
+# step 4 lane A: the oracle runbooks run under Git Bash too.
+tools/oracle/*.sh text eol=lf
+
+# step 6 (Fable 24(3c)): a canary route file is pinned by the sha256 of its bytes (route_repeat --route-sha256);
+# LF in every checkout, so the frozen hash is the same everywhere.
+tools/perf/routes/*.json text eol=lf

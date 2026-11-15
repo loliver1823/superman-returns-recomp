@@ -1,0 +1,35 @@
+; Appended to ExitScreen() of ScrGameplayOpt / ScrControllerOpt / ScrAudioOpt (reg2 =
+; _global, flags 0x129). Stack-only. Runs after the game's own ExitScreen body, which is
+; where Gameplay applies Y inversion / auto-center and Controller applies the scheme (Audio
+; and vibration apply on change), so the getters return what the game now uses. In the
+; front end AND from the in-game pause menu: that is how in-game changes reach the menu.
+;   _global.FlowMgr.SR_OnHostSettings = <host_settings_fn>;   // the reply lands here
+;   fscommand("SR_SetSettings", "<screen tag>" + _global.FlowMgr.CurInterfaceState + " "
+;             + <snapshot of the SettingsAdapter getters>);   // the host persists the last token
+;   // The host's reply is the ONLY writer of _global.SRSettings: the value as stored (the
+;   // host-owned bits 14 apply_to_loaded_saves / 15 volumes known, volumes kept while there
+;   // is no audio mixer). A failed file write still replies (the same value, kept for the
+;   // session); an invalid snapshot (a getter returned undefined -> NaN) gets no reply, so
+;   // _global.SRSettings keeps its last good value (iter-463 settings review finding 2).
+;   delete _global.FlowMgr.SR_OnHostSettings;
+    Push [reg2]
+    EA_GetNamedMember 'FlowMgr'
+    EA_PushConstByte 'SR_OnHostSettings'
+.include 'host_settings_fn.aptasm'
+    SetMember
+    EA_PushConstByte 'FSCommand:SR_SetSettings'
+    EA_PushConstByte $TAG
+    Push [reg2]
+    EA_GetNamedMember 'FlowMgr'
+    EA_GetNamedMember 'CurInterfaceState'
+    Add2
+    EA_PushConstByte ' '
+    Add2
+.include 'snapshot_expr.aptasm'
+    Add2
+    GetURL2
+    Push [reg2]
+    EA_GetNamedMember 'FlowMgr'
+    EA_PushConstByte 'SR_OnHostSettings'
+    Delete
+    Pop

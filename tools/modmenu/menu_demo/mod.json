@@ -1,0 +1,6 @@
+{
+  "name": "Menu Demo",
+  "author": "superman-recomp (test mod)",
+  "version": "0.1",
+  "description": "A harmless example for the MODS menu: it adds one text file the game never reads. Copy this folder into the mods folder to see how a mod with a manifest is listed."
+}

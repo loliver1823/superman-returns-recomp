@@ -1,0 +1,14 @@
+; r1 = this, r2 = _global, r3 = keyCode. _global.SRViewer.Input(this, keyCode) true = handled.
+    Push [reg3]
+    Push [reg1]
+    EA_PushByte 2
+    Push [reg2]
+    Push ['SRViewer']
+    GetMember
+    Push ['Input']
+    CallMethod
+    Not
+    If viewer_input_pass
+    op_74
+    Return
+viewer_input_pass:

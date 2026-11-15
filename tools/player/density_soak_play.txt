@@ -1,0 +1,333 @@
+# iter-466 density lane: a 10-minute low free-roam FLIGHT for the 200% stability soak (harness_play.py,
+# player keymap). v2: stay airborne (v1 landed and walked into a Midtown wall for 8 of its 10 minutes).
+# Take off once, then 40 cycles of: fly forward (W) for ~12 s with a slow turn, then a sharp turn
+# away so a wall never holds him (a collision landing still walks on with the same turns).
+# (no '#' inside a command: harness_play.py strips everything after one as a comment)
+await \[APT_REQ\] .*path='screens/hud/main_hud' 1500
+wait 15000
+keymap player
+sample start
+tap Space 200
+wait 2500
+# cycle 1
+down W
+mouse 500 0 6000
+wait 6000
+up W
+mouse 1600 0 1200
+wait 300
+sample fly-1
+# cycle 2
+down W
+mouse -700 0 6000
+wait 6000
+up W
+mouse -1600 0 1200
+wait 300
+sample fly-2
+# cycle 3
+down W
+mouse 350 0 6000
+wait 6000
+up W
+mouse 1600 0 1200
+wait 300
+sample fly-3
+# cycle 4
+down W
+mouse -450 0 6000
+wait 6000
+up W
+mouse -1600 0 1200
+wait 300
+sample fly-4
+# cycle 5
+down W
+mouse 800 0 6000
+wait 6000
+up W
+mouse 1600 0 1200
+wait 300
+sample fly-5
+# cycle 6
+down W
+mouse -300 0 6000
+wait 6000
+up W
+mouse -1600 0 1200
+wait 300
+sample fly-6
+# cycle 7
+down W
+mouse 600 0 6000
+wait 6000
+up W
+mouse 1600 0 1200
+wait 300
+sample fly-7
+# cycle 8
+down W
+mouse -850 0 6000
+wait 6000
+up W
+mouse -1600 0 1200
+wait 300
+sample fly-8
+# cycle 9
+down W
+mouse 500 0 6000
+wait 6000
+up W
+mouse 1600 0 1200
+wait 300
+sample fly-9
+# cycle 10
+down W
+mouse -700 0 6000
+wait 6000
+up W
+mouse -1600 0 1200
+wait 300
+sample fly-10
+# cycle 11
+down W
+mouse 350 0 6000
+wait 6000
+up W
+mouse 1600 0 1200
+wait 300
+sample fly-11
+# cycle 12
+down W
+mouse -450 0 6000
+wait 6000
+up W
+mouse -1600 0 1200
+wait 300
+sample fly-12
+# cycle 13
+down W
+mouse 800 0 6000
+wait 6000
+up W
+mouse 1600 0 1200
+wait 300
+sample fly-13
+# cycle 14
+down W
+mouse -300 0 6000
+wait 6000
+up W
+mouse -1600 0 1200
+wait 300
+sample fly-14
+# cycle 15
+down W
+mouse 600 0 6000
+wait 6000
+up W
+mouse 1600 0 1200
+wait 300
+sample fly-15
+# cycle 16
+down W
+mouse -850 0 6000
+wait 6000
+up W
+mouse -1600 0 1200
+wait 300
+sample fly-16
+# cycle 17
+down W
+mouse 500 0 6000
+wait 6000
+up W
+mouse 1600 0 1200
+wait 300
+sample fly-17
+# cycle 18
+down W
+mouse -700 0 6000
+wait 6000
+up W
+mouse -1600 0 1200
+wait 300
+sample fly-18
+# cycle 19
+down W
+mouse 350 0 6000
+wait 6000
+up W
+mouse 1600 0 1200
+wait 300
+sample fly-19
+# cycle 20
+down W
+mouse -450 0 6000
+wait 6000
+up W
+mouse -1600 0 1200
+wait 300
+sample fly-20
+# cycle 21
+down W
+mouse 800 0 6000
+wait 6000
+up W
+mouse 1600 0 1200
+wait 300
+sample fly-21
+# cycle 22
+down W
+mouse -300 0 6000
+wait 6000
+up W
+mouse -1600 0 1200
+wait 300
+sample fly-22
+# cycle 23
+down W
+mouse 600 0 6000
+wait 6000
+up W
+mouse 1600 0 1200
+wait 300
+sample fly-23
+# cycle 24
+down W
+mouse -850 0 6000
+wait 6000
+up W
+mouse -1600 0 1200
+wait 300
+sample fly-24
+# cycle 25
+down W
+mouse 500 0 6000
+wait 6000
+up W
+mouse 1600 0 1200
+wait 300
+sample fly-25
+# cycle 26
+down W
+mouse -700 0 6000
+wait 6000
+up W
+mouse -1600 0 1200
+wait 300
+sample fly-26
+# cycle 27
+down W
+mouse 350 0 6000
+wait 6000
+up W
+mouse 1600 0 1200
+wait 300
+sample fly-27
+# cycle 28
+down W
+mouse -450 0 6000
+wait 6000
+up W
+mouse -1600 0 1200
+wait 300
+sample fly-28
+# cycle 29
+down W
+mouse 800 0 6000
+wait 6000
+up W
+mouse 1600 0 1200
+wait 300
+sample fly-29
+# cycle 30
+down W
+mouse -300 0 6000
+wait 6000
+up W
+mouse -1600 0 1200
+wait 300
+sample fly-30
+# cycle 31
+down W
+mouse 600 0 6000
+wait 6000
+up W
+mouse 1600 0 1200
+wait 300
+sample fly-31
+# cycle 32
+down W
+mouse -850 0 6000
+wait 6000
+up W
+mouse -1600 0 1200
+wait 300
+sample fly-32
+# cycle 33
+down W
+mouse 500 0 6000
+wait 6000
+up W
+mouse 1600 0 1200
+wait 300
+sample fly-33
+# cycle 34
+down W
+mouse -700 0 6000
+wait 6000
+up W
+mouse -1600 0 1200
+wait 300
+sample fly-34
+# cycle 35
+down W
+mouse 350 0 6000
+wait 6000
+up W
+mouse 1600 0 1200
+wait 300
+sample fly-35
+# cycle 36
+down W
+mouse -450 0 6000
+wait 6000
+up W
+mouse -1600 0 1200
+wait 300
+sample fly-36
+# cycle 37
+down W
+mouse 800 0 6000
+wait 6000
+up W
+mouse 1600 0 1200
+wait 300
+sample fly-37
+# cycle 38
+down W
+mouse -300 0 6000
+wait 6000
+up W
+mouse -1600 0 1200
+wait 300
+sample fly-38
+# cycle 39
+down W
+mouse 600 0 6000
+wait 6000
+up W
+mouse 1600 0 1200
+wait 300
+sample fly-39
+# cycle 40
+down W
+mouse -850 0 6000
+wait 6000
+up W
+mouse -1600 0 1200
+wait 300
+sample fly-40
+sample end
+releaseall

@@ -1,0 +1,352 @@
+; Owned entirely by SCRCOSTUMES. ExitScreen deletes this object, and all FlowMgr
+; callbacks exist only during their synchronous FSCommand. No global native
+; method is replaced and no callable reference survives the movie's unload.
+    op_71
+    EA_PushConstByte 'SRCostumes'
+    EA_PushZero
+    EA_PushConstByte 'Object'
+    NewObject
+    SetMember
+    op_71
+    EA_GetNamedMember 'SRCostumes'
+    StoreRegister 1
+    Pop
+
+; Append(retail) -> retail.concat(complete host additions), preserving the
+; original retail record objects, their order and Locked values.
+    Push [reg1]
+    EA_PushConstByte 'Append'
+    .func2 ''(r3 'retail') flags=0x50129
+        Push [reg1]
+        EA_PushConstByte 'items'
+        EA_PushZero
+        InitArray
+        SetMember
+        Push [reg1]
+        EA_PushConstByte 'complete'
+        op_74
+        SetMember
+        Push [reg1]
+        EA_PushConstByte 'count'
+        op_76
+        SetMember
+        Push [reg1]
+        EA_PushConstByte 'received'
+        EA_PushZero
+        SetMember
+        Push [reg2]
+        EA_GetNamedMember 'FlowMgr'
+        StoreRegister 4
+        Pop
+        Push [reg4]
+        EA_PushConstByte 'SR_CostumeBegin'
+        Push [reg1]
+        EA_GetNamedMember 'Begin'
+        SetMember
+        Push [reg4]
+        EA_PushConstByte 'SR_CostumeItem'
+        Push [reg1]
+        EA_GetNamedMember 'Item'
+        SetMember
+        Push [reg4]
+        EA_PushConstByte 'SR_CostumeText'
+        Push [reg1]
+        EA_GetNamedMember 'Text'
+        SetMember
+        Push [reg4]
+        EA_PushConstByte 'SR_CostumeEnd'
+        Push [reg1]
+        EA_GetNamedMember 'End'
+        SetMember
+        GetURL 'FSCommand:SR_ModCostumes', ''
+        Push [reg4]
+        EA_PushConstByte 'SR_CostumeBegin'
+        Delete
+        Pop
+        Push [reg4]
+        EA_PushConstByte 'SR_CostumeItem'
+        Delete
+        Pop
+        Push [reg4]
+        EA_PushConstByte 'SR_CostumeText'
+        Delete
+        Pop
+        Push [reg4]
+        EA_PushConstByte 'SR_CostumeEnd'
+        Delete
+        Pop
+        Push [reg1]
+        EA_GetNamedMember 'complete'
+        Not
+        If costume_no_additions
+        Push [reg1]
+        EA_GetNamedMember 'items'
+        EA_GetNamedMember 'length'
+        EA_PushZero
+        Equals2
+        If costume_no_additions
+        ; With mod suits on the screen, the suit Superman starts in (retail record 0, "Superman
+        ; Returns" = Costume1 SupermanEnt) is always wearable, so a player can go back to it
+        ; from a mod suit before the retail unlock (costumeUnlocked bit 0). Only Locked changes.
+        Push [reg3]
+        EA_PushZero
+        GetMember
+        EA_PushConstByte 'Locked'
+        op_74
+        SetMember
+        Push [reg1]
+        EA_GetNamedMember 'items'
+        EA_PushOne
+        Push [reg3]
+        EA_PushConstByte 'concat'
+        CallMethod
+        Return
+costume_no_additions:
+        Push [reg3]
+        Return
+    .end
+    SetMember
+
+    Push [reg1]
+    EA_PushConstByte 'Begin'
+    .func2 ''(r3 'count') flags=0x40129
+        Push [reg2]
+        EA_GetNamedMember 'SRCostumes'
+        EA_PushConstByte 'count'
+        Push [reg3]
+        SetMember
+    .end
+    SetMember
+
+    Push [reg1]
+    EA_PushConstByte 'Item'
+    .func2 ''(r3 'index', r4 'id', r5 'name') flags=0x70129
+        EA_PushZero
+        EA_PushConstByte 'Object'
+        NewObject
+        StoreRegister 6
+        Pop
+        Push [reg6]
+        EA_PushConstByte 'SRId'
+        Push [reg4]
+        SetMember
+        Push [reg6]
+        EA_PushConstByte 'Name'
+        Push [reg5]
+        SetMember
+        Push [reg6]
+        EA_PushConstByte 'Locked'
+        op_74
+        SetMember
+        Push [reg6]
+        EA_PushConstByte 'MediaType'
+        EA_PushConstByte 'costume'
+        SetMember
+        Push [reg2]
+        EA_GetNamedMember 'SRCostumes'
+        EA_GetNamedMember 'items'
+        Push [reg3]
+        Push [reg6]
+        SetMember
+        Push [reg2]
+        EA_GetNamedMember 'SRCostumes'
+        EA_PushConstByte 'received'
+        Push [reg2]
+        EA_GetNamedMember 'SRCostumes'
+        EA_GetNamedMember 'received'
+        Increment
+        SetMember
+    .end
+    SetMember
+
+    Push [reg1]
+    EA_PushConstByte 'Text'
+    .func2 ''(r3 'index', r4 'field', r5 'text') flags=0x60129
+        Push [reg2]
+        EA_GetNamedMember 'SRCostumes'
+        EA_GetNamedMember 'items'
+        Push [reg3]
+        GetMember
+        Push [reg4]
+        Push [reg5]
+        SetMember
+        Push [reg2]
+        EA_GetNamedMember 'SRCostumes'
+        EA_PushConstByte 'received'
+        Push [reg2]
+        EA_GetNamedMember 'SRCostumes'
+        EA_GetNamedMember 'received'
+        Increment
+        SetMember
+    .end
+    SetMember
+
+    Push [reg1]
+    EA_PushConstByte 'End'
+    .func2 ''(r3 'count', r4 'nameFont') flags=0x60129
+        Push [reg2]
+        EA_GetNamedMember 'SRCostumes'
+        EA_PushConstByte 'nameFont'
+        Push [reg4]
+        SetMember
+        Push [reg2]
+        EA_GetNamedMember 'SRCostumes'
+        StoreRegister 4
+        Pop
+        Push [reg3]
+        Push [reg4]
+        EA_GetNamedMember 'count'
+        Equals2
+        Not
+        If costume_incomplete
+        Push [reg3]
+        Push [reg4]
+        EA_GetNamedMember 'items'
+        EA_GetNamedMember 'length'
+        Equals2
+        Not
+        If costume_incomplete
+        Push [reg4]
+        EA_GetNamedMember 'received'
+        Push [reg3]
+        EA_PushByte 4
+        Multiply
+        Equals2
+        Not
+        If costume_incomplete
+        Push [reg4]
+        EA_PushConstByte 'complete'
+        op_73
+        SetMember
+costume_incomplete:
+    .end
+    SetMember
+
+; Wear(id, viewer): the host reports QUEUED, not a claim that the model changed.
+; Feedback uses the existing description text field; no extra popup owns a
+; callback into this screen or alters the retail viewer's navigation state.
+    Push [reg1]
+    EA_PushConstByte 'Wear'
+    .func2 ''(r3 'id', r4 'viewer') flags=0x60129
+        Push [reg1]
+        EA_PushConstByte 'reply'
+        EA_PushConstByte 'Costume request received no response.'
+        SetMember
+        Push [reg2]
+        EA_GetNamedMember 'FlowMgr'
+        StoreRegister 5
+        Pop
+        Push [reg5]
+        EA_PushConstByte 'SR_CostumeResult'
+        Push [reg1]
+        EA_GetNamedMember 'Result'
+        SetMember
+        EA_PushConstByte 'FSCommand:SR_CostumeWear'
+        Push [reg3]
+        GetURL2
+        Push [reg5]
+        EA_PushConstByte 'SR_CostumeResult'
+        Delete
+        Pop
+        Push [reg1]
+        EA_GetNamedMember 'reply'
+        EA_PushOne
+        EA_PushZero
+        Push [reg4]
+        EA_PushConstByte 'IsFullScreen'
+        CallMethod
+        Not
+        If costume_grid_feedback
+        Push [reg4]
+        EA_GetNamedMember 'mFullScreen'
+        EA_GetNamedMember 'DescrTxt'
+        Jump costume_feedback
+costume_grid_feedback:
+        Push [reg4]
+        EA_GetNamedMember 'mThumbDescrTxt'
+costume_feedback:
+        EA_CallNamedMethodPop 'SetText'
+    .end
+    SetMember
+
+    Push [reg1]
+    EA_PushConstByte 'Result'
+    .func2 ''(r3 'id', r4 'queued', r5 'message') flags=0x60129
+        Push [reg2]
+        EA_GetNamedMember 'SRCostumes'
+        EA_PushConstByte 'reply'
+        Push [reg5]
+        SetMember
+        Push [reg2]
+        EA_GetNamedMember 'SRCostumes'
+        EA_PushConstByte 'queued'
+        Push [reg4]
+        SetMember
+    .end
+    SetMember
+
+; Retail(index, viewer) -> true when the retail SetActiveCostume may make the change now. The
+; host remembers the retail suit as worn (SR_CostumeWorn <index>) and answers through Result:
+; queued 0 = this session animates another family's banks, so the suit is worn from the next
+; start; the note goes in the description field and the retail call is skipped. queued 2 = the
+; host made the same request itself (no popup, iter-465): the retail call is skipped, the
+; description stays. No reply (an older host) keeps the retail behaviour.
+    Push [reg1]
+    EA_PushConstByte 'Retail'
+    .func2 ''(r3 'index', r4 'viewer') flags=0x60129
+        Push [reg1]
+        EA_PushConstByte 'queued'
+        op_73
+        SetMember
+        Push [reg2]
+        EA_GetNamedMember 'FlowMgr'
+        StoreRegister 5
+        Pop
+        Push [reg5]
+        EA_PushConstByte 'SR_CostumeResult'
+        Push [reg1]
+        EA_GetNamedMember 'Result'
+        SetMember
+        EA_PushConstByte 'FSCommand:SR_CostumeWorn'
+        Push [reg3]
+        GetURL2
+        Push [reg5]
+        EA_PushConstByte 'SR_CostumeResult'
+        Delete
+        Pop
+        Push [reg1]
+        EA_GetNamedMember 'queued'
+        EA_PushByte 2
+        Equals2
+        If costume_retail_handled
+        Push [reg1]
+        EA_GetNamedMember 'queued'
+        If costume_retail_now
+        Push [reg1]
+        EA_GetNamedMember 'reply'
+        EA_PushOne
+        EA_PushZero
+        Push [reg4]
+        EA_PushConstByte 'IsFullScreen'
+        CallMethod
+        Not
+        If costume_retail_grid
+        Push [reg4]
+        EA_GetNamedMember 'mFullScreen'
+        EA_GetNamedMember 'DescrTxt'
+        Jump costume_retail_note
+costume_retail_grid:
+        Push [reg4]
+        EA_GetNamedMember 'mThumbDescrTxt'
+costume_retail_note:
+        EA_CallNamedMethodPop 'SetText'
+        op_74
+        Return
+costume_retail_now:
+        op_73
+        Return
+costume_retail_handled:
+        op_74
+        Return
+    .end
+    SetMember

@@ -1,0 +1,73 @@
+# iter-467 hooks: THE FLICKER GATE'S PLAY SCRIPT (tools/perf/flicker_gate.py passes it to perf_run --play; both
+# its rolls run it). The player tape tools/player/gameplay_play.txt WITHOUT its pause round trip: the world-rule
+# gate grades gameplay, and a pause in a gate roll put the menu over the world in the span and the freezes (dev
+# gates postmerge_sj / postmerge_hooks gate2: the resume Escape tap landed inside a 2 s SIM_FREEZE hold, never
+# reached the game, and the menu stayed up for the rest of the roll - "menu over world 10"). The Esc = START
+# proof stays in the player tape.
+#
+# THE SPAN'S DUMP MARK: with SR_PRESENT_DUMP_FROM_MARK=1 (exe from iter-467 hooks on) the span's every-present
+# window opens at `mark dump` below - once Superman is on foot after the opening movie - never at a present number:
+# over the 64 archived gates the HUD came at p9,767-p21,251, so a number taken from one roll lands anywhere in the
+# next (postmerge_sj's re-placed span opened on the opening movie). The actions then run inside the window (360
+# dumped presents take 10-80 s of wall time), in play throughout; the freeze roll runs the same tape (the mark
+# does nothing there). The actions start after the movie, not 20 s after the HUD request (the opening FMV runs
+# 31-42 s after it: the player tape's first steps land on the movie).
+#
+# THE DARK WALL (2026-10-14): walking while the camera turned right, then the closing walk, steered Superman into a
+# dark building wall in the tutorial street, so from freeze 3 on the frozen view was the wall; the world rule
+# (world_floor: centre luma >= 8, dark fraction <= 0.6) then graded those freezes dark and freeze rolls failed WORLD
+# NOT DRAWN by chance (world 5 of 15 on scm4 abp, dc3 abp, pg2 cppm4; other rolls of the same exe 13-14). The walk now
+# stops before the camera turns, and the closing step is a camera pan with no walk. Tested on exe 42f048a64456 (dev
+# ac0e8058): world 15 of 15 graded freezes, none dark (archive v1_native/tape1/tape_A; a variant turning left while
+# walking also gave 15 of 15).
+# (no '#' inside a command: harness_play.py strips everything after one as a comment)
+await \[APT_REQ\] .*path='screens/hud/main_hud' 1500
+await \[PC_CONTROLS\] context gameplay .*mode on-foot camera 240
+wait 3000
+mark dump
+keymap player
+sample play
+# walk forward (W = left stick up), stop, then turn the camera with the mouse (mouse-look = right stick)
+down W
+watch 1500 walk
+wait 1500
+up W
+mouse 900 0 1500
+watch 1500 look-right
+sample walk-done
+mouse -900 0 1500
+mouse 0 -250 800
+watch 1500 look-back
+# sprint (Left Shift = RB) a little
+down W
+down Left Shift
+wait 2500
+up Left Shift
+up W
+sample sprint-done
+# take off (Space = Y), fly forward with W, turn with the mouse, then land (Space again)
+tap Space 200
+wait 3000
+sample takeoff
+down W
+watch 2000 fly
+mouse 1200 0 2500
+wait 2000
+up W
+sample fly-done
+mouse 0 300 1000
+wait 3000
+# hover (Left Ctrl = LB) and punch (left mouse = X) for the read-back
+down Left Ctrl
+wait 1000
+up Left Ctrl
+click left 150
+wait 800
+click left 150
+sample actions
+tap Space 1500
+wait 5000
+mouse -600 0 3000
+wait 2000
+sample end
+releaseall

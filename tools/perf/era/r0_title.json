@@ -1,0 +1,17 @@
+{
+  "name": "era-r0-title-attract",
+  "purpose": "era matrix R0 (tools/perf/era_matrix.py; from Codex final_native_acceptance_s1c2_title.json, sha256 fcfa2a46..., = emu-stage1 archive/s1/census2/s1c2_title.json): C1 stage 1's census s1c2, roll R0: a NO-INPUT boot (the legal screen, the intro movies, the title movie, PRESS START and the attract cycle) ended by the graceful quit, through sr_drive so the roll carries its launch provenance (provenance.json: the exe it started, bound to the log's quit channel) - s1c1's R0 ran the title scenario through run_recomp_x, which writes none, and era_census.py grades a roll without a launch identity INCOMPLETE. PORT FEATURES OFF (the game's own front end): s1c1's R0 (port features on) sat at PRESS START 4 min 13 s with no attract movie, while the natural front end starts it ~2.25 min after the title request (docs/NATURAL_BASELINE.md iter-449t). 420 s of observation after the FE's first tick. Run: tools/sr_drive.ps1 -Scenario <this> -Out <SET>/s1c2_r0_title/drive -ExePath <EXE> -GracefulQuit -TimeoutSeconds 720 -Stage J:\\sr_stage -Gates <G>,SR_PORT_FEATURES=0,SR_LOG=player,SDL_AUDIODRIVER=disk.",
+  "gates": "",
+  "steps": [
+    {
+      "name": "fe-alive",
+      "await": "\\[NAT_FE\\] #1 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "observe-title-attract",
+      "purpose": "No input: the intro movies, the title and the attract cycle play on their own (420 s).",
+      "dwellMs": 420000
+    }
+  ]
+}

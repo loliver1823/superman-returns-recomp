@@ -1,0 +1,11 @@
+[
+  { "case_id": "sub_basic", "va": "0x82165F80", "regs": { "r3": "0x82F00000", "r4": "0x10" },
+    "mem":   { "0x82F005C8": "00000064" },
+    "watch": [ { "addr": "0x82F005C8", "size": 4 } ],
+    "expect_mem": { "0x82F005CB": "54" } },
+
+  { "case_id": "sub_underflow", "va": "0x82165F80", "regs": { "r3": "0x82F00000", "r4": "0x0A" },
+    "mem":   { "0x82F005C8": "00000005" },
+    "watch": [ { "addr": "0x82F005C8", "size": 4 } ],
+    "expect_mem": { "0x82F005C8": "fffffffb" } }
+]

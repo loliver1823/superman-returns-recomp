@@ -1,0 +1,86 @@
+{
+  "name": "input-hotplug-fe",
+  "purpose": "iter-464 input lane (docs/INPUT_GLYPHS.md): controller HOT-PLUG in the live game, driven ONLY by virtual pads - no keyboard, no focus. Run with -Gates SR_HARNESS_REAL_INPUT=1,SR_GLYPHS=auto and, alongside, `python tools/glyphs/vpad_hotplug.py --plan fe --log-glob <Out> --mark <Out>/marks.txt`: a ViGEm Xbox 360 pad is plugged at the title and presses START, the LOAD A GAME? popup comes up, a DualShock 4 is plugged and takes player 1 (PS prompts), it is unplugged (user 0 NOT CONNECTED), the Xbox pad's Guide takes player 1 back (360 prompts) and its A starts a new game. Then the KEYBOARD (the harness channel - still no focus) presses START in gameplay: the keyboard takes player 1 and the pause menu's hint bar shows keyboard prompts; B (the X key) closes it. Apart from those two keys this scenario only awaits the game's own transitions and holds the capture windows. -TimeoutSeconds 600.",
+  "gates": "SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=20,SR_PRESENT_DUMP_SPARSE_CAP=900",
+  "steps": [
+    {
+      "name": "fe-alive",
+      "await": "\\[NAT_FE\\] #1 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "settle-title",
+      "await": "\\[NAT_FE\\] #256 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "pad-connected",
+      "purpose": "The virtual Xbox 360 pad is hot-plugged by vpad_hotplug.py.",
+      "await": "\\[INPUT\\] controller connected: .* type=xbox",
+      "timeoutMs": 60000
+    },
+    {
+      "name": "pad-start",
+      "purpose": "START pressed on the virtual pad reaches the guest.",
+      "await": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)",
+      "timeoutMs": 120000
+    },
+    {
+      "name": "popup",
+      "await": "XamShowDeviceSelectorUI\\(user=|\\[APT_REQ\\] #\\d+ path='screens/misc/ScrGenPop'",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "ds4-takes-over",
+      "await": "\\[INPUT\\] player 1 = ps4",
+      "timeoutMs": 90000
+    },
+    {
+      "name": "ds4-unplugged",
+      "await": "\\[INPUT\\] controller disconnected: .* it was player 1",
+      "timeoutMs": 60000
+    },
+    {
+      "name": "xbox-back",
+      "await": "\\[INPUT\\] player 1 = xbox .*\\(was ps4; button\\)",
+      "timeoutMs": 60000
+    },
+    {
+      "name": "new-game",
+      "purpose": "A on the virtual Xbox pad accepts the popup.",
+      "await": "\\[APT_REQ\\] #\\d+ path='screens/hud/main_hud'",
+      "timeoutMs": 150000,
+      "optional": true
+    },
+    {
+      "name": "settle-gameplay",
+      "dwellMs": 20000
+    },
+    {
+      "name": "kb-pause",
+      "purpose": "START from the keyboard: the keyboard becomes player 1 (keyboard prompts in the pause menu).",
+      "key": "ENTER",
+      "holdMs": 250,
+      "maxPulses": 2,
+      "gapMs": 6000,
+      "expect": "\\[INPUT\\] player 1 = keyboard",
+      "expectMs": 20000,
+      "optional": true
+    },
+    {
+      "name": "kb-pause-hold",
+      "dwellMs": 15000
+    },
+    {
+      "name": "kb-unpause",
+      "key": "B",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "optional": true
+    },
+    {
+      "name": "after",
+      "dwellMs": 15000
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: loliver1823 <151630620+loliver1823@users.noreply.github.com>
+Date: Sat, 10 Oct 2026 00:00:00 +1100
+Subject: [PATCH] divw / divwu / divd / divdu: PowerPC division semantics (no host trap)
+
+A zero divisor (or INT_MIN / -1, signed) gives an undefined result on PowerPC and raises
+no exception; the raw C division traps on x86 (#DE). Emit the guarded form that
+tools/regen/patch_div_guards.py wrote as a text pass over the output until iter-467
+(result 0, as Xenia's JIT), byte for byte, comment included.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+diff --git a/XenonRecomp/recompiler.cpp b/XenonRecomp/recompiler.cpp
+index 90f8843..b28a628 100644
+--- a/XenonRecomp/recompiler.cpp
++++ b/XenonRecomp/recompiler.cpp
+@@ -964,23 +964,23 @@ bool Recompiler::Recompile(
+         break;
+ 
+     case PPC_INST_DIVD:
+-        println("\t{}.s64 = {}.s64 / {}.s64;", r(insn.operands[0]), r(insn.operands[1]), r(insn.operands[2]));
++        println("\t{0}.s64 = ({2}.s64 == 0 || ({1}.s64 == (-9223372036854775807LL - 1) && {2}.s64 == -1)) ? 0 : ({1}.s64 / {2}.s64);  // div guarded (PPC: no trap)", r(insn.operands[0]), r(insn.operands[1]), r(insn.operands[2]));
+         break;
+ 
+     case PPC_INST_DIVDU:
+-        println("\t{}.u64 = {}.u64 / {}.u64;", r(insn.operands[0]), r(insn.operands[1]), r(insn.operands[2]));
++        println("\t{0}.u64 = {2}.u64 != 0 ? ({1}.u64 / {2}.u64) : 0;  // div guarded (PPC: no trap)", r(insn.operands[0]), r(insn.operands[1]), r(insn.operands[2]));
+         if (strchr(insn.opcode->name, '.'))
+             println("\t{}.compare<int32_t>({}.s32, 0, {});", cr(0), r(insn.operands[0]), xer());
+         break;
+ 
+     case PPC_INST_DIVW:
+-        println("\t{}.s32 = {}.s32 / {}.s32;", r(insn.operands[0]), r(insn.operands[1]), r(insn.operands[2]));
++        println("\t{0}.s32 = ({2}.s32 == 0 || ({1}.s32 == (-2147483647 - 1) && {2}.s32 == -1)) ? 0 : ({1}.s32 / {2}.s32);  // div guarded (PPC: no trap)", r(insn.operands[0]), r(insn.operands[1]), r(insn.operands[2]));
+         if (strchr(insn.opcode->name, '.'))
+             println("\t{}.compare<int32_t>({}.s32, 0, {});", cr(0), r(insn.operands[0]), xer());
+         break;
+ 
+     case PPC_INST_DIVWU:
+-        println("\t{}.u32 = {}.u32 / {}.u32;", r(insn.operands[0]), r(insn.operands[1]), r(insn.operands[2]));
++        println("\t{0}.u32 = {2}.u32 != 0 ? ({1}.u32 / {2}.u32) : 0;  // div guarded (PPC: no trap)", r(insn.operands[0]), r(insn.operands[1]), r(insn.operands[2]));
+         if (strchr(insn.opcode->name, '.'))
+             println("\t{}.compare<int32_t>({}.s32, 0, {});", cr(0), r(insn.operands[0]), xer());
+         break;

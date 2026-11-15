@@ -1,0 +1,125 @@
+{
+  "name": "perf-tutorial",
+  "purpose": "iter-464 perf lane (tools/perf/perf_run.py): tutorial_tape_full.json with a 5-minute dwell after the main_hud anchor (the tutorial flight era) and sparse present dumps (era witness frames only).",
+  "gates": "SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=300,SR_PRESENT_DUMP_SPARSE_CAP=200",
+  "steps": [
+    {
+      "name": "fe-alive",
+      "await": "\\[NAT_FE\\] #1 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "settle-title",
+      "await": "\\[NAT_FE\\] #256 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "press-start",
+      "key": "ENTER",
+      "holdMs": 250,
+      "maxPulses": 4,
+      "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)",
+      "expectMs": 90000
+    },
+    {
+      "name": "first-screen",
+      "expect": "\\[FE_SETSCREEN\\] #1 ",
+      "expectMs": 60000
+    },
+    {
+      "name": "await-ui-tail",
+      "purpose": "The exact named HintB request = the UI request tail proxy (APT_REQ #15 in the valid rolls; ScrGenPop, the dialog itself, is #16). NOT proof the dialog is ready - the settle + single-deadline pulses own that risk.",
+      "await": "\\[APT_REQ\\] #\\d+ path='\\.\\./common/ButtonHints/XBox360/HintB'",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "settle-dialog",
+      "purpose": "Bounded settle after the request tail.",
+      "dwellMs": 8000
+    },
+    {
+      "name": "clear-dialog",
+      "purpose": "Accept the storage dialog against ONE absolute deadline (the legacy driver waited expectMs twice). Confirmed transition = the runtime XamShowDeviceSelectorUI(user= invocation, never the import banner. DELIVERED only proves the guest sampled A.",
+      "key": "A",
+      "holdMs": 4000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 12,
+      "gapMs": 5000,
+      "expect": "XamShowDeviceSelectorUI\\(user=",
+      "expectMs": 150000,
+      "singleDeadline": true
+    },
+    {
+      "name": "settle-modepage",
+      "purpose": "Let the mode-select page finish coming up before navigating it.",
+      "dwellMs": 60000
+    },
+    {
+      "name": "select-mode",
+      "purpose": "Press A on whatever is focused. Blind by necessity - the item text does not render.",
+      "key": "A",
+      "holdMs": 3000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 8000,
+      "optional": true
+    },
+    {
+      "name": "nav-down",
+      "purpose": "Move the selection. DOWN is an EXTENDED key - without KEYEVENTF_EXTENDEDKEY the guest never sees it (iter-450V).",
+      "key": "DOWN",
+      "holdMs": 3000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 4000,
+      "optional": true
+    },
+    {
+      "name": "select-again",
+      "key": "A",
+      "holdMs": 3000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 8000,
+      "optional": true
+    },
+    {
+      "name": "nav-up-select",
+      "purpose": "And the other direction, in case the first item was the wrong one.",
+      "key": "UP",
+      "holdMs": 3000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 2,
+      "gapMs": 4000,
+      "optional": true
+    },
+    {
+      "name": "select-third",
+      "key": "A",
+      "holdMs": 3000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 8000,
+      "optional": true
+    },
+    {
+      "name": "await-main-hud-request",
+      "purpose": "The GUEST requests the in-game HUD package set: an APT witness of the era, nothing more (director ruling iter-453).",
+      "await": "\\[APT_REQ\\].*path='screens/hud/main_hud'",
+      "timeoutMs": 300000
+    },
+    {
+      "name": "skip-opening-movie", "cutsceneSkip": true,
+      "purpose": "iter-467 cutscene skip (owner 2026-10-11: a natural player action, not forcing; sr_drive -SkipCutscenes / SR_DRIVE_SKIP_CUTSCENES=0 turns it off): A pulses during the new game's opening FMV (the skip-movie action, event 187: A (alt) / START in the gameplay contexts, docs/PC_CONTROLS.md) until the movie is over: the player's first gameplay MODE ([PC_CONTROLS] context gameplay ... mode on-foot camera; the merge-ready gate showed pad A killing the opening FMV with NO [EV187] accept line), an [EV187] ... ACCEPTED-KILL edge, or the movie's own EOM if it ends first. The gate's in-game start takes either (tools/perf/perf_report.py MOVIE_SKIP). Optional: a missed skip only costs the movie's 30 s.",
+      "key": "A", "holdMs": 400, "holdUntilConfirmed": true, "maxPulses": 15, "gapMs": 2000, "optional": true,
+      "expect": "\\[EV187\\] #\\d+ slot=\\d+ rc=01 ACCEPTED-KILL|\\[MOVIE_PACE\\] movie#\\d+ EOM wall=[\\d.]+s frames=(?:[2-9]|[1-9]\\d+)\\b|\\[PC_CONTROLS\\] context gameplay \\(igc type \\d+\\) config \\S+ invX=\\d+ invY=\\d+ mode [a-z]",
+      "expectFresh": true, "expectMs": 60000
+    },
+    {
+      "name": "tape-play",
+      "purpose": "The tape drives gameplay from the anchor; observe 5 minutes (the perf gameplay era).",
+      "dwellMs": 300000
+    }
+  ]
+}

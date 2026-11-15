@@ -1,0 +1,120 @@
+{
+  "name": "femenu-settings-back",
+  "purpose": "lane E L-b (was the iter-463 step 7 diagnostic slice): MAIN MENU > OPTIONS > CONTROLS > VIEW PAD LAYOUT -> the game's own CONTROLLER OPTIONS over ScrPressStart -> B (capture) -> the menu comes back with OPTIONS focused. -TimeoutSeconds 300.",
+  "gates": "SR_MENU_CENSUS=1,SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=20,SR_PRESENT_DUMP_SPARSE_CAP=900",
+  "steps": [
+    {
+      "name": "fe-alive",
+      "await": "\\[NAT_FE\\] #1 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "settle-title",
+      "await": "\\[NAT_FE\\] #256 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "press-start",
+      "key": "ENTER",
+      "holdMs": 250,
+      "maxPulses": 4,
+      "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)",
+      "expectMs": 90000
+    },
+    {
+      "name": "title-ui-tail",
+      "await": "\\[APT_REQ\\] #15 path='\\.\\./common/ButtonHints/XBox360/HintB'",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "title-visible",
+      "requireVisibleMs": 8000,
+      "visibleTimeoutMs": 200000,
+      "dwellMs": 6000
+    },
+    {
+      "name": "start-bootflow",
+      "key": "ENTER",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*claim LoadCreate",
+      "expectMs": 30000
+    },
+    {
+      "name": "menu-visible",
+      "dwellMs": 4000
+    },
+    {
+      "name": "fe-down-to-options",
+      "key": "DOWN",
+      "holdMs": 250,
+      "maxPulses": 2,
+      "gapMs": 1500,
+      "dwellMs": 1500
+    },
+    {
+      "name": "fe-open-options",
+      "key": "A",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "dwellMs": 3000,
+      "expect": "\\[SR_FSCMD\\].*menu button=2",
+      "expectMs": 10000,
+      "purpose": "lane E L-b: MAIN MENU > OPTIONS opens the OPTIONS screen directly (its GAME tab first)"
+    },
+    {
+      "name": "fe-options-shown",
+      "expect": "\\[PC_SETTINGS\\] shown \\(FE",
+      "expectSince": "fe-open-options",
+      "expectMs": 15000,
+      "dwellMs": 2000
+    },
+    {
+      "name": "tab-controls",
+      "key": "RB",
+      "holdMs": 160,
+      "maxPulses": 1,
+      "dwellMs": 1500,
+      "expect": "\\[PC_SETTINGS\\] tab CONTROLS",
+      "expectMs": 8000
+    },
+    {
+      "name": "view-pad-layout",
+      "key": "A",
+      "holdMs": 160,
+      "maxPulses": 1,
+      "dwellMs": 6000,
+      "expect": "\\[GAME_OPTIONS\\] _global\\.SRFrontEnd\\.SR_OptionsClosed\\(1: VIEW PAD LAYOUT\\) called",
+      "expectMs": 15000,
+      "purpose": "the first CONTROLS row; once the screen is gone the opener opens the game's own CONTROLLER OPTIONS"
+    },
+    {
+      "name": "controller-open",
+      "expect": "\\[SR_FSCMD\\].*SR_Log 'settings open ",
+      "expectSince": "view-pad-layout",
+      "expectMs": 15000,
+      "dwellMs": 5000
+    },
+    {
+      "name": "back-from-controller",
+      "key": "B",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "dwellMs": 5000,
+      "expect": "\\[SR_FSCMD\\].*SR_SetSettings 'ScrControllerOpt FE \\d+' -> stored",
+      "expectMs": 15000
+    },
+    {
+      "name": "menu-back",
+      "expect": "\\[MENU_CENSUS\\].*page='MAIN MENU'.* sel=2 ",
+      "expectSince": "back-from-controller",
+      "expectMs": 15000,
+      "dwellMs": 2000
+    },
+    {
+      "name": "after-back",
+      "dwellMs": 20000
+    }
+  ]
+}

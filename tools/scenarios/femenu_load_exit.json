@@ -1,0 +1,44 @@
+{
+  "name": "femenu-load-exit",
+  "purpose": "iter-463 custom_frontend steps 4-5 (docs/CUSTOM_FRONTEND.md 10, 'Menu v1' + 'Exit'): title -> START -> MAIN MENU -> DOWN, A = LOAD GAME (the game's own slot picker / no-save handling; the roll's save root is fresh and empty unless SR_CONTENT_DIR seeds one) -> B = BootFlowLoadCanceled, the game re-raises LOAD A GAME? and the menu comes back -> DOWN x3, Enter (keyboard START mapped to A) = EXIT -> Esc (pad BACK mapped to B) cancels the confirm -> A = EXIT again -> DOWN, A = YES -> fscommand SR_Quit -> the process exits through the window-close path. The last step is the pass condition: exit code 0 within 2 s (sr_drive expectExitCode); a crash on exit or a hang fails the roll. Run with -Gates SR_MODS=custom_frontend. -TimeoutSeconds 420.",
+  "gates": "SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=20,SR_PRESENT_DUMP_SPARSE_CAP=800",
+  "steps": [
+    { "name": "fe-alive", "await": "\\[NAT_FE\\] #1 natural FE master tick", "timeoutMs": 180000 },
+    { "name": "settle-title", "await": "\\[NAT_FE\\] #256 natural FE master tick", "timeoutMs": 180000 },
+    {
+      "name": "press-start", "key": "ENTER", "holdMs": 250, "maxPulses": 4, "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)", "expectMs": 90000
+    },
+    { "name": "title-ui-tail", "await": "\\[APT_REQ\\] #15 path='\\.\\./common/ButtonHints/XBox360/HintB'", "timeoutMs": 240000 },
+    { "name": "title-visible", "requireVisibleMs": 8000, "visibleTimeoutMs": 200000, "dwellMs": 8000 },
+    {
+      "name": "start-bootflow", "key": "ENTER", "holdMs": 250, "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*claim LoadCreate", "expectMs": 30000
+    },
+    { "name": "menu-visible", "dwellMs": 5000 },
+    { "name": "down-to-load", "key": "DOWN", "holdMs": 250, "maxPulses": 1, "dwellMs": 2000 },
+    {
+      "name": "load-game", "key": "A", "holdMs": 250, "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*answer cppId=\\S+ button=1", "expectMs": 10000
+    },
+    { "name": "load-observe", "purpose": "Capture window: the game's own LOAD path on an empty save root.", "dwellMs": 12000 },
+    { "name": "back-from-load", "key": "B", "holdMs": 250, "maxPulses": 1, "dwellMs": 10000 },
+    { "name": "down-to-exit", "purpose": "MAIN MENU = NEW GAME / LOAD GAME / OPTIONS / MODS / EXIT since the modmenu lane", "key": "DOWN", "holdMs": 250, "maxPulses": 4, "gapMs": 1500, "dwellMs": 2000 },
+    {
+      "name": "exit-by-enter", "key": "ENTER", "holdMs": 250, "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*menu button=4", "expectMs": 10000
+    },
+    { "name": "confirm-visible", "dwellMs": 5000 },
+    { "name": "cancel-by-esc", "key": "ESCAPE", "holdMs": 250, "maxPulses": 1, "dwellMs": 5000 },
+    { "name": "exit-again", "key": "A", "holdMs": 250, "maxPulses": 1, "dwellMs": 4000 },
+    { "name": "down-to-yes", "key": "DOWN", "holdMs": 250, "maxPulses": 1, "dwellMs": 2000 },
+    {
+      "name": "yes-quit", "key": "A", "holdMs": 250, "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*SR_Quit", "expectMs": 10000
+    },
+    {
+      "name": "exit-clean", "purpose": "PASS condition: the process ends with exit code 0 within 2 s of SR_Quit (docs/CUSTOM_FRONTEND.md 10 'Exit'). A crash code or a process still running fails the roll.",
+      "expectExitCode": 0, "exitTimeoutMs": 2000
+    }
+  ]
+}

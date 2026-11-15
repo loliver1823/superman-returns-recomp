@@ -1,0 +1,20 @@
+{
+  "schema": "sr-native-image-case/1",
+  "provenance": {"kind": "synthetic-regression", "source": "NativeImageStore real queue submission, blocked completion, and descriptor retirement contract; not a live game capture"},
+  "operations": [
+    ["init", 1, 0, "S_OK"],
+    ["create", "image", 8, 8, 1, 0.25, 0.5, 1, "S_OK"],
+    ["block"],
+    ["submit", "flight", "image", "S_OK"],
+    ["release", "image", "S_OK"],
+    ["drop", "image"],
+    ["collect", "S_OK"],
+    ["stats", 0, 1, 1, 0],
+    ["wait", "flight", 0, "WAIT_TIMEOUT"],
+    ["unblock"],
+    ["wait", "flight", 2000, "S_OK"],
+    ["collect", "S_OK"],
+    ["stats", 0, 0, 0, 0],
+    ["shutdown", "S_OK"]
+  ]
+}

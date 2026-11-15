@@ -1,0 +1,65 @@
+; X/WEAR. An appended record (it has an SRId) is ours: the host makes the retail costume
+; request for its suit (SR_CostumeWear). A retail record keeps the retail path; when the retail
+; code will accept it (unlocked) SRCostumes.Retail tells the host which suit is now worn
+; (SR_CostumeWorn <index>, remembered for the next boot) and the original function continues to
+; the retail RecordAdapter.SetActiveCostume - unless this session animates another family's
+; banks (a mod suit's), when the suit is worn from the next start instead.
+; r1=this, r2=_global, r3=key, r4=index (HandleInput has 5 registers, so the SRId is read again
+; rather than kept).
+    Push [reg3]
+    Push [reg2]
+    EA_GetNamedMember 'INPUTCODE'
+    EA_GetNamedMember 'SQUARE'
+    Equals2
+    Not
+    If costume_input_done
+    EA_PushZero
+    Push [reg1]
+    EA_GetNamedMember 'mThumbViewer'
+    EA_PushConstByte 'GetSelected'
+    CallMethod
+    StoreRegister 4
+    Pop
+    Push [reg1]
+    EA_GetNamedMember 'mThumbViewer'
+    EA_GetNamedMember 'mThumbData'
+    Push [reg4]
+    GetMember
+    EA_GetNamedMember 'SRId'
+    op_76
+    Equals2
+    If costume_retail
+    Push [reg1]
+    EA_GetNamedMember 'mThumbViewer'
+    Push [reg1]
+    EA_GetNamedMember 'mThumbViewer'
+    EA_GetNamedMember 'mThumbData'
+    Push [reg4]
+    GetMember
+    EA_GetNamedMember 'SRId'
+    EA_PushByte 2
+    Push [reg2]
+    EA_GetNamedMember 'SRCostumes'
+    EA_CallNamedMethodPop 'Wear'
+    op_74
+    Return
+costume_retail:
+    Push [reg4]
+    EA_PushOne
+    Push [reg1]
+    EA_GetNamedMember 'mThumbViewer'
+    EA_PushConstByte 'IsLocked'
+    CallMethod
+    If costume_input_done
+    Push [reg1]
+    EA_GetNamedMember 'mThumbViewer'
+    Push [reg4]
+    EA_PushByte 2
+    Push [reg2]
+    EA_GetNamedMember 'SRCostumes'
+    EA_PushConstByte 'Retail'
+    CallMethod
+    If costume_input_done
+    op_74
+    Return
+costume_input_done:

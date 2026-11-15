@@ -1,0 +1,7 @@
+[
+  { "case_id": "in_zero",   "va": "0x822BCC78", "regs": { "r4": "0x0" },        "expect": { "r3": "0x1" } },
+  { "case_id": "in_four",   "va": "0x822BCC78", "regs": { "r4": "0x4" },        "expect": { "r3": "0x5" } },
+  { "case_id": "at_bound",  "va": "0x822BCC78", "regs": { "r4": "0x5" },        "expect": { "r3": "0xffffffff" } },
+  { "case_id": "over",      "va": "0x822BCC78", "regs": { "r4": "0xa" },        "expect": { "r3": "0xffffffff" } },
+  { "case_id": "wrap_neg1", "va": "0x822BCC78", "regs": { "r4": "0xffffffff" }, "expect": { "r3": "0x0" } }
+]

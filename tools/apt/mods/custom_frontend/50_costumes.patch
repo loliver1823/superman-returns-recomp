@@ -1,0 +1,13 @@
+# Extend the retail picker after its own getter, before its own unlock/hint loop
+# and ThumbViewer.Create. Never replace RecordAdapter or retail entries 0..2.
+movie SCRCOSTUMES
+append-to action initaction:BistroBaseScreen file=srcostumes.aptasm
+append-to function InitGui in ScrCostumes after-call=GetCostumeData file=costumes_data.aptasm
+prepend-to function HandleInput in ScrCostumes file=costumes_input.aptasm
+append-to function InitGui in ScrCostumes file=costumes_font.aptasm
+prepend-to function ExitScreen in ScrCostumes
+    Push [reg2]
+    EA_PushConstByte 'SRCostumes'
+    Delete
+    Pop
+end

@@ -1,0 +1,36 @@
+{
+  "name": "hrr-title-ab",
+  "purpose": "iter-458 H-VQ (Astra 035/036): within-roll hostRangeReadable cache A/B on a QUIET title. Reaches the title exactly as physfree_gameplay.json does (same first four steps), then sends NO input while SR_HRR_CACHE_WINDOW (process age, seconds) switches the cache OFF -> ON -> OFF. Valid only while the title stays up across all three windows: any loading, ScrGenPop dialog or attract movie inside a window rejects that comparison. Run with -TimeoutSeconds 600 and gates SR_HRR_CACHE=1,SR_HRR_CACHE_WINDOW=90-120 (the window uses a dash: sr_drive splits -Gates on commas, which invalidated hrr1).",
+  "gates": "SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1",
+  "steps": [
+    {
+      "name": "fe-alive",
+      "await": "\\[NAT_FE\\] #1 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "settle-title",
+      "await": "\\[NAT_FE\\] #256 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "press-start",
+      "key": "ENTER",
+      "holdMs": 250,
+      "maxPulses": 4,
+      "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)",
+      "expectMs": 90000
+    },
+    {
+      "name": "first-screen",
+      "expect": "\\[FE_SETSCREEN\\] #1 ",
+      "expectMs": 60000
+    },
+    {
+      "name": "quiet-title",
+      "purpose": "No input. The cache window (process age 90-120 s) sits inside this dwell; the final OFF window runs to its end.",
+      "dwellMs": 270000
+    }
+  ]
+}

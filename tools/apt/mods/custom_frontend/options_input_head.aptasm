@@ -1,0 +1,98 @@
+; Prepended to HandleInput(keyCode r3) of ScrGameplayOpt / ScrControllerOpt / ScrAudioOpt
+; (docs/CUSTOM_FRONTEND.md 5.2; reg2 = _global in all three, flags 0x129). Stack-only.
+; Only while the custom front end opened the screen (SRFrontEnd.inSettings) AND the game
+; is in its front end (FlowMgr.CurInterfaceState == "FE"): the pause menu opens the same
+; screens, and there the game's own Back / START handling must run unchanged.
+; B (TRIANGLE), Esc/Backspace (pad BACK = INPUTCODE.SELECT) and START go back to the menu.
+; Outside the pause menu the game's own code would send Back to CONTROL_ROOM (Audio,
+; Controller), has no Back at all (Gameplay), and START would not return.
+; The screen was opened as an overlay at depth 60 over the still-loaded ScrPressStart
+; (srfrontend.aptasm GoSettings); leaving unloads that overlay the game's way
+; (FlowMgr.SwitchLevel(cur, "NONE", 60) -> gSM.UnloadOverlayScreen, which runs this
+; screen's ExitScreen: the game applies its values there and our capture stores them).
+; Cleanup as the game's own screens do when they leave a DisplayWell screen:
+; SetFortressDisplayWell(false) (hides the well, clears the title) and ClearHints().
+;   var fe = _global.SRFrontEnd;
+;   if (fe.inSettings && _global.FlowMgr.CurInterfaceState == "FE" &&
+;       (keyCode == INPUTCODE.TRIANGLE || keyCode == INPUTCODE.SELECT || keyCode == INPUTCODE.START)) {
+;     fscommand("SR_Log", "settings back key=" + keyCode);
+;     _global.playSound(_global.SOUND.CLOSE);
+;     _global.SetFortressDisplayWell(false); _global.ClearHints();
+;     fe.inSettings = false;
+;     fe.Defer("ShowMenu", 2);          // ScrPressStart (the owner) is still loaded
+;     _global.FlowMgr.SwitchLevel(fe.settingsScreen, "NONE", 60);
+;     return false;
+;   }
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_GetNamedMember 'inSettings'
+    Not
+    If oi_nat
+    Push [reg2]
+    EA_GetNamedMember 'FlowMgr'
+    EA_GetNamedMember 'CurInterfaceState'
+    EA_PushConstByte 'FE'
+    Equals2
+    Not
+    If oi_nat
+    Push [reg3]
+    Push [reg2]
+    EA_GetNamedMember 'INPUTCODE'
+    EA_GetNamedMember 'TRIANGLE'
+    Equals2
+    If oi_back
+    Push [reg3]
+    Push [reg2]
+    EA_GetNamedMember 'INPUTCODE'
+    EA_GetNamedMember 'SELECT'
+    Equals2
+    If oi_back
+    Push [reg3]
+    Push [reg2]
+    EA_GetNamedMember 'INPUTCODE'
+    EA_GetNamedMember 'START'
+    Equals2
+    Not
+    If oi_nat
+oi_back:
+    EA_PushConstByte 'FSCommand:SR_Log'
+    EA_PushConstByte 'settings back key='
+    Push [reg3]
+    Add2
+    GetURL2
+    Push [reg2]
+    EA_GetNamedMember 'SOUND'
+    EA_GetNamedMember 'CLOSE'
+    EA_PushOne
+    Push [reg2]
+    EA_CallNamedMethodPop 'playSound'
+    op_74
+    EA_PushOne
+    Push [reg2]
+    EA_CallNamedMethodPop 'SetFortressDisplayWell'
+    EA_PushZero
+    Push [reg2]
+    EA_CallNamedMethodPop 'ClearHints'
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_PushConstByte 'inSettings'
+    op_74
+    SetMember
+    EA_PushByte 2
+    EA_PushConstByte 'ShowMenu'
+    EA_PushByte 2
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_CallNamedMethodPop 'Defer'
+    EA_PushByte 60
+    EA_PushConstByte 'NONE'
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_GetNamedMember 'settingsScreen'
+    EA_PushByte 3
+    Push [reg2]
+    EA_GetNamedMember 'FlowMgr'
+    EA_CallNamedMethodPop 'SwitchLevel'
+    op_74
+    Return
+oi_nat:

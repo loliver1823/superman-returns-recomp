@@ -1,0 +1,67 @@
+# iter-466 stutter lane: a STREAMING-heavy gameplay route for the hitch census (docs/PERFORMANCE.md
+# section 7). Same harness channel and player keymap as tools/player/gameplay_play.txt; run it
+# through tools/perf/perf_run.py --scenario gameplay --play tools/perf/stutter_play.txt --dwell 220.
+# Route: take off, then long superspeed flights across Metropolis with wide mouse turns (the city
+# streams in ahead of the camera), a slow cruise, a landing, a walk and a few punches.
+# (no '#' inside a command: harness_play.py strips everything after one as a comment)
+await \[APT_REQ\] .*path='screens/hud/main_hud' 1500
+wait 20000
+keymap player
+sample hud
+tap Space 200
+wait 3000
+sample takeoff
+# leg 1: superspeed straight out, then a wide right turn
+down W
+down Left Shift
+watch 6000 leg1
+mouse 1500 0 4000
+watch 6000 leg1b
+up Left Shift
+sample leg1-done
+# leg 2: cruise, climb a little, turn back left at superspeed
+mouse 0 -300 1500
+watch 4000 cruise
+down Left Shift
+mouse -2200 0 6000
+watch 8000 leg2
+up Left Shift
+sample leg2-done
+# leg 3: dive a little, superspeed along a new heading
+mouse 0 400 1500
+down Left Shift
+watch 10000 leg3
+mouse 900 0 3000
+watch 8000 leg3b
+up Left Shift
+up W
+sample leg3-done
+# hover and look around (the streamer keeps loading what comes into view)
+mouse 2400 0 5000
+wait 3000
+mouse -2400 0 5000
+wait 3000
+# leg 4: one more long superspeed run
+down W
+down Left Shift
+watch 12000 leg4
+mouse -1200 0 3000
+watch 10000 leg4b
+up Left Shift
+up W
+sample leg4-done
+# land, walk and punch
+tap Space 1500
+wait 6000
+sample landed
+down W
+watch 6000 walk
+mouse 900 0 2000
+up W
+click left 150
+wait 800
+click left 150
+wait 800
+click left 150
+sample end
+releaseall

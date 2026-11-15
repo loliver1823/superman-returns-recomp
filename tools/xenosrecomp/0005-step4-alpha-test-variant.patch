@@ -1,0 +1,124 @@
+diff --git a/XenosRecomp/main.cpp b/XenosRecomp/main.cpp
+index 5e0eebd..17b4814 100644
+--- a/XenosRecomp/main.cpp
++++ b/XenosRecomp/main.cpp
+@@ -211,9 +211,12 @@ int main(int argc, char** argv)
+                     // XENOS_PS_ONLY=1: pixel shaders only (a PS-side codegen change
+                     // without touching any vertex program).
+                     static const bool psOnly = [] { const char* e = std::getenv("XENOS_PS_ONLY"); return e && e[0] == '1'; }();
+-                    if (psOnly && !recompiler.isPixelShader)
++                    // superman (step 4, 0005): XENOS_AT_ONLY=1 writes only the alpha-test variants (<stem>.at.dxil),
++                    // adding them to a cache without touching any other file.
++                    static const bool atOnly = [] { const char* e = std::getenv("XENOS_AT_ONLY"); return e && e[0] == '1'; }();
++                    if ((psOnly && !recompiler.isPixelShader) || atOnly)
+                     {
+-                        // skip every VS output
++                        // skip every VS output (psOnly) / every non-variant output (atOnly)
+                     }
+                     else if (!vsfOnly)
+                     {
+@@ -221,8 +224,31 @@ int main(int argc, char** argv)
+                         if (!recompiler.isPixelShader)
+                             writeAllBytes((stem + ".vfetch").c_str(), recompiler.vfetchSidecar.data(), recompiler.vfetchSidecar.size());
+                     }
++                    // superman (step 4, 0005): the alpha-test variant of every pixel shader that writes colour 0
++                    // (shader_recompiler.h alphaTestMode); the host draws with it only when RB_COLORCONTROL enables the test.
++                    if (recompiler.isPixelShader && !vsfOnly)
++                    {
++                        thread_local ShaderRecompiler atRecompiler;
++                        atRecompiler = {};
++                        atRecompiler.alphaTestMode = true;
++                        const bool atOk = sehRecompile(atRecompiler, shader.data, include) && atRecompiler.unsupported.empty();
++                        if (atOk && atRecompiler.alphaTestEmitted)
++                        {
++                            IDxcBlob* at = dxcCompiler.compile(atRecompiler.out, true, false, false);
++                            if (at != nullptr)
++                            {
++                                writeAllBytes((stem + ".at.dxil").c_str(), at->GetBufferPointer(), at->GetBufferSize());
++                                at->Release();
++                            }
++                            else
++                            {
++                                fmt::println("AT-SKIP {} ({:016X})", shader.srcPath, hashShaderPair.first);
++                                writeAllBytes((stem + ".at.fail.hlsl").c_str(), atRecompiler.out.data(), atRecompiler.out.size());
++                            }
++                        }
++                    }
+                     // superman (P1): the in-shader vertex-fetch variant of every VS.
+-                    if (!recompiler.isPixelShader && !psOnly)
++                    if (!recompiler.isPixelShader && !psOnly && !atOnly)
+                     {
+                         thread_local ShaderRecompiler fetchRecompiler;
+                         fetchRecompiler = {};
+diff --git a/XenosRecomp/shader_recompiler.cpp b/XenosRecomp/shader_recompiler.cpp
+index 16d6e5c..4aaf53c 100644
+--- a/XenosRecomp/shader_recompiler.cpp
++++ b/XenosRecomp/shader_recompiler.cpp
+@@ -1530,6 +1530,11 @@ void ShaderRecompiler::recompile(const uint8_t* shaderData, const std::string_vi
+     }
+ 
+     out += "\tDEFINE_SHARED_CONSTANTS();\n";
++    // superman (step 4, 0005): the alpha-test variant's test word (shader_recompiler.h alphaTestMode).
++    alphaTestEmitted = alphaTestMode && isPixelShader &&
++        (reinterpret_cast<const PixelShader*>(shaderData + shaderContainer->shaderOffset)->outputs & PIXEL_SHADER_OUTPUT_COLOR0) != 0;
++    if (alphaTestEmitted)
++        out += "\tuint g_AlphaTest : packoffset(c17.y);\n";
+     out += "};\n\n";
+ 
+     out += "#endif\n";
+@@ -2244,6 +2249,32 @@ float4 XeVfLoad(uint slot, uint addr, int offsetDwords, uint fmt, bool isSigned,
+                     indent();
+                     out += "}";
+ 
++                    if (alphaTestEmitted)
++                    {
++                        // superman (step 4, 0005): the Xenos alpha test, as Xenia's CompletePixelShader (shader_recompiler.h
++                        // alphaTestMode): g_AlphaTest = 8 | RB_COLORCONTROL.alpha_func (0 = no test), ALWAYS skips,
++                        // NOT_EQUAL is "not equal" (true for NaN), the others the LESS / EQUAL / GREATER mask.
++                        out += '\n';
++                        indent();
++                        out += "[branch] if ((g_AlphaTest & 8u) != 0u && (g_AlphaTest & 7u) != 7u)\n";
++                        indent();
++                        out += "{\n";
++                        indent();
++                        out += "\tuint xeAlphaMask = g_AlphaTest & 7u;\n";
++                        indent();
++                        out += "\tbool xeAlphaPass = xeAlphaMask == 5u ? (oC0.w != g_AlphaThreshold) :\n";
++                        indent();
++                        out += "\t\t(((xeAlphaMask & 1u) != 0u && oC0.w < g_AlphaThreshold) ||\n";
++                        indent();
++                        out += "\t\t ((xeAlphaMask & 2u) != 0u && oC0.w == g_AlphaThreshold) ||\n";
++                        indent();
++                        out += "\t\t ((xeAlphaMask & 4u) != 0u && oC0.w > g_AlphaThreshold));\n";
++                        indent();
++                        out += "\tif (!xeAlphaPass) discard;\n";
++                        indent();
++                        out += "}\n";
++                    }
++
+                 #ifdef UNLEASHED_RECOMP
+                     specConstantsMask |= SPEC_CONSTANT_ALPHA_TO_COVERAGE;
+ 
+diff --git a/XenosRecomp/shader_recompiler.h b/XenosRecomp/shader_recompiler.h
+index 3b22bd9..1344af4 100644
+--- a/XenosRecomp/shader_recompiler.h
++++ b/XenosRecomp/shader_recompiler.h
+@@ -59,6 +59,18 @@ struct ShaderRecompiler : StringBuffer
+     // instruction's filter first, d3d12_texture_cache.cc GetSamplerParameters). 0 in the step-4 cached corpus.
+     uint32_t filterOverrides = 0;
+ 
++    // superman (step 4, 0005): ALPHA-TEST variant of a pixel shader. The Xenos alpha test (RB_COLORCONTROL
++    // alpha_func / alpha_test_enable against RB_ALPHA_REF) runs on oC0.w after the shader, as Xenia's
++    // DxbcShaderTranslator::CompletePixelShader does it (dxbc_shader_translator_om.cc: the LESS / EQUAL / GREATER
++    // mask, NOT_EQUAL as "not equal" so NaN passes, ALWAYS skips, exact compares - use_fuzzy_alpha_epsilon is
++    // false by default). Only a shader that writes colour 0 tests (Xenia: writes_color_target(0)). The host
++    // passes the test in the shared constants: g_AlphaThreshold (c17.x) = RB_ALPHA_REF, g_AlphaTest (c17.y) =
++    // 8 | alpha_func, 0 = no test. Emitted as <hash>.ps.at.dxil; the plain translation is unchanged (the
++    // upstream spec-constant clip stays compiled out in this DXIL build). alphaTestEmitted = the variant holds the
++    // test (the shader writes colour 0).
++    bool alphaTestMode = false;
++    bool alphaTestEmitted = false;
++
+     // superman (iter-463): a setTexLOD / UseRegisterLOD fetch needs the
+     // register-LOD local; declared after translation at texLodDeclPos.
+     bool usesTexLod = false;

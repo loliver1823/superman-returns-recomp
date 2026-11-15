@@ -1,0 +1,56 @@
+# iter-466 map lane: THE USEFUL PAUSE MAP (docs/MAP.md). The pause_map port feature: SCRMAP gets a
+# generic marker renderer (_global.SRMap) fed by the host through fscommand SR_Map
+# (kernel/map_markers.cpp). srmap.aptasm is GENERATED from srmap.as (tools/apt/as2asm.py).
+movie SCRMAP
+# marker art templates in the Screen sprite (char 25): the screen's own ring (char 5), its pulse
+# ring (char 6) and its Superman icon (char 13), as named, hidden instances to duplicate
+clone-place mSupermanIcon as SRMapT0 char=25 depth=5 with-char=5 x=-200 y=-200
+clone-place mSupermanIcon as SRMapT1 char=25 depth=6 with-char=6 x=-200 y=-200
+clone-place mSupermanIcon as SRMapT2 char=25 depth=7 x=-200 y=-200
+# the ring art is black and this Apt's Color.setTransform only scales (no offsets), so each marker
+# colour is a template whose own placement colour transform paints the ring: RGB x 0 + the colour.
+# The palette (index = the host's colour index, kernel/map_markers.cpp kPalette): ring (char 5) per colour
+clone-place mSupermanIcon as SRMapR0 char=25 depth=30 with-char=5 x=-200 y=-200 cxmul=ff000000 cxadd=00ffffff
+clone-place mSupermanIcon as SRMapR1 char=25 depth=31 with-char=5 x=-200 y=-200 cxmul=ff000000 cxadd=00ffc830
+clone-place mSupermanIcon as SRMapR2 char=25 depth=32 with-char=5 x=-200 y=-200 cxmul=ff000000 cxadd=0038b8ff
+clone-place mSupermanIcon as SRMapR3 char=25 depth=33 with-char=5 x=-200 y=-200 cxmul=ff000000 cxadd=00c070ff
+clone-place mSupermanIcon as SRMapR4 char=25 depth=34 with-char=5 x=-200 y=-200 cxmul=ff000000 cxadd=00ff5040
+clone-place mSupermanIcon as SRMapR5 char=25 depth=35 with-char=5 x=-200 y=-200 cxmul=ff000000 cxadd=0040ff80
+clone-place mSupermanIcon as SRMapR6 char=25 depth=36 with-char=5 x=-200 y=-200 cxmul=ff000000 cxadd=00ff9030
+clone-place mSupermanIcon as SRMapR7 char=25 depth=37 with-char=5 x=-200 y=-200 cxmul=ff000000 cxadd=0030e0e0
+clone-place mSupermanIcon as SRMapR8 char=25 depth=38 with-char=5 x=-200 y=-200 cxmul=ff000000 cxadd=00ff60c0
+clone-place mSupermanIcon as SRMapR9 char=25 depth=39 with-char=5 x=-200 y=-200 cxmul=ff000000 cxadd=00a0a0a0
+# the reticle arrow (char 9) per colour: a sprite whose child carries no colour transform of its own.
+# The pulse ring (char 6) and the reticle (char 10) do: a child placement with its own colour transform
+# replaces the parent's here (rolls ch2_k / race96_k: both stayed white), so the story reticle is built
+# from a tinted ring + four tinted arrows in the reticle's own layout and the metro pulse is a tinted
+# ring the screen scales every tick
+clone-place mSupermanIcon as SRMapA0 char=25 depth=40 with-char=9 x=-200 y=-200 cxmul=ff000000 cxadd=00ffffff
+clone-place mSupermanIcon as SRMapA1 char=25 depth=41 with-char=9 x=-200 y=-200 cxmul=ff000000 cxadd=00ffc830
+clone-place mSupermanIcon as SRMapA2 char=25 depth=42 with-char=9 x=-200 y=-200 cxmul=ff000000 cxadd=0038b8ff
+clone-place mSupermanIcon as SRMapA3 char=25 depth=43 with-char=9 x=-200 y=-200 cxmul=ff000000 cxadd=00c070ff
+clone-place mSupermanIcon as SRMapA4 char=25 depth=44 with-char=9 x=-200 y=-200 cxmul=ff000000 cxadd=00ff5040
+clone-place mSupermanIcon as SRMapA5 char=25 depth=45 with-char=9 x=-200 y=-200 cxmul=ff000000 cxadd=0040ff80
+clone-place mSupermanIcon as SRMapA6 char=25 depth=46 with-char=9 x=-200 y=-200 cxmul=ff000000 cxadd=00ff9030
+clone-place mSupermanIcon as SRMapA7 char=25 depth=47 with-char=9 x=-200 y=-200 cxmul=ff000000 cxadd=0030e0e0
+clone-place mSupermanIcon as SRMapA8 char=25 depth=48 with-char=9 x=-200 y=-200 cxmul=ff000000 cxadd=00ff60c0
+clone-place mSupermanIcon as SRMapA9 char=25 depth=49 with-char=9 x=-200 y=-200 cxmul=ff000000 cxadd=00a0a0a0
+# the trail bars: the screen's panel art (char 15, 185 x 100) painted per colour, and its dark edge
+clone-place mSupermanIcon as SRMapL0 char=25 depth=60 with-char=15 x=-200 y=-200 cxmul=ff000000 cxadd=00ffffff
+clone-place mSupermanIcon as SRMapL1 char=25 depth=61 with-char=15 x=-200 y=-200 cxmul=ff000000 cxadd=00ffc830
+clone-place mSupermanIcon as SRMapL2 char=25 depth=62 with-char=15 x=-200 y=-200 cxmul=ff000000 cxadd=0038b8ff
+clone-place mSupermanIcon as SRMapL3 char=25 depth=63 with-char=15 x=-200 y=-200 cxmul=ff000000 cxadd=00c070ff
+clone-place mSupermanIcon as SRMapL4 char=25 depth=64 with-char=15 x=-200 y=-200 cxmul=ff000000 cxadd=00ff5040
+clone-place mSupermanIcon as SRMapL5 char=25 depth=65 with-char=15 x=-200 y=-200 cxmul=ff000000 cxadd=0040ff80
+clone-place mSupermanIcon as SRMapL6 char=25 depth=66 with-char=15 x=-200 y=-200 cxmul=ff000000 cxadd=00ff9030
+clone-place mSupermanIcon as SRMapL7 char=25 depth=67 with-char=15 x=-200 y=-200 cxmul=ff000000 cxadd=0030e0e0
+clone-place mSupermanIcon as SRMapL8 char=25 depth=68 with-char=15 x=-200 y=-200 cxmul=ff000000 cxadd=00ff60c0
+clone-place mSupermanIcon as SRMapL9 char=25 depth=69 with-char=15 x=-200 y=-200 cxmul=ff000000 cxadd=00a0a0a0
+clone-place mSupermanIcon as SRMapLk char=25 depth=70 with-char=15 x=-200 y=-200 cxmul=dc000000 cxadd=00141414
+# the screen's own panel shape (char 15) as the legend's backing
+clone-place mSupermanIcon as SRMapT3 char=25 depth=8 with-char=15 x=-200 y=-200
+append-to action initaction:ScrMap file=srmap.aptasm
+append-to function InitGui in ScrMap file=map_open.aptasm
+append-to function SetSupermanIcon in ScrMap file=map_tick.aptasm
+prepend-to function HandleInput in ScrMap file=map_input.aptasm
+prepend-to function ExitScreen in ScrMap file=map_exit.aptasm

@@ -1,0 +1,108 @@
+{
+  "name": "density-soak",
+  "purpose": "iter-466 density lane: the 200% stability soak. LOAD GAME (custom MAIN MENU, PORT FEATURES ON) from a free-roam save seed (-Gates SR_CONTENT_DIR=<copy of a playthrough boss save>), METROPOLIS, then ~11 min of free roam while tools/player/density_soak_play.txt flies low (sr_roll -PlayScript). Gates for the roll: SR_PORT_FEATURES=1 (sr_roll -PortFeatures 1), SR_TRAFFIC_DENSITY=200, SR_POPULATION_DENSITY=200, SR_HIGHFPS_PACE=1. Read the traffic groups with Frida during the soak (docs/MODS.md 7.3).",
+  "gates": "SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=300,SR_PRESENT_DUMP_SPARSE_CAP=900,SR_HIGHFPS_PACE=1",
+  "requires": {
+    "contentSeed": true
+  },
+  "steps": [
+    {
+      "name": "fe-alive",
+      "await": "\\[NAT_FE\\] #1 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "settle-title",
+      "await": "\\[NAT_FE\\] #256 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "press-start",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 4,
+      "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)",
+      "expectMs": 90000
+    },
+    {
+      "name": "title-ui-tail",
+      "await": "\\[APT_REQ\\] #15 path='\\.\\./common/ButtonHints/XBox360/HintB'",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "title-visible",
+      "requireVisibleMs": 8000,
+      "visibleTimeoutMs": 200000,
+      "dwellMs": 6000
+    },
+    {
+      "name": "start-bootflow",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 10000,
+      "expect": "\\[SR_FSCMD\\].*claim LoadCreate",
+      "expectMs": 30000
+    },
+    {
+      "name": "menu-visible",
+      "dwellMs": 4000
+    },
+    {
+      "name": "down-to-load",
+      "key": "DOWN",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "dwellMs": 1500
+    },
+    {
+      "name": "load-game",
+      "key": "A",
+      "holdMs": 1000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*answer cppId=\\S+ button=1",
+      "expectMs": 15000
+    },
+    {
+      "name": "slots-filled",
+      "purpose": "the LOAD A GAME list (a dwell: the old [PATH_RESOLVE] FillSlotInfo marker cannot fire since iter-464's skip_lr; its stand-in is [APT_REQ] artassets/SaveImages/SaveImage_N, tools/scenarios/natural_load.json)",
+      "dwellMs": 6000
+    },
+    {
+      "name": "load-slot",
+      "key": "A",
+      "holdMs": 1000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*SR_SaveEvent 'load' saveFlow\\+0x54=\\d -> slot \\d",
+      "expectMs": 30000
+    },
+    {
+      "name": "load-lands",
+      "purpose": "the loaded game's first screen: main_hud (first hour) or ScrMainMenu (past it); not expectFresh - LoadComplete requests it inside the same call (natural_load.json)",
+      "expect": "\\[APT_SCREEN\\] path='screens/(hud/main_hud|frontend/ScrMainMenu)'",
+      "expectMs": 120000
+    },
+    {
+      "name": "metropolis",
+      "purpose": "past the first hour the load lands on the METROPOLIS / FORTRESS carousel: A = METROPOLIS (lift_proof.json)",
+      "key": "A",
+      "holdMs": 1000,
+      "maxPulses": 3,
+      "gapMs": 15000,
+      "expect": "\\[APT_REQ\\] #\\d+ path='screens/hud/main_hud'|\\[APT_SCREEN\\] path='screens/hud/main_hud'",
+      "expectFresh": true,
+      "expectMs": 240000,
+      "optional": true
+    },
+    {
+      "name": "soak",
+      "purpose": "10+ minutes of free roam at the roll's density (tools/player/density_soak_play.txt flies low through the streets beside this dwell)",
+      "dwellMs": 690000
+    }
+  ]
+}

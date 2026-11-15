@@ -1,0 +1,45 @@
+{
+  "name": "natural-load",
+  "purpose": "iter-463 devtools item 6: the RETAIL front end's own LOAD path from a save seed, NO mod (-Gates SR_MODS=0,SR_CONTENT_DIR=<content root>; requires.contentSeed makes sr_drive refuse without one). title -> START -> the natural LOAD A GAME? popup (LoadCreate: [Start New Game, Load Game], default 0; CUSTOM_FRONTEND.md 2.1 rows 6-9) -> DOWN, A = button 1 LOAD GAME -> sub_822B32B8 calls AS ScrPressStart.ShowSlotSelector(1) (the slot picker's content enumeration: [XAM_CONTENT] XamContentCreateEnumerator dev=1 lr=82149738) -> SaveLoadSlots MODE_LOAD fills its 3 slots (an in-use slot's save image: [APT_REQ] artassets/SaveImages/SaveImage_N); in LOAD mode an empty slot is DISABLED and the focus lands on the FIRST IN-USE slot (SaveLoadSlots.as 0x0F3D-0x0FA9: isEnabled = IsSlotInUse || mode==SAVE; isSelected = isEnabled && !foundSelected) -> A = SaveLoadAdapter.LoadTask(slot) -> sub_822B4ED8 applies the slot (AptDisplayListBuildTable_sub_8218E4A0) and calls LoadComplete(true) synchronously -> ScrPressStart.LoadComplete: IsFirstHour() ? ChangeInterfaceState(IG) = main_hud : SwitchScreen(MAINMENU) = screens/frontend/ScrMainMenu. Named failures: no in-use slot in the seed (A on a disabled slot does nothing: load-slot never sees LoadComplete), or LoadComplete without a new screen. The markers replace [PATH_RESOLVE] (it cannot fire since iter-464's skip_lr: no ctx.lr on a direct call), frozen 10-24 from rolls g14A_nld / g14A_nlde and their frames. Before a roll: python tools/save_records.py verify <seed> must list a used slot. Tag the result natural, save-seeded (<label>) (docs/SAVES.md). -TimeoutSeconds 420.",
+  "gates": "SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=20,SR_PRESENT_DUMP_SPARSE_CAP=900",
+  "requires": { "contentSeed": true },
+  "steps": [
+    { "name": "fe-alive", "await": "\\[NAT_FE\\] #1 natural FE master tick", "timeoutMs": 180000 },
+    { "name": "settle-title", "await": "\\[NAT_FE\\] #256 natural FE master tick", "timeoutMs": 180000 },
+    {
+      "name": "press-start", "key": "ENTER", "holdMs": 2000, "holdUntilConfirmed": true, "maxPulses": 4, "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)", "expectMs": 90000
+    },
+    { "name": "title-ui-tail", "await": "\\[APT_REQ\\] #15 path='\\.\\./common/ButtonHints/XBox360/HintB'", "timeoutMs": 240000 },
+    { "name": "title-visible", "requireVisibleMs": 8000, "visibleTimeoutMs": 200000, "dwellMs": 6000 },
+    {
+      "name": "start-bootflow", "key": "ENTER", "holdMs": 2000, "holdUntilConfirmed": true, "maxPulses": 3, "gapMs": 10000,
+      "purpose": "START -> StartBootFlow -> sign-in gate -> device step -> the C++ LoadCreate popup: its ScrGenPop request (the natural_new marker).",
+      "expect": "\\[APT_REQ\\] #\\d+ path='screens/misc/ScrGenPop'", "expectMs": 30000
+    },
+    { "name": "popup-visible", "purpose": "Capture window: the natural LOAD A GAME? popup with a save present.", "dwellMs": 6000 },
+    {
+      "name": "down-to-load", "key": "DOWN", "holdMs": 2000, "holdUntilConfirmed": true, "maxPulses": 1, "dwellMs": 1500,
+      "purpose": "Focus button 1 (Load Game); the popup's default is button 0."
+    },
+    {
+      "name": "load-game", "key": "A", "holdMs": 2000, "holdUntilConfirmed": true, "maxPulses": 1,
+      "purpose": "LOAD GAME -> the native answer calls AS ShowSlotSelector(1): the slot picker enumerates the save device's content (0.2 s after A).",
+      "expect": "\\[XAM_CONTENT\\] #\\d+ XamContentCreateEnumerator\\(user=0 dev=1 type=1 .*lr=82149738", "expectFresh": true, "expectMs": 15000
+    },
+    {
+      "name": "slots-filled", "purpose": "The adapter delivered the slot info (SetSlotWaitMode(false) follows in FillSlotInfo); only now are the slot buttons enabled and focused. Marker: the in-use slot's save image is requested, counted only after LOAD GAME was entered.",
+      "expect": "\\[APT_REQ\\] #\\d+ path='artassets/SaveImages/SaveImage_\\d+'", "expectSince": "load-game", "expectMs": 30000, "dwellMs": 4000
+    },
+    {
+      "name": "load-slot", "key": "A", "holdMs": 2000, "holdUntilConfirmed": true, "maxPulses": 1,
+      "purpose": "A on the focused (first in-use) slot -> LoadTask -> LoadComplete(true), which requests the loaded game's first screen inside the same call (main_hud 57 ms after A). Absent = the seed has no in-use slot (all three disabled).",
+      "expect": "\\[APT_SCREEN\\] path='screens/(hud/main_hud|frontend/ScrMainMenu)'", "expectFresh": true, "expectMs": 30000
+    },
+    {
+      "name": "load-lands", "purpose": "PASS condition: the loaded game's first screen - main_hud (first hour: straight into the game) or ScrMainMenu (the METROPOLIS / FORTRESS carousel after the first hour). Not expectFresh: LoadComplete requests the screen inside the same call, so the line can land before this step starts; neither screen is requested earlier in this run.",
+      "expect": "\\[APT_SCREEN\\] path='screens/(hud/main_hud|frontend/ScrMainMenu)'", "expectMs": 60000
+    },
+    { "name": "observe-after", "purpose": "Capture window: whatever the loaded save shows (frames decide; ScrMainMenu needs a further A = METROPOLIS, not driven here).", "dwellMs": 45000 }
+  ]
+}

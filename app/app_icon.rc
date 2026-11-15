@@ -1,0 +1,4 @@
+// iter-465 window: the exe's own app icon (Explorer, and the window's icon until the game's
+// title icon from default.xex replaces it - app/window_icon.cpp). An original design drawn by
+// tools/player/make_app_icon.py; no game art.
+1 ICON "app_icon.ico"

@@ -1,0 +1,49 @@
+# The Xenia shaders the renderer embeds as precompiled DXBC (Shader Model 5.1), one source per line,
+# relative to the Xenia root. cmake/xenia_shaders.cmake compiles each with the Windows SDK's fxc.exe
+# into <build>/generated/xenia-shaders/xenia/<gpu|ui>/shaders/bytecode/d3d12_5_1/<name>_<stage>.h,
+# the header Xenia's own build makes (tools/build/compile_shader_dxbc.py). tools/vendor_xenia_shaders.py
+# copies these sources and everything they include into this directory.
+#
+# EDRAM resolves (gfx/d3d12_pm4_shmem.cpp; the emulation layer's resolve path, kept for the test oracle)
+src/xenia/gpu/shaders/resolve_fast_32bpp_1x2xmsaa.cs.xesl
+src/xenia/gpu/shaders/resolve_fast_32bpp_4xmsaa.cs.xesl
+src/xenia/gpu/shaders/resolve_fast_64bpp_1x2xmsaa.cs.xesl
+src/xenia/gpu/shaders/resolve_fast_64bpp_4xmsaa.cs.xesl
+src/xenia/gpu/shaders/resolve_full_8bpp.cs.xesl
+src/xenia/gpu/shaders/resolve_full_16bpp.cs.xesl
+src/xenia/gpu/shaders/resolve_full_32bpp.cs.xesl
+src/xenia/gpu/shaders/resolve_full_64bpp.cs.xesl
+src/xenia/gpu/shaders/resolve_full_128bpp.cs.xesl
+src/xenia/gpu/shaders/resolve_fast_32bpp_1x2xmsaa_scaled.cs.xesl
+src/xenia/gpu/shaders/resolve_fast_32bpp_4xmsaa_scaled.cs.xesl
+src/xenia/gpu/shaders/resolve_fast_64bpp_1x2xmsaa_scaled.cs.xesl
+src/xenia/gpu/shaders/resolve_fast_64bpp_4xmsaa_scaled.cs.xesl
+src/xenia/gpu/shaders/resolve_full_8bpp_scaled.cs.xesl
+src/xenia/gpu/shaders/resolve_full_16bpp_scaled.cs.xesl
+src/xenia/gpu/shaders/resolve_full_32bpp_scaled.cs.xesl
+src/xenia/gpu/shaders/resolve_full_64bpp_scaled.cs.xesl
+src/xenia/gpu/shaders/resolve_full_128bpp_scaled.cs.xesl
+# Texture loads (gfx/d3d12_pm4_shmem.cpp)
+src/xenia/gpu/shaders/texture_load_8bpb.cs.xesl
+src/xenia/gpu/shaders/texture_load_16bpb.cs.xesl
+src/xenia/gpu/shaders/texture_load_32bpb.cs.xesl
+src/xenia/gpu/shaders/texture_load_64bpb.cs.xesl
+src/xenia/gpu/shaders/texture_load_128bpb.cs.xesl
+src/xenia/gpu/shaders/texture_load_depth_unorm.cs.xesl
+src/xenia/gpu/shaders/texture_load_depth_float.cs.xesl
+src/xenia/gpu/shaders/texture_load_8bpb_scaled.cs.xesl
+src/xenia/gpu/shaders/texture_load_16bpb_scaled.cs.xesl
+src/xenia/gpu/shaders/texture_load_32bpb_scaled.cs.xesl
+src/xenia/gpu/shaders/texture_load_64bpb_scaled.cs.xesl
+src/xenia/gpu/shaders/texture_load_128bpb_scaled.cs.xesl
+src/xenia/gpu/shaders/texture_load_depth_unorm_scaled.cs.xesl
+src/xenia/gpu/shaders/texture_load_depth_float_scaled.cs.xesl
+# Present chain (gfx/d3d12_present_chain.cpp): FXAA (NVIDIA FXAA 3.11) and the guest output
+# passes (bilinear; AMD FidelityFX CAS and FSR 1.0 EASU / RCAS)
+src/xenia/gpu/shaders/fxaa.cs.hlsl
+src/xenia/gpu/shaders/fxaa_extreme.cs.hlsl
+src/xenia/ui/shaders/guest_output_bilinear.ps.xesl
+src/xenia/ui/shaders/guest_output_ffx_cas_resample.ps.xesl
+src/xenia/ui/shaders/guest_output_ffx_cas_sharpen.ps.xesl
+src/xenia/ui/shaders/guest_output_ffx_fsr_easu.ps.xesl
+src/xenia/ui/shaders/guest_output_ffx_fsr_rcas.ps.xesl

@@ -1,0 +1,37 @@
+{
+  "name": "physmem-metropolis-return",
+  "purpose": "iter-465 physmem lane: the Warworld -> Metropolis return on the NATURAL game (no mods, port features off). Title -> START -> the game's own LOAD A GAME? popup -> A = START NEW GAME -> main_hud -> the level-skip dev tool (plan data/devtools/plans/metropolis_return_from_new_game.txt) passes MSTobj01..03 (the MSTobj03 save prompt answered Continue Without Saving by the plan), WARobj01, WARobj02 -> the game returns to Metropolis and reloads it (the 224 MB world pool, 0xDFF0000) -> CinematicLuthorSteals is won there -> hold 120 s of Metropolis gameplay for frames. Before the fix the return died at [PHYS_CAP] guestPhysAlloc(0xDFF0000) -> [ICALL_FAIL] 8260527C. Dev-tool assisted (the plan drives the game's own objectives): tag results 'dev-tool assisted', still the natural code path. Gates: -Gates \"SR_MODS=0,SR_DEVTOOLS=levelskip,SR_DEVTOOLS_CMDS=<abs plan>,SR_DEVTOOLS_OUT=<dir>,SR_INSTANCE_ID=physmem,SDL_AUDIODRIVER=disk\". -TimeoutSeconds 1500.",
+  "gates": "SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=20,SR_PRESENT_DUMP_SPARSE_CAP=1500",
+  "steps": [
+    { "name": "fe-alive", "await": "\\[NAT_FE\\] #1 natural FE master tick", "timeoutMs": 180000 },
+    { "name": "settle-title", "await": "\\[NAT_FE\\] #256 natural FE master tick", "timeoutMs": 180000 },
+    {
+      "name": "press-start", "key": "ENTER", "holdMs": 250, "maxPulses": 4, "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)", "expectMs": 90000
+    },
+    { "name": "title-ui-tail", "await": "\\[APT_REQ\\] #15 path='\\.\\./common/ButtonHints/XBox360/HintB'", "timeoutMs": 240000 },
+    { "name": "title-visible", "requireVisibleMs": 8000, "visibleTimeoutMs": 200000, "dwellMs": 6000 },
+    {
+      "name": "start-bootflow", "key": "ENTER", "holdMs": 250, "maxPulses": 1,
+      "expect": "\\[APT_REQ\\] #\\d+ path='screens/misc/ScrGenPop'", "expectMs": 30000
+    },
+    { "name": "popup-visible", "purpose": "The natural LOAD A GAME? popup.", "dwellMs": 6000 },
+    {
+      "name": "start-new-game", "key": "A", "holdMs": 250, "maxPulses": 1,
+      "expect": "\\[APT_REQ\\] #\\d+ path='screens/hud/main_hud'", "expectMs": 120000
+    },
+    {
+      "name": "warworld-done",
+      "purpose": "WARobj02 passed: the game itself starts the return to Metropolis",
+      "await": "\\[DEVTOOL\\] act=levelskip.pass args=6 WARobj02",
+      "timeoutMs": 1200000
+    },
+    {
+      "name": "plan-done",
+      "purpose": "Back in Metropolis: the world pool was granted, the city reloaded and CinematicLuthorSteals won",
+      "await": "\\[DEVTOOL\\] levelskip done|\\[ICALL_FAIL\\]|\\[PHYS_CAP\\]",
+      "timeoutMs": 900000
+    },
+    { "name": "metropolis-hold", "purpose": "Metropolis gameplay continues (frames)", "dwellMs": 120000 }
+  ]
+}

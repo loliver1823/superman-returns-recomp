@@ -1,0 +1,69 @@
+{
+ "name": "playthrough-chain-nat",
+ "purpose": "iter-465 playthrough lane: the NATURAL twin of playthrough_chain_pf.json (port features off, no mods): title -> START -> the game's own LOAD A GAME? popup -> A = START NEW GAME -> the plan (tools/devtools/playthrough_plan.py output, pad step kept) walks the story spine; SR_LEVELSKIP_DECLINE_SAVES=1 answers the other save prompts Continue Without Saving. Dev-tool assisted. Gates: SR_INSTANCE_ID=playthrough,SR_PORT_FEATURES=0,SR_MODS=0,SR_DEVTOOLS=levelskip+cheats,SR_DEVTOOLS_CMDS=<abs plan>,SR_DEVTOOLS_OUT=<dir>,SR_LEVELSKIP_DECLINE_SAVES=1,SDL_AUDIODRIVER=disk. -TimeoutSeconds 4800.",
+ "gates": "SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=300,SR_PRESENT_DUMP_SPARSE_CAP=900",
+ "steps": [
+  {
+   "name": "fe-alive",
+   "await": "\\[NAT_FE\\] #1 natural FE master tick",
+   "timeoutMs": 180000
+  },
+  {
+   "name": "settle-title",
+   "await": "\\[NAT_FE\\] #256 natural FE master tick",
+   "timeoutMs": 180000
+  },
+  {
+   "name": "press-start",
+   "key": "ENTER",
+   "holdMs": 250,
+   "maxPulses": 4,
+   "gapMs": 12000,
+   "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)",
+   "expectMs": 90000
+  },
+  {
+   "name": "title-ui-tail",
+   "await": "\\[APT_REQ\\] #15 path='\\.\\./common/ButtonHints/XBox360/HintB'",
+   "timeoutMs": 240000
+  },
+  {
+   "name": "title-visible",
+   "requireVisibleMs": 8000,
+   "visibleTimeoutMs": 200000,
+   "dwellMs": 6000
+  },
+  {
+   "name": "start-bootflow",
+   "key": "ENTER",
+   "holdMs": 250,
+   "maxPulses": 1,
+   "expect": "\\[APT_REQ\\] #\\d+ path='screens/misc/ScrGenPop'",
+   "expectMs": 30000
+  },
+  {
+   "name": "popup-visible",
+   "purpose": "The natural LOAD A GAME? popup.",
+   "dwellMs": 6000
+  },
+  {
+   "name": "start-new-game",
+   "key": "A",
+   "holdMs": 250,
+   "maxPulses": 1,
+   "expect": "\\[APT_REQ\\] #\\d+ path='screens/hud/main_hud'",
+   "expectMs": 120000
+  },
+  {
+   "name": "plan-end",
+   "purpose": "the plan ends (done = the target was won) or stops; or a crash marker",
+   "await": "\\[DEVTOOL\\] levelskip \\w+ at k=|\\[ICALL_FAIL\\]|\\[PHYS_CAP\\]",
+   "timeoutMs": 4200000
+  },
+  {
+   "name": "after-hold",
+   "purpose": "what the game does by itself after the plan (frames)",
+   "dwellMs": 180000
+  }
+ ]
+}

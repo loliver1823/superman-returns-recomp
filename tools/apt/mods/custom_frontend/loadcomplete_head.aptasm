@@ -1,0 +1,34 @@
+; Prepended to ScrPressStart.LoadComplete(successful r3) (reg2 = _global, flags 0x129).
+; Stack-only. LoadComplete(true) is what the game sends after button 0 (NEW GAME:
+; ProfileSettings_applyOptions just reset scheme / Y inversion / vibration / auto-center
+; from the profile) and after a load (the save's own options were just restored by
+; ScriptCmd_FillRecordArray_sub_821652E0), in both cases right before the game leaves the
+; front end (sub_822B32B8 -> sub_822A0C00). The universal store is re-applied here, through
+; the game's own setters (ApplyStore; why 2 honours apply_to_loaded_saves).
+; iter-464: and the host's current-save-slot tracker learns "new" (a new playthrough has no
+; slot yet) or "load" (saveFlow+0x54 = the slot just loaded) - "Autosave without asking".
+;   if (successful) _global.SRFrontEnd.ApplyStore(_global.SRFrontEnd.lastAnswer == 1 ? 2 : 1);
+    Push [reg3]
+    Not
+    If lc_done
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_GetNamedMember 'lastAnswer'
+    EA_PushOne
+    Equals2
+    If lc_load
+    GetURL 'FSCommand:SR_SaveEvent', 'new'
+    EA_PushOne
+    EA_PushOne
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_CallNamedMethodPop 'ApplyStore'
+    Jump lc_done
+lc_load:
+    GetURL 'FSCommand:SR_SaveEvent', 'load'
+    EA_PushByte 2
+    EA_PushOne
+    Push [reg2]
+    EA_GetNamedMember 'SRFrontEnd'
+    EA_CallNamedMethodPop 'ApplyStore'
+lc_done:

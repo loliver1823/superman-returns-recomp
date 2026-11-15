@@ -1,0 +1,540 @@
+==============================================================================
+FORCING AUDIT  (scripts/audit_forcing.py) -- guest-state-writing / guest-driving sites
+==============================================================================
+  total sites: 261
+    UNGATED  (FLAGGED for review -- possible hidden band-aid): 0
+    OWNGATE  (private SR_* env, NOT the master gate -- charter violation): 7
+    MASTER   (behind forcingAllowed() -- OK): 144
+    ALLOW    (reviewed platform-fix allowlist -- OK): 110
+
+--- MASTER-gated (144) ---
+  kernel/crt_file_lock_init_fix.cpp:99  void sub_827AC498(PPCContext& __restrict ctx, uint8_t* base)()  <guest_write>
+      sr::kernel::writeGuestBE32(slotVA, fakeCS);
+  kernel/dogma_hash_hooks.cpp:147  void sub_825FDBB0(PPCContext& __restrict ctx, uint8_t* base)()  <ppc_store>
+      PPC_STORE_U32(structVA + off,     bucketsVA);
+  kernel/dogma_hash_hooks.cpp:148  void sub_825FDBB0(PPCContext& __restrict ctx, uint8_t* base)()  <ppc_store>
+      PPC_STORE_U32(structVA + off + 4, kBucketCount);
+  kernel/dogma_hash_hooks.cpp:209  void sub_825FD958(PPCContext& __restrict ctx, uint8_t* base)()  <guest_write>
+      sr::kernel::writeGuestBE32(ctx.r3.u32,     0);
+  kernel/dogma_hash_hooks.cpp:210  void sub_825FD958(PPCContext& __restrict ctx, uint8_t* base)()  <guest_write>
+      sr::kernel::writeGuestBE32(ctx.r3.u32 + 4, 0);
+  kernel/dogma_hash_hooks.cpp:222  void sub_825FD958(PPCContext& __restrict ctx, uint8_t* base)()  <guest_write>
+      sr::kernel::writeGuestBE32(ctx.r3.u32,     0);
+  kernel/dogma_hash_hooks.cpp:223  void sub_825FD958(PPCContext& __restrict ctx, uint8_t* base)()  <guest_write>
+      sr::kernel::writeGuestBE32(ctx.r3.u32 + 4, 0);
+  kernel/dogma_pool_registry_seed.cpp:83  #include "guest_context.hpp" #include "../app/log.hpp" #incl()  <guest_write>
+      writeGuestBE32(vtableVA + 0x24u, kFakePoolAllocFn);
+  kernel/dogma_pool_registry_seed.cpp:85  #include "guest_context.hpp" #include "../app/log.hpp" #incl()  <guest_write>
+      writeGuestBE32(poolVA + 0x00u, vtableVA);
+  kernel/dogma_pool_registry_seed.cpp:87  #include "guest_context.hpp" #include "../app/log.hpp" #incl()  <guest_write>
+      writeGuestBE32(kFallbackPoolGlobalVA, poolVA);
+  kernel/fe_flow_watch.cpp:1088  namespace {()  <guest_call>
+      sr::kernel::GuestCaller gc("AUI_NAT");
+  kernel/fe_flow_watch.cpp:1188  namespace {()  <guest_call>
+      sr::kernel::GuestCaller gc("FE_PHASE_CTORS");
+  kernel/fe_flow_watch.cpp:1240  namespace {()  <guest_call>
+      sr::kernel::GuestCaller gcE("SCREEN_SYS_CTOR");
+  kernel/fe_flow_watch.cpp:1301  namespace {()  <guest_call>
+      sr::kernel::GuestCaller gcL("APT_LOGIC_TICK");
+  kernel/fe_flow_watch.cpp:1362  namespace {()  <guest_call>
+      sr::kernel::GuestCaller gcS("IFACE_STATE_RX");
+  kernel/fe_flow_watch.cpp:1431  namespace {()  <guest_call>
+      sr::kernel::GuestCaller gcR("SM_REBUILD");
+  kernel/rtam_service.cpp:219  void __imp__sub_8271F848(PPCContext& __restrict ctx, uint8_t()  <guest_call>
+      sr::kernel::GuestCaller gc("RTAM_SCHED");
+  kernel/rtam_service.cpp:282  void __imp__sub_8271F848(PPCContext& __restrict ctx, uint8_t()  <guest_call>
+      sr::kernel::GuestCaller gc("RTAM_WORKER");
+  kernel/rtam_service.cpp:323  void __imp__sub_8271F848(PPCContext& __restrict ctx, uint8_t()  <guest_call>
+      sr::kernel::GuestCaller gc("RTAM_FSM");
+  kernel/rtam_service.cpp:351  void __imp__sub_8271F848(PPCContext& __restrict ctx, uint8_t()  <guest_write>
+      sr::kernel::writeGuestBE32(vtOut + i * 4u, kNoopFnVA);
+  kernel/rtam_service.cpp:352  void __imp__sub_8271F848(PPCContext& __restrict ctx, uint8_t()  <guest_write>
+      sr::kernel::writeGuestBE32(vtOut + 3u * 4u, slot3VA);
+  kernel/rtam_service.cpp:357  void __imp__sub_8271F848(PPCContext& __restrict ctx, uint8_t()  <guest_write>
+      sr::kernel::writeGuestBE32(obj + i * 4u, 0);
+  kernel/rtam_service.cpp:358  void __imp__sub_8271F848(PPCContext& __restrict ctx, uint8_t()  <guest_write>
+      sr::kernel::writeGuestBE32(obj, vtOut);
+  kernel/rtam_service.cpp:380  void __imp__sub_8271F848(PPCContext& __restrict ctx, uint8_t()  <guest_call>
+      sr::kernel::GuestCaller gc("RTAM_PREP");
+  kernel/rtam_service.cpp:422  void __imp__sub_8271F848(PPCContext& __restrict ctx, uint8_t()  <guest_write>
+      sr::kernel::writeGuestBE32(holderVA + z * 4u, 0);
+  kernel/rtam_service.cpp:485  void __imp__sub_8271F848(PPCContext& __restrict ctx, uint8_t()  <guest_call>
+      sr::kernel::GuestCaller gc("RTAM_LOAD");
+  kernel/rtam_service.cpp:641  void __imp__sub_8271F848(PPCContext& __restrict ctx, uint8_t()  <guest_call>
+      sr::kernel::GuestCaller gc("RTAMINI_DRV");
+  kernel/splash_hooks.cpp:191  namespace {()  <guest_write>
+      sr::kernel::writeGuestBE32(lockVA, 0);
+  kernel/splash_hooks.cpp:727  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(vtableVA + 28, kFakeStub);
+  kernel/splash_hooks.cpp:728  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(managerVA + 0, vtableVA);
+  kernel/splash_hooks.cpp:737  void startKernelSplashOverlayThread() {()  <guest_write>
+      if (g1 == 0) sr::kernel::writeGuestBE32(kEdf8VA, edf8VA);
+  kernel/splash_hooks.cpp:738  void startKernelSplashOverlayThread() {()  <guest_write>
+      if (g2 == 0) sr::kernel::writeGuestBE32(kEdfcVA, edfcVA);
+  kernel/splash_hooks.cpp:739  void startKernelSplashOverlayThread() {()  <guest_write>
+      if (g3 == 0) sr::kernel::writeGuestBE32(kEb80VA, managerVA);
+  kernel/splash_hooks.cpp:803  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(kEdf8VA, edf8VA); restored = true;
+  kernel/splash_hooks.cpp:806  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(kEdfcVA, edfcVA); restored = true;
+  kernel/splash_hooks.cpp:824  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(kEb80VA, pick); restored = true;
+  kernel/splash_hooks.cpp:844  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x829A0020u, s_lastAptMgr);
+  kernel/splash_hooks.cpp:857  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(managerVA, vtableVA); restored = true;
+  kernel/splash_hooks.cpp:863  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(vtableVA + 28, kFakeStub); restored = true;
+  kernel/splash_hooks.cpp:887  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(psm + kPsmCounterOff, 0u);  // start the climb from 0
+  kernel/splash_hooks.cpp:994  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(cfg + 144u, 1);
+  kernel/splash_hooks.cpp:1018  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(uiMgr + 0x54u, fab);
+  kernel/splash_hooks.cpp:1325  void startKernelSplashOverlayThread() {()  <guest_write>
+      if (p944 != 0x826D83F8u) sr::kernel::writeGuestBE32(0x8293B944u, 0x826D83F8u);
+  kernel/splash_hooks.cpp:1326  void startKernelSplashOverlayThread() {()  <guest_write>
+      if (p948 != 0x826D8480u) sr::kernel::writeGuestBE32(0x8293B948u, 0x826D8480u);
+  kernel/splash_hooks.cpp:1339  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(ctxVA + 0x04u, rsm);      // *(ctx+4) = resStreamMgr
+  kernel/splash_hooks.cpp:1340  void startKernelSplashOverlayThread() {()  <guest_write>
+      for (uint32_t o = 0x34u; o <= 0x44u; o += 4) sr::kernel::writeGuestBE32(ctxVA + o, 0x40u);
+  kernel/splash_hooks.cpp:1341  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(ctxVA + 0x48u, 0x40u);
+  kernel/splash_hooks.cpp:1651  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(ac + 32, aptMgr);
+  kernel/splash_hooks.cpp:1888  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(envObj, 0x8209A458u);
+  kernel/splash_hooks.cpp:1891  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x82968C08u, 0x8209A8D0u);
+  kernel/splash_hooks.cpp:1903  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x829A17BCu, clientEnv);
+  kernel/splash_hooks.cpp:1907  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x829A17BCu, savedCtx);
+  kernel/splash_hooks.cpp:1911  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x829A0020u, created);
+  kernel/splash_hooks.cpp:1935  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(ac + 32, mgrNow);  // heal ctx-root
+  kernel/splash_hooks.cpp:2075  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(alObj + 0, 0x82089C70u);   // vtable
+  kernel/splash_hooks.cpp:2227  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(postTgt + 0xe0u, pubCtx);
+  kernel/splash_hooks.cpp:2256  void startKernelSplashOverlayThread() {()  <guest_write>
+      if (post == 0) sr::kernel::writeGuestBE32(loaderVA + 0x10u, resMgr);
+  kernel/splash_hooks.cpp:2257  void startKernelSplashOverlayThread() {()  <guest_write>
+      if (subA) sr::kernel::writeGuestBE32(loaderVA + 0x04u, subA);   // bypass matcher: set slots directl
+  kernel/splash_hooks.cpp:2258  void startKernelSplashOverlayThread() {()  <guest_write>
+      if (subB) sr::kernel::writeGuestBE32(loaderVA + 0x08u, subB);
+  kernel/splash_hooks.cpp:2345  void startKernelSplashOverlayThread() {()  <guest_write>
+      for (int i = 0; i < 6; ++i) sr::kernel::writeGuestBE32(dimsVA + i * 4u, kDims[i]);
+  kernel/splash_hooks.cpp:2363  void startKernelSplashOverlayThread() {()  <guest_write>
+      if (s1c != 0 && s20 != 0) sr::kernel::writeGuestBE32(0x829A17BCu, ctxVA);  // publish as active ctx
+  kernel/splash_hooks.cpp:2818  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(buf0 + 0x08u, cmd0);     // cmd array
+  kernel/splash_hooks.cpp:2819  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(buf0 + 0x0cu, 2u);       // state = free
+  kernel/splash_hooks.cpp:2820  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(buf0 + 0x18u, 0x1000u);  // cmd capacity
+  kernel/splash_hooks.cpp:2821  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(buf1 + 0x08u, cmd1);
+  kernel/splash_hooks.cpp:2822  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(buf1 + 0x0cu, 2u);
+  kernel/splash_hooks.cpp:2823  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(buf1 + 0x18u, 0x1000u);
+  kernel/splash_hooks.cpp:2824  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(arrVA, buf0);
+  kernel/splash_hooks.cpp:2825  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(arrVA + 4u, buf1);
+  kernel/splash_hooks.cpp:2826  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(rcVA + 0x54u, 2u);       // buffer count
+  kernel/splash_hooks.cpp:2827  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(rcVA + 0x60u, arrVA);    // buffer array
+  kernel/splash_hooks.cpp:2828  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(pairVA, rcVA);           // slot 0 = fab render ctx
+  kernel/splash_hooks.cpp:2829  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x829A93C8u, pairVA);
+  kernel/splash_hooks.cpp:2843  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(feObj, 0x82001888u);
+  kernel/splash_hooks.cpp:2864  void startKernelSplashOverlayThread() {()  <guest_write>
+      if (ringBuf0) sr::kernel::writeGuestBE32(ringBuf0 + 0x0cu, 2u);
+  kernel/splash_hooks.cpp:2865  void startKernelSplashOverlayThread() {()  <guest_write>
+      if (ringBuf1) sr::kernel::writeGuestBE32(ringBuf1 + 0x0cu, 2u);
+  kernel/splash_hooks.cpp:3088  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(lockVA, 0);
+  kernel/splash_hooks.cpp:3112  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(holdVA, 0x10u);
+  kernel/splash_hooks.cpp:3113  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(slotVA, holdVA);
+  kernel/splash_hooks.cpp:3120  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x829A1AC0u, 0x826D1590u);
+  kernel/splash_hooks.cpp:3217  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(slotVA, holdVA);   // register zeroed *slot — refill
+  kernel/splash_hooks.cpp:3219  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x829A17BCu, ictx);
+  kernel/splash_hooks.cpp:3251  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(movVA + 4u, defObjVA);
+  kernel/splash_hooks.cpp:3252  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(movVA + 8u, 0x24000000u);   // type 9 (Movie) << 26
+  kernel/splash_hooks.cpp:3253  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(movVA + 0x14u,
+  kernel/splash_hooks.cpp:3371  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(im_holdVA, 0x10u);
+  kernel/splash_hooks.cpp:3372  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(im_slotVA, im_holdVA);
+  kernel/splash_hooks.cpp:3395  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(clip + 0xcu, flagsNow | 0x2000000u);
+  kernel/splash_hooks.cpp:3451  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x829A17BCu, pumpCtx);
+  kernel/splash_hooks.cpp:3503  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(s_natSlot, 0);
+  kernel/splash_hooks.cpp:3565  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(im_slotVA, im_holdVA);
+  kernel/splash_hooks.cpp:3577  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(im_movVA + 4u, defObj);
+  kernel/splash_hooks.cpp:3578  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(im_movVA + 8u, 0x24000000u);  // Movie<<26
+  kernel/splash_hooks.cpp:3579  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(im_movVA + 0x14u,
+  kernel/splash_hooks.cpp:3658  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(defObj + 4u, defObj);
+  kernel/splash_hooks.cpp:3708  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x829A1624u, newBase);
+  kernel/splash_hooks.cpp:3709  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x829A1628u, 8u);   // reserve slots
+  kernel/splash_hooks.cpp:3710  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(newBase, im_clip);       // r0 = this
+  kernel/splash_hooks.cpp:3711  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(newBase + 4u, im_clip);  // r1 = this
+  kernel/splash_hooks.cpp:3713  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(newBase + r * 4u, 0);
+  kernel/splash_hooks.cpp:3731  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x829A1624u, regBase);
+  kernel/splash_hooks.cpp:3732  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x829A1628u, regSize);
+  kernel/splash_hooks.cpp:3775  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(bcVA + 4u, 14u);
+  kernel/splash_hooks.cpp:3776  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(bcVA + 8u, parr);
+  kernel/splash_hooks.cpp:3936  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x829A1624u, newBase);
+  kernel/splash_hooks.cpp:3937  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x829A1628u, 8u);
+  kernel/splash_hooks.cpp:3938  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(newBase, im_clip);
+  kernel/splash_hooks.cpp:3939  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(newBase + 4u, im_clip);
+  kernel/splash_hooks.cpp:3941  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(newBase + r * 4u, 0);
+  kernel/splash_hooks.cpp:3952  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x829A1624u, regBase);
+  kernel/splash_hooks.cpp:3953  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x829A1628u, regSize);
+  kernel/splash_hooks.cpp:4162  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x829A17BCu, c);
+  kernel/splash_hooks.cpp:4202  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x829A17BCu, savedCtx);
+  kernel/splash_hooks.cpp:4608  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(auiMod + 0x1318u, 0);
+  kernel/splash_hooks.cpp:4639  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(auiMod + 0x1310u, auiMod + 0xF50u);
+  kernel/splash_hooks.cpp:4654  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(auiMod + 0xF50u + 0x14u, auiMod + 0xD60u);
+  kernel/splash_hooks.cpp:4660  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(auiMod + 0xF50u + 4u, 4u);
+  kernel/splash_hooks.cpp:4662  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(auiMod + 0xF50u + 8u, 1u);
+  kernel/splash_hooks.cpp:4672  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(auiMod + 0xF50u + 0xcu, 0x4E6E6B28u);
+  kernel/splash_hooks.cpp:4674  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(auiMod + 0xF50u + 0x18u, auiMod + 0x90u);
+  kernel/splash_hooks.cpp:4805  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(clip + 0xcu, fl | 0x2000000u);
+  kernel/splash_hooks.cpp:4820  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x829A17BCu, ictx);
+  kernel/splash_hooks.cpp:4887  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x829A1624u, nB);
+  kernel/splash_hooks.cpp:4888  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x829A1628u, 8u);
+  kernel/splash_hooks.cpp:4889  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(nB, c2);
+  kernel/splash_hooks.cpp:4890  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(nB + 4u, c2);
+  kernel/splash_hooks.cpp:4892  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(nB + r2 * 4u, 0);
+  kernel/splash_hooks.cpp:4902  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x829A1624u, rB);
+  kernel/splash_hooks.cpp:4903  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x829A1628u, rS);
+  kernel/splash_hooks.cpp:4921  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(lastC + 0xcu, fl2 | 0x2000000u);
+  kernel/splash_hooks.cpp:4972  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(e0c + 0x2cu, rSrc);
+  kernel/splash_hooks.cpp:5108  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(w2 + 4u, nd2);
+  kernel/splash_hooks.cpp:5109  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(nd2 + 0x24u,
+  kernel/splash_hooks.cpp:5118  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(nd2 + 0x14u,
+  kernel/splash_hooks.cpp:5294  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x829A1770u, (uint32_t)(cf + 2));
+  kernel/splash_hooks.cpp:5330  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(nd + 0x18u, fl2 | 0x80000000u);
+  kernel/splash_hooks.cpp:5412  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(pHold, 0x10u);
+  kernel/splash_hooks.cpp:5413  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(pSlot, pHold);
+  kernel/splash_hooks.cpp:5454  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(s_pSlot, s_pHold);
+  kernel/splash_hooks.cpp:5466  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(pMov + 4u, pDef);
+  kernel/splash_hooks.cpp:5467  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(pMov + 8u, 0x24000000u);
+  kernel/splash_hooks.cpp:5468  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(pMov + 0x14u,
+  kernel/splash_hooks.cpp:5496  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(ovl2 + 0xcu, fo | 0x2000000u);
+  kernel/splash_hooks.cpp:5552  void startKernelSplashOverlayThread() {()  <guest_write>
+      sr::kernel::writeGuestBE32(0x829A17BCu, prevCtx);
+
+--- ALLOWLISTED platform-fix (110) ---
+  kernel/audio_render_driver.cpp:155  #if defined(_WIN32) #include <windows.h> #include <float.h> ()  <guest_memset> [guest stack for the XAudio render thread the console's audio subsystem provides]
+      std::memset(guestVAToHost(stackVA), 0, kStackSize);
+  kernel/audio_render_driver.cpp:276  #if defined(_WIN32) #include <windows.h> #include <float.h> ()  <guest_write> [guest stack for the XAudio render thread the console's audio subsystem provides]
+      writeGuestBE32_local(r4, handle);
+  kernel/audio_render_driver.cpp:1011  namespace sr { namespace kernel {()  <guest_memset> [XAudio render-driver config buffer (import impl)]
+      std::memset(guestVAToHost(cfgVA), 0, kConfigSize);
+  kernel/gpu_ring_alloc_fix.cpp:52  static void runAllocIsolationProbe() {()  <guest_call> [SR_ALLOC_PROBE/SR_ALLOC_WATCH default-off diagnostic probe (gated at launch)]
+      GuestCaller gc("ALLOC_PROBE");
+  kernel/gpu_ring_alloc_fix.cpp:74  static void runAllocIsolationProbe() {()  <guest_write> [SR_ALLOC_PROBE/SR_ALLOC_WATCH default-off diagnostic probe (gated at launch)]
+      for (uint32_t o = 0; o + 4 <= R; o += 4) writeGuestBE32(P1 + o, 0xAB000000u | o);
+  kernel/gpu_ring_alloc_fix.cpp:124  static void runAllocWatchProbe() {()  <guest_call> [SR_ALLOC_PROBE/SR_ALLOC_WATCH default-off diagnostic probe (gated at launch)]
+      GuestCaller gc("ALLOC_WATCH");
+  kernel/gpu_ring_alloc_fix.cpp:133  static void runAllocWatchProbe() {()  <guest_write> [SR_ALLOC_PROBE/SR_ALLOC_WATCH default-off diagnostic probe (gated at launch)]
+      for (uint32_t o = 0; o + 4 <= R; o += 4) writeGuestBE32(P1 + o, 0xAB000000u | o);
+  kernel/guest_context.cpp:1294  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(kArrayVA + i * 4, kEntries[i]);
+  kernel/guest_context.cpp:1679  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(g_guestBase + kDogmaGuard1VA, 1u);
+  kernel/guest_context.cpp:1680  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(g_guestBase + kDogmaGuard2VA, 1u);
+  kernel/guest_context.cpp:1732  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(bundle + 0x10, static_cast<uint32_t>(interrupt100ns / 10000u));
+  kernel/guest_context.cpp:1735  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(g_guestBase + kBundleCell, kBundleVA);
+  kernel/guest_context.cpp:1765  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(kAllocatorVtableSlot4VA, slot0);
+  kernel/guest_context.cpp:1771  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(kAllocatorVtableVA, kAllocatorSlot0StubVA);
+  kernel/guest_context.cpp:1772  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(kAllocatorVtableSlot4VA, kAllocatorSlot0StubVA);
+  kernel/guest_context.cpp:1776  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(kAllocatorVtableSlot4VA, slot0);
+  kernel/guest_context.cpp:1837  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(kernelData + kKernelModuleInfoPtrOffset, moduleInfoVA);
+  kernel/guest_context.cpp:1850  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(moduleInfo + 0, moduleInfoVA + 0x80);  // Point to a valid address
+  kernel/guest_context.cpp:1852  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(moduleInfo + 88, xexHeaderVA);
+  kernel/guest_context.cpp:1866  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(kernelData + kKernelProcessInfoPtrOffset, processInfoVA);
+  kernel/guest_context.cpp:1911  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(g_guestBase + kHeapHandleSub8246DF08VA, kHeapStateVA);
+  kernel/guest_context.cpp:1913  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(g_guestBase + kHeapHandlePtrPath1VA, kHeapStateVA);
+  kernel/guest_context.cpp:1915  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(g_guestBase + kHeapHandlePtrVA, kHeapStateVA);
+  kernel/guest_context.cpp:1917  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(g_guestBase + kHeapHandlePtr2VA, kHeapStateVA);
+  kernel/guest_context.cpp:1937  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(g_guestBase + 1408, kFallbackCritSect);
+  kernel/guest_context.cpp:1939  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(g_guestBase + 80, kFallbackCritSect);
+  kernel/guest_context.cpp:1940  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_memset> [EDRAM console memory the PC lacks: zero-init]
+      std::memset(g_guestBase + kFallbackCritSect, 0, 64);
+  kernel/guest_context.cpp:1945  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(g_guestBase + 8, kFallbackHeapBase);   // Common offset for top
+  kernel/guest_context.cpp:1946  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(g_guestBase + 16, kFallbackHeapBase);  // Another common offset
+  kernel/guest_context.cpp:1947  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(g_guestBase + 20, kFallbackHeapBase);  // Yet another
+  kernel/guest_context.cpp:1948  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(g_guestBase + 24, kFallbackHeapSize);  // Top size
+  kernel/guest_context.cpp:1955  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(g_guestBase + kFallbackHeapBase + 0, 0);       // prev_size (unused for top)
+  kernel/guest_context.cpp:1956  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(g_guestBase + kFallbackHeapBase + 4, topSize); // size with PINUSE
+  kernel/guest_context.cpp:1962  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(g_guestBase + binOffset, binOffset);      // fwd = self
+  kernel/guest_context.cpp:1963  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(g_guestBase + binOffset + 4, binOffset);  // back = self
+  kernel/guest_context.cpp:1975  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(g_guestBase + kCritSectTableVA + i * 8, kFallbackCritSect);
+  kernel/guest_context.cpp:1991  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_write> [EDRAM console memory the PC lacks: zero-init]
+      writeGuestBE32(heapState + kCritSectOffset, kCritSectVA);
+  kernel/guest_context.cpp:2023  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_memset> [EDRAM console memory the PC lacks: zero-init]
+      std::memset(g_guestBase + kEDRAMBase, 0, kEDRAMSize);
+  kernel/guest_context.cpp:2030  extern "C" __declspec(dllexport) uint64_t g_debugDispatchTab()  <guest_memset> [EDRAM console memory the PC lacks: zero-init]
+      std::memset(g_guestBase + kGPURegBase, 0, 0x10000);
+  kernel/recomp_switch_fixes.cpp:128  namespace {()  <guest_write> [XenonRecomp dropped switch/bctr case bodies: recompiler-hole reimpl]
+      inline void wr32(uint32_t va, uint32_t v) { sr::kernel::writeGuestBE32(va, v); }
+  kernel/stubs.cpp:1091  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r3, handle);
+  kernel/stubs.cpp:1175  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(ioStatusVA + 0, kStatusInvalidHandle);
+  kernel/stubs.cpp:1176  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(ioStatusVA + 4, 0u);
+  kernel/stubs.cpp:1195  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(ioStatusVA + 0, kStatusSuccess);
+  kernel/stubs.cpp:1196  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(ioStatusVA + 4, static_cast<uint32_t>(n));
+  kernel/stubs.cpp:1240  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r4 + 0, kStatusInvalidHandle);
+  kernel/stubs.cpp:1241  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r4 + 4, 0u);
+  kernel/stubs.cpp:1248  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r4 + 0, kStatusInvalidInfoClass);
+  kernel/stubs.cpp:1249  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r4 + 4, 0u);
+  kernel/stubs.cpp:1256  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r4 + 0, kStatusInvalidParameter);
+  kernel/stubs.cpp:1257  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r4 + 4, 0u);
+  kernel/stubs.cpp:1281  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      for (uint32_t i = 0; i < kFileNetworkOpenInfoSize; i += 4) writeGuestBE32(r5 + i, 0u);
+  kernel/stubs.cpp:1282  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r5 + 32, static_cast<uint32_t>(fileSize >> 32));
+  kernel/stubs.cpp:1283  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r5 + 36, static_cast<uint32_t>(fileSize & 0xFFFFFFFFu));
+  kernel/stubs.cpp:1284  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r5 + 40, static_cast<uint32_t>(fileSize >> 32));
+  kernel/stubs.cpp:1285  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r5 + 44, static_cast<uint32_t>(fileSize & 0xFFFFFFFFu));
+  kernel/stubs.cpp:1286  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r5 + 48, 0x00000080u);  // FILE_ATTRIBUTE_NORMAL
+  kernel/stubs.cpp:1289  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r4 + 0, kStatusSuccess);
+  kernel/stubs.cpp:1290  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r4 + 4, kFileNetworkOpenInfoSize);
+  kernel/stubs.cpp:1308  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r4 + 0, kStatusInvalidHandle);
+  kernel/stubs.cpp:1309  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r4 + 4, 0u);
+  kernel/stubs.cpp:1317  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r4 + 0, kStatusInvalidInfoClass);
+  kernel/stubs.cpp:1318  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r4 + 4, 0u);
+  kernel/stubs.cpp:1325  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r4 + 0, kStatusInvalidParameter);
+  kernel/stubs.cpp:1326  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r4 + 4, 0u);
+  kernel/stubs.cpp:1340  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r4 + 0, kStatusSuccess);
+  kernel/stubs.cpp:1341  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r4 + 4, 0u);
+  kernel/stubs.cpp:1401  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      if (r7) { writeGuestBE32(r7 + 0, kStatusNoMoreFiles); writeGuestBE32(r7 + 4, 0u); }
+  kernel/stubs.cpp:1425  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(va +  0, nextEntryOffset);
+  kernel/stubs.cpp:1426  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(va +  4, static_cast<uint32_t>(state.nextIndex));  // FileIndex
+  kernel/stubs.cpp:1427  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(va +  8, 0u);  writeGuestBE32(va + 12, 0u);  // CreationTime
+  kernel/stubs.cpp:1428  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(va + 16, 0u);  writeGuestBE32(va + 20, 0u);  // LastAccessTime
+  kernel/stubs.cpp:1429  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(va + 24, 0u);  writeGuestBE32(va + 28, 0u);  // LastWriteTime
+  kernel/stubs.cpp:1430  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(va + 32, 0u);  writeGuestBE32(va + 36, 0u);  // ChangeTime
+  kernel/stubs.cpp:1433  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(va + 40, static_cast<uint32_t>(fileSize >> 32));
+  kernel/stubs.cpp:1434  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(va + 44, static_cast<uint32_t>(fileSize & 0xFFFFFFFF));
+  kernel/stubs.cpp:1435  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(va + 48, static_cast<uint32_t>(fileSize >> 32));  // AllocationSize
+  kernel/stubs.cpp:1436  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(va + 52, static_cast<uint32_t>(fileSize & 0xFFFFFFFF));
+  kernel/stubs.cpp:1438  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(va + 56, attrs);
+  kernel/stubs.cpp:1439  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(va + 60, nameLen);
+  kernel/stubs.cpp:1461  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(bufVA + lastOffset, 0u);
+  kernel/stubs.cpp:1464  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(ioStatusVA + 0, kStatusSuccess);
+  kernel/stubs.cpp:1465  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(ioStatusVA + 4, offset);
+  kernel/stubs.cpp:1554  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r3, guestHandle);
+  kernel/stubs.cpp:1556  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r3, 0);  // No host event on non-Windows; wait/set remain no-ops.
+  kernel/stubs.cpp:1583  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r3, guestHandle);
+  kernel/stubs.cpp:1624  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r3, 0);
+  kernel/stubs.cpp:1641  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      if (r5) writeGuestBE32(r5, static_cast<uint32_t>(prevCount));
+  kernel/stubs.cpp:2200  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      if (handlePtr) writeGuestBE32(handlePtr, handle);
+  kernel/stubs.cpp:2203  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      if (r5) writeGuestBE32(r5, handle);
+  kernel/stubs.cpp:2468  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_call> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      sr::kernel::GuestCaller gc("VD_ISR");
+  kernel/stubs.cpp:3879  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r5 + 0, call);  // dwPacketNumber
+  kernel/stubs.cpp:4023  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      if (r5 && isGuestVAInRange(r5)) writeGuestBE32(r5, id);
+  kernel/stubs.cpp:4024  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      if (r6 && isGuestVAInRange(r6)) writeGuestBE32(r6, param);
+  kernel/stubs.cpp:4065  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(pDeviceId, 0x00000001);  // a valid attached HDD device id
+  kernel/stubs.cpp:4102  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r4 + 0, 0x00090000); // high word of fake XUID
+  kernel/stubs.cpp:4103  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(r4 + 4, 0x00000001); // low word
+  kernel/stubs.cpp:4159  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(bufVA, value);
+  kernel/stubs.cpp:4162  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(reqVA, valueSize);
+  kernel/stubs.cpp:4325  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      if (r4 && prev != (DWORD)-1) writeGuestBE32(r4, prev);
+  kernel/stubs.cpp:4340  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      if (r4 && prev != (DWORD)-1) writeGuestBE32(r4, prev);
+  kernel/stubs.cpp:4353  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(dest + o, pattern);
+  kernel/stubs.cpp:4411  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(out + 0x00, 1280);       // dwDisplayWidth
+  kernel/stubs.cpp:4412  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(out + 0x04, 720);        // dwDisplayHeight
+  kernel/stubs.cpp:4413  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(out + 0x08, 0);          // fIsInterlaced
+  kernel/stubs.cpp:4414  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(out + 0x0C, 1);          // fIsWideScreen
+  kernel/stubs.cpp:4415  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(out + 0x10, 1);          // fIsHiDef
+  kernel/stubs.cpp:4416  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(out + 0x14, 0x42700000); // RefreshRate 60.0f
+  kernel/stubs.cpp:4417  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(out + 0x18, 1);          // VideoStandard NTSC-M
+  kernel/stubs.cpp:4419  #include <float.h> #include <malloc.h> #include <windows.h> ()  <guest_write> [fake GPU device MMIO: PM4->D3D12 surface (charter-allowed)]
+      writeGuestBE32(out + o, 0);
+
+--- OWN-GATE (fold onto the master gate) (7) ---
+  kernel/apt_as_watch.cpp:103  PPC_FUNC(sub_82688B90) {()  <guest_write> [SR_SET_WATCH]
+      sr::kernel::writeGuestBE32(0x829A1628u, 8u);
+  kernel/apt_as_watch.cpp:104  PPC_FUNC(sub_82688B90) {()  <guest_write> [SR_SET_WATCH]
+      sr::kernel::writeGuestBE32(newBase, scope);        // r0 = this
+  kernel/apt_as_watch.cpp:105  PPC_FUNC(sub_82688B90) {()  <guest_write> [SR_SET_WATCH]
+      sr::kernel::writeGuestBE32(newBase + 4u, scope);   // r1 = this
+  kernel/apt_as_watch.cpp:107  PPC_FUNC(sub_82688B90) {()  <guest_write> [SR_SET_WATCH]
+      sr::kernel::writeGuestBE32(newBase + r * 4u, 0);
+  kernel/apt_as_watch.cpp:119  PPC_FUNC(sub_82688B90) {()  <guest_write> [SR_SET_WATCH]
+      sr::kernel::writeGuestBE32(0x829A1624u, savedBase);
+  kernel/apt_as_watch.cpp:120  PPC_FUNC(sub_82688B90) {()  <guest_write> [SR_SET_WATCH]
+      sr::kernel::writeGuestBE32(0x829A1628u, savedSize);
+  kernel/fm_world_ptr_patcher.cpp:155  #include <condition_variable> #include <cstdint> #include <m()  <guest_write> [observe-only(dead)]
+      writeGuestBE32(fieldAddr, target);
+
+--- UNGATED -- FLAGGED (gate behind forcingAllowed() or allowlist w/ reason) (0) ---
+
+RESULT: no ungated non-allowlisted forcing sites. Default exe forces nothing (by this check).

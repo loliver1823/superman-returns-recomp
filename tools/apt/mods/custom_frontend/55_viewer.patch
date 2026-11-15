@@ -1,0 +1,8 @@
+# iter-465 viewer lane: THE COSTUME VIEWER (docs/MODS.md "Costume viewer"). SCRCOSTUMES re-laid out
+# from the game's own UI pieces; the host overlay draws the selected suit's 3D model in the open
+# centre. srviewer.aptasm is GENERATED from viewer/srviewer.as (tools/apt/as2asm.py).
+movie SCRCOSTUMES
+append-to action initaction:BistroBaseScreen file=srviewer.aptasm
+append-to function InitGui in ScrCostumes file=viewer_open.aptasm
+prepend-to function HandleInput in ScrCostumes file=viewer_input.aptasm
+prepend-to function ExitScreen in ScrCostumes file=viewer_exit.aptasm

@@ -1,0 +1,228 @@
+diff --git a/src/xenia/gpu/trace_dump.cc b/src/xenia/gpu/trace_dump.cc
+index 6a27325..37581b5 100644
+--- a/src/xenia/gpu/trace_dump.cc
++++ b/src/xenia/gpu/trace_dump.cc
+@@ -37,6 +37,15 @@
+ 
+ DEFINE_path(target_trace_file, "", "Specifies the trace file to load.", "GPU");
+ DEFINE_path(trace_dump_path, "", "Output path for dumped files.", "GPU");
++// iter-456p (superman-recomp): stop playback at a chosen command so a sweep can
++// attribute pixels to a draw range. -1 keeps the stock behaviour (play to the
++// last command of frame 0).
++// Defined in trace_player.cc, where the omission actually happens.
++DECLARE_int32(trace_skip_draw_first);
++DECLARE_int32(trace_skip_draw_last);
++
++DEFINE_int32(trace_dump_last_command, -1,
++             "Stop playback after this command index (-1 = last).", "GPU");
+ 
+ namespace xe {
+ namespace gpu {
+@@ -128,11 +137,50 @@ bool TraceDump::Load(const std::filesystem::path& trace_file_path) {
+ int TraceDump::Run() {
+   BeginHostCapture();
+   player_->SeekFrame(0);
+-  player_->SeekCommand(
+-      static_cast<int>(player_->current_frame()->commands.size() - 1));
++  int last_command =
++      static_cast<int>(player_->current_frame()->commands.size() - 1);
++  if (cvars::trace_dump_last_command >= 0 &&
++      cvars::trace_dump_last_command < last_command) {
++    last_command = cvars::trace_dump_last_command;
++  }
++  XELOGI("TraceDump: seeking to command {} of {}", last_command,
++         player_->current_frame()->commands.size() - 1);
++  player_->SeekCommand(last_command);
+   player_->WaitOnPlayback();
+   EndHostCapture();
+ 
++  // ── iter-456p (superman-recomp): FAIL-CLOSED ABLATION ACCOUNTING ──────────
++  // A request that was not honoured EXACTLY must not quietly yield a baseline
++  // image - that would read as "omitting these draws changed nothing", which is
++  // the one conclusion a silent no-op could fake.
++  {
++    const int32_t first = cvars::trace_skip_draw_first;
++    const int32_t last = cvars::trace_skip_draw_last;
++    const uint32_t total = player_->draw_packets_total();
++    const uint32_t skipped = player_->draw_packets_skipped();
++    XELOGI("TraceDump: draw packets={} skip_request=[{}..{}] skipped={}", total,
++           first, last, skipped);
++    if (first != 0 || last != 0) {
++      const char* refusal = nullptr;
++      if (first <= 0 || last <= 0) {
++        refusal = "both bounds must be >= 1 (a single bound or zero is refused)";
++      } else if (first > last) {
++        refusal = "the range is inverted";
++      } else if (static_cast<uint32_t>(last) > total) {
++        refusal = "the range runs past the frame's draw count";
++      } else if (skipped != static_cast<uint32_t>(last - first + 1)) {
++        refusal = "the skipped count does not equal the requested span";
++      }
++      if (refusal) {
++        XELOGE(
++            "TraceDump: REFUSING to write an image - {}. request=[{}..{}] "
++            "draws={} skipped={}",
++            refusal, first, last, total, skipped);
++        return 1;
++      }
++    }
++  }
++
+   // Capture.
+   int result = 0;
+   ui::Presenter* presenter = graphics_system_->presenter();
+diff --git a/src/xenia/gpu/trace_player.cc b/src/xenia/gpu/trace_player.cc
+index 303e4d5..511d6eb 100644
+--- a/src/xenia/gpu/trace_player.cc
++++ b/src/xenia/gpu/trace_player.cc
+@@ -9,6 +9,41 @@
+ 
+ #include "xenia/gpu/trace_player.h"
+ 
++#include "xenia/base/cvar.h"
++#include "xenia/base/logging.h"
++#include "xenia/gpu/packet_disassembler.h"
++#include "xenia/gpu/register_file.h"
++#include "xenia/gpu/shader.h"
++
++// ── iter-456p (superman-recomp): FULL-FRAME DRAW ABLATION ────────────────────
++// Omit selected DRAW packets while the rest of the frame - every generic packet,
++// memory and register record, event, and the SWAP - still executes. Truncating
++// playback instead produces no image at all, because TraceDump captures the
++// presenter's guest output and that only exists after the swap.
++//
++// The range is 1-BASED INCLUSIVE and aligns with [PM4_TEXINV] draw=N on the
++// recomp side. 0/0 disables. Both bounds must be supplied; the caller validates
++// against the real draw total after playback and refuses to emit an image if the
++// request was not honoured exactly.
++DEFINE_int32(trace_skip_draw_first, 0,
++             "First 1-based draw packet to OMIT (0 = ablation disabled).",
++             "GPU");
++DEFINE_int32(trace_skip_draw_last, 0,
++             "Last 1-based draw packet to OMIT, inclusive (0 = disabled).",
++             "GPU");
++
++// ── iter-456p Slice C (superman-recomp): THE SAMPLED-SLOT OBSERVER ───────────
++// A fetch-REGISTER inventory is not a sampled-texture inventory: all 32 slots
++// can hold valid-looking descriptors while the active shader samples only a few,
++// so stale constants masquerade as used textures. Xenia's own parsed
++// Shader::TextureBinding::fetch_constant is the authoritative used-slot list.
++//
++// OBSERVER ONLY: it runs AFTER ExecutePacket, reads the shaders and the register
++// file, and logs. It binds nothing, changes no state, and skips no draw.
++DEFINE_bool(trace_log_sampled_textures, false,
++            "Log the active VS/PS parsed texture bindings after each draw.",
++            "GPU");
++
+ #include "xenia/gpu/command_processor.h"
+ #include "xenia/gpu/graphics_system.h"
+ #include "xenia/gpu/registers.h"
+@@ -92,6 +127,34 @@ void TracePlayer::PlayTrace(const uint8_t* trace_data, size_t trace_size,
+   });
+ }
+ 
++// iter-456p Slice C: log ONLY the slots the active shaders actually sample.
++void TracePlayer::LogSampledTextures(uint32_t draw_ordinal) {
++  auto command_processor = graphics_system_->command_processor();
++  auto* regs = graphics_system_->register_file();
++  if (!regs) return;
++
++  auto dump_stage = [&](const char* stage, Shader* shader) {
++    if (!shader) return;
++    for (const auto& b : shader->texture_bindings()) {
++      const uint32_t slot = b.fetch_constant;
++      if (slot >= 32) continue;
++      // Fetch constants live at XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0, six
++      // dwords per texture slot.
++      const uint32_t base =
++          XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + slot * 6;
++      uint32_t f[6];
++      for (uint32_t i = 0; i < 6; i++) f[i] = regs->values[base + i];
++      XELOGI(
++          "[XE_SAMPLED] draw={} stage={} shaderHash={:016X} slot={} "
++          "raw={:08X},{:08X},{:08X},{:08X},{:08X},{:08X}",
++          draw_ordinal, stage, shader->ucode_data_hash(), slot, f[0], f[1],
++          f[2], f[3], f[4], f[5]);
++    }
++  };
++  dump_stage("VS", command_processor->active_vertex_shader());
++  dump_stage("PS", command_processor->active_pixel_shader());
++}
++
+ void TracePlayer::PlayTraceOnThread(const uint8_t* trace_data,
+                                     size_t trace_size,
+                                     TracePlaybackMode playback_mode,
+@@ -99,6 +162,11 @@ void TracePlayer::PlayTraceOnThread(const uint8_t* trace_data,
+   auto memory = graphics_system_->memory();
+   auto command_processor = graphics_system_->command_processor();
+ 
++  // iter-456p: per-playback accounting. A stale count from a previous seek
++  // would make the ablation report a range it did not actually apply.
++  draw_packets_total_ = 0;
++  draw_packets_skipped_ = 0;
++
+   if (clear_caches) {
+     command_processor->ClearCaches();
+   }
+@@ -156,8 +224,31 @@ void TracePlayer::PlayTraceOnThread(const uint8_t* trace_data,
+         auto cmd = reinterpret_cast<const PacketEndCommand*>(trace_ptr);
+         trace_ptr += sizeof(*cmd);
+         if (pending_packet) {
+-          command_processor->ExecutePacket(pending_packet->base_ptr,
+-                                           pending_packet->count);
++          // Classify BEFORE executing. Only kDraw packets carry an ordinal and
++          // only they may be omitted; a generic packet, a register write or the
++          // swap must always run, or the frame stops being the same frame.
++          const auto category = PacketDisassembler::GetPacketCategory(
++              memory->TranslatePhysical(pending_packet->base_ptr));
++          bool omit = false;
++          if (category == PacketCategory::kDraw) {
++            ++draw_packets_total_;
++            const int32_t ord = static_cast<int32_t>(draw_packets_total_);
++            if (cvars::trace_skip_draw_first > 0 &&
++                cvars::trace_skip_draw_last > 0 &&
++                ord >= cvars::trace_skip_draw_first &&
++                ord <= cvars::trace_skip_draw_last) {
++              omit = true;
++              ++draw_packets_skipped_;
++            }
++          }
++          if (!omit) {
++            command_processor->ExecutePacket(pending_packet->base_ptr,
++                                             pending_packet->count);
++            if (category == PacketCategory::kDraw &&
++                cvars::trace_log_sampled_textures) {
++              LogSampledTextures(draw_packets_total_);
++            }
++          }
+           pending_packet = nullptr;
+         }
+         if (pending_break) {
+diff --git a/src/xenia/gpu/trace_player.h b/src/xenia/gpu/trace_player.h
+index 9117e88..5e296b4 100644
+--- a/src/xenia/gpu/trace_player.h
++++ b/src/xenia/gpu/trace_player.h
+@@ -41,6 +41,12 @@ class TracePlayer : public TraceReader {
+   // Scalar from 0-10000
+   uint32_t playback_percent() const { return playback_percent_; }
+ 
++  // iter-456p (superman-recomp): how many kDraw packets the last playback saw,
++  // and how many of them were omitted. Reported so a caller can verify the
++  // ablation did exactly what it was asked to.
++  uint32_t draw_packets_total() const { return draw_packets_total_; }
++  uint32_t draw_packets_skipped() const { return draw_packets_skipped_; }
++
+   void SeekFrame(int target_frame);
+   void SeekCommand(int target_command);
+ 
+@@ -56,6 +62,10 @@ class TracePlayer : public TraceReader {
+   int current_frame_index_;
+   int current_command_index_;
+   bool playing_trace_ = false;
++  // iter-456p (superman-recomp): draw-packet ablation accounting.
++  void LogSampledTextures(uint32_t draw_ordinal);   // iter-456p Slice C
++  uint32_t draw_packets_total_ = 0;
++  uint32_t draw_packets_skipped_ = 0;
+   std::atomic<uint32_t> playback_percent_ = {0};
+   std::unique_ptr<xe::threading::Event> playback_event_;
+ };

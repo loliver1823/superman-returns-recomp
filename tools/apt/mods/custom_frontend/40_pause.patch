@@ -1,0 +1,146 @@
+# lane E L-c (RELEASE_PLAN step 5; STEP5_PLAN 10, the owner's q14d): THE 9-ROW PAUSE MENU (docs/CUSTOM_FRONTEND.md
+# 5.14). Port features on (this recipe); off = the retail menu, untouched.
+#   RESUME GAME, RESTART OBJECTIVE, SAVE / LOAD   the game's own btn1-btn3, as they were
+#   ACHIEVEMENTS                                  btn4 (was STATISTICS): the host page (SR_Achievements, lane E L-a)
+#   STATISTICS, MOVES LIST                        btn5, btn6 (were MOVES LIST, GAMEPLAY OPTIONS): the game's own screens
+#   OPTIONS                                       btn7 (was CONTROLLER OPTIONS): the one OPTIONS screen (lane E L-b)
+#   (PHOTO MODE)                                  btn8 (was AUDIO OPTIONS): hidden and out of the focus order until
+#                                                 unit P gives it its action - its slot is kept, so P needs no layout
+#   QUIT GAME                                     btn9: QUIT TO TITLE / QUIT TO DESKTOP (srpause.aptasm ShowQuit)
+# No clone: the nine retail buttons are re-labelled and re-purposed, so the tab order (m_tabIndex 0-8) and the game's
+# own by-name select / disable / restore (InitGui: RESTART and SAVE / LOAD, PauseSelectedItem) keep their shape.
+# The rows sit on one 38-unit pitch from y 68 (ACHIEVEMENTS fills the retail gap after SAVE / LOAD), the QUIT spacer is
+# kept: QUIT GAME at 392 (retail 58 .. 344 and 402); the panel, its bevels and the hint bar do not move.
+# The MORE OPTIONS row (iter-464 btn10) is gone: what it held is in OPTIONS (AUTOSAVE and, in a dev build, DEV TOOLS on
+# the GAME tab; DISPLAY / GRAPHICS / WORLD; CHEATS), MODS is on the MAIN MENU only.
+movie SCRPAUSEMENU
+edit-place btn1 char=2 y=68
+edit-place btn2 char=2 y=106
+edit-place btn3 char=2 y=144
+edit-place btn4 char=2 y=182
+edit-place btn5 char=2 y=220
+edit-place btn6 char=2 y=258
+edit-place btn7 char=2 y=296
+edit-place btn8 char=2 y=334
+edit-place btn9 char=2 y=392
+append-to action initaction:ScrPauseMenu file=srpause.aptasm
+append-to action initaction:BistroBaseScreen file=devtools_ui.aptasm
+# InitGui (reg1 this, reg2 _global): after the game's own labels, the re-purposed rows' labels (STATISTICS and MOVES
+# LIST in the game's own text, through its LocalizationAdapter; ACHIEVEMENTS and OPTIONS are literals, as MORE
+# OPTIONS was), btn8 out of the menu, then SRPause.Install(this)
+append-to function InitGui in ScrPauseMenu
+    EA_PushConstByte 'ACHIEVEMENTS'
+    EA_PushOne
+    Push [reg1]
+    EA_GetNamedMember 'btn4'
+    EA_CallNamedMethodPop 'SetText'
+    EA_PushConstByte 'Label_ScrStatistics'
+    EA_PushOne
+    Push [reg2]
+    EA_GetNamedMember 'LocalizationAdapter'
+    EA_PushConstByte 'GetLocalizedText'
+    CallMethod
+    EA_PushOne
+    Push [reg1]
+    EA_GetNamedMember 'btn5'
+    EA_CallNamedMethodPop 'SetText'
+    EA_PushConstByte 'Label_ScrMovesList'
+    EA_PushOne
+    Push [reg2]
+    EA_GetNamedMember 'LocalizationAdapter'
+    EA_PushConstByte 'GetLocalizedText'
+    CallMethod
+    EA_PushOne
+    Push [reg1]
+    EA_GetNamedMember 'btn6'
+    EA_CallNamedMethodPop 'SetText'
+    EA_PushConstByte 'OPTIONS'
+    EA_PushOne
+    Push [reg1]
+    EA_GetNamedMember 'btn7'
+    EA_CallNamedMethodPop 'SetText'
+    EA_PushZero
+    Push [reg1]
+    EA_GetNamedMember 'btn8'
+    EA_CallNamedMethodPop 'disable'
+    Push [reg1]
+    EA_GetNamedMember 'btn8'
+    EA_PushConstByte '_visible'
+    op_74
+    SetMember
+    Push [reg1]
+    EA_PushOne
+    Push [reg2]
+    EA_GetNamedMember 'SRPause'
+    EA_CallNamedMethodPop 'Install'
+end
+# HandleInput(keyCode r4): A on a re-purposed row (btn4 ACHIEVEMENTS, btn5 STATISTICS, btn6 MOVES LIST, btn7 OPTIONS,
+# btn9 QUIT GAME) does what the game's own rows do first - PauseSelectedItem := the row (the game's own focus restore
+# when its screen closes), the button's own press, the OPEN sound - then the row's action (SRPause.OnRow); RESUME,
+# RESTART and SAVE / LOAD keep the game's own handling. reg3 / reg5 are the game's own scratch registers here (it
+# writes them first thing in its CROSS branch).
+prepend-to function HandleInput in ScrPauseMenu
+    Push [reg4]
+    Push [reg2]
+    EA_GetNamedMember 'INPUTCODE'
+    EA_GetNamedMember 'CROSS'
+    Equals2
+    Not
+    If pmi_done
+    EA_PushZero
+    Push [reg2]
+    EA_GetNamedMember 'gFM'
+    EA_PushConstByte 'getSelectedItem'
+    CallMethod
+    StoreRegister 5
+    Pop
+    Push [reg5]
+    EA_GetNamedMember '_name'
+    StoreRegister 3
+    Pop
+    Push [reg3]
+    EA_PushConstByte 'btn4'
+    Equals2
+    If pmi_mine
+    Push [reg3]
+    EA_PushConstByte 'btn5'
+    Equals2
+    If pmi_mine
+    Push [reg3]
+    EA_PushConstByte 'btn6'
+    Equals2
+    If pmi_mine
+    Push [reg3]
+    EA_PushConstByte 'btn7'
+    Equals2
+    If pmi_mine
+    Push [reg3]
+    EA_PushConstByte 'btn9'
+    Equals2
+    If pmi_mine
+    Jump pmi_done
+pmi_mine:
+    Push [reg2]
+    EA_PushConstByte 'PauseSelectedItem'
+    Push [reg3]
+    SetMember
+    Push [reg4]
+    EA_PushOne
+    Push [reg5]
+    EA_CallNamedMethodPop 'handleInput'
+    Push [reg2]
+    EA_GetNamedMember 'SOUND'
+    EA_GetNamedMember 'OPEN'
+    EA_PushOne
+    Push [reg2]
+    EA_CallNamedMethodPop 'playSound'
+    Push [reg3]
+    EA_PushOne
+    Push [reg2]
+    EA_GetNamedMember 'SRPause'
+    EA_CallNamedMethodPop 'OnRow'
+    op_74
+    Return
+pmi_done:
+end
+prepend-to function ExitScreen in ScrPauseMenu file=pause_exitscreen_head.aptasm

@@ -1,0 +1,630 @@
+# Superman Returns (Xbox 360) - XenonRecomp config
+# Paths relative to this config file
+
+[main]
+file_path = "../../Superman Returns (USA)/default.xex"
+out_directory_path = "ppc_out"
+switch_table_file_path = "superman_switch_tables.toml"
+
+# Disable optimizations for first pass (recommended until running)
+skip_lr = false
+skip_msr = false
+ctr_as_local = false
+xer_as_local = false
+reserved_as_local = false
+cr_as_local = false
+non_argument_as_local = false
+non_volatile_as_local = false
+
+# Register save/restore - found via XenonRecomp --find-save-restore guest/config/superman.toml
+restgprlr_14_address = 0x8279E440
+savegprlr_14_address = 0x8279E3F0
+restfpr_14_address = 0x8279F23C
+savefpr_14_address = 0x8279F1F0
+restvmx_14_address = 0x8279E9C8
+savevmx_14_address = 0x8279E730
+restvmx_64_address = 0x8279EA5C
+savevmx_64_address = 0x8279E7C4
+
+# Explicit function boundaries for mid-function entry points
+# 0x827609A4 is called as a continuation (game stores return address, later calls it as entry)
+# It's inside sub_82760928 but game jumps to it directly
+#
+# iter-28 corruption-class investigation: discovered 4 unmapped-stub-call targets
+# in pre-iter-27 logs that turned out to be real functions Ghidra auto-analysis
+# missed AND XenonRecomp didn't lift. Same recurring class as sub_827A0000 etc.
+# Added to the explicit-function list so a future XenonRecomp regeneration
+# auto-translates them. iter-28's stubs (sub_8246D5C8, sub_8246D6C8, sub_827AC440,
+# sub_827A0000) in ppc_missing_recomp_stubs.cpp can be removed once these are
+# auto-generated from these toml entries.
+functions = [
+  { address = 0x827609A4, size = 0x54 },   # continuation point -> end of sub_82760928
+  # iter-463 charter (burndown item 11): the four iter-27/28 entries
+  # 0x827A0000 / 0x8246D5C8 / 0x8246D6C8 / 0x827AC440 are DELETED - none is a
+  # function start (a CRT errno store, two return addresses and a branch
+  # target inside other functions); they were garbage-vtable targets of the
+  # heap-corruption era. See tools/regen/hand/ppc_missing_recomp_stubs.cpp.
+  # iter-28 corruption-class investigation — turned out NOT to be corruption.
+  # All 4 unmapped targets in this batch are real Ghidra-missed functions.
+  # The "unaligned" 0x82479082 was a red herring: PPC_LOOKUP_FUNC shifts off
+  # the low 2 bits, so it actually dispatches to the function at 0x82479080;
+  # that function was just also missing. Currently unstubbed (don't fire in
+  # post-iter-28 dispatch paths) but should auto-translate on next regen.
+  { address = 0x82605680, size = 0x34 },   # vtable method, caller's r31 = this
+  { address = 0x82110000, size = 0x54 },   # state-bits update on object at r30 (modifies +0x124|+0x44|+0x128|+0x11C)
+  { address = 0x82110180, size = 0x134 },  # GPU ring buffer write (uses __imp__VdGlobalDevice + 0x4DF4 vtable)
+  { address = 0x82479080, size = 0x24 },   # constant returner: returns 0xFFFFFFFF805000A8
+  { address = 0x82760968, size = 0xC },    # R1: tail of the 0x827609A4 continuation (li r3,0; r1 += 128; __restgprlr_28)
+  { address = 0x8272C4E0, size = 0x188 },  # D3 (SPLICE_CONVERSION finding 2): XenonAnalyse ended this waveform evaluator at 0x8272C630, so its 7 switch cases' `b 0x8272c638` (the common scale + clamp tail) returned a stale f1
+]
+
+# Invalid instructions - skip padding, exception handlers
+invalid_instructions = [
+  { data = 0x00000000, size = 4 },
+]
+
+
+# Oracle reader diagnostic. No control transfer or register mutation.
+# Shared generated ABI uses empty SR_ORACLE=0 definitions.
+[[midasm_hook]]
+name = "SrReaderLock_823A1120"
+address = 0x823A1120
+registers = ["r1", "r27"]
+
+[[midasm_hook]]
+name = "SrReaderCopy_823A1194"
+address = 0x823A1194
+registers = ["r1", "r3", "r4", "r5", "r27", "r31"]
+
+[[midasm_hook]]
+name = "SrReaderReturn_823A1198"
+address = 0x823A1198
+registers = ["r1"]
+
+# -- Mid-asm hooks (iter-296d+) ----------------------------------------------
+# Native implementations: kernel/midasm_hooks.cpp. Regenerate after editing.
+
+# Allocator deferred-free sweep sub_82763628: the FE_TICK thread was observed
+# spinning its list-walk loop forever (lr frozen at 0x82763630, skip path has
+# no calls). Entry hook resets per-thread state; iteration hook runs Brent
+# cycle detection and can bail to the natural exit block at 0x827636C0.
+[[midasm_hook]]
+name = "SweepEnterMidAsmHook82763628"
+address = 0x82763644
+registers = ["r26"]
+
+[[midasm_hook]]
+name = "SweepIterMidAsmHook82763628"
+address = 0x8276365C
+registers = ["r26", "r31"]
+jump_address_on_true = 0x827636C0
+
+# Screen-object pick iterator sub_8219F7A8: walks a live (id, obj) vector at
+# container+8, re-reading the end pointer each pass; null entries are a
+# call-free leaf path, so a corrupt begin/end pair spins the FE_TICK thread
+# forever (observed lr=0x8219F7B0, ctr=0x826CB730 frozen). Hook fires once
+# after the count is computed (r27); on an absurd count it bails to the clean
+# exit block at 0x8219F968.
+[[midasm_hook]]
+name = "PickIterGuardMidAsmHook8219F7A8"
+address = 0x8219F7F0
+registers = ["r29", "r27"]
+jump_address_on_true = 0x8219F968
+
+# Static-BSS fill guard (iter-296g): sub_826F5970 = vector assign/fill (grow
+# via 826F5818, then splat *r29 x r31 words at *r30). On bad DOGMA rolls a
+# worker-dispatched rehash (sub_826F5F60 family, reached via the opaque
+# 0x828EE drain) runs this with a broken buffer that OVERLAPS the Apt/AS
+# static globals (caught: zero-fill over the importCb slot 0x829A1AC0, which
+# then breaks the AS-intern table and every register attempt). Hook fires
+# after the buffer lands in r11; on static-window overlap it bails to the
+# natural loop exit 0x826F59B8 (vector left empty-but-consistent).
+[[midasm_hook]]
+name = "StaticFillGuardMidAsmHook826F5970"
+address = 0x826F5994
+registers = ["r11", "r31", "r29"]
+jump_address_on_true = 0x826F59B8
+
+# == R1 (docs/SPLICE_CONVERSION.md): host hooks that replaced the hand-edited guest bodies ==
+# The C++ side: kernel/r1_hooks_core.cpp (this block) and kernel/r1_hooks_b1..b3.cpp (the
+# blocks below). Every hook is registered in docs/OVERRIDES.json as "midasm:0x<ADDR>".
+
+# Guest setjmp for the seven setjmp users other than luaD_rawrunprotected (iter-467, kernel/r1_platform.cpp):
+# at the function entry, a resume after a longjmp jumps to the instruction after its `bl Crt_Setjmp`;
+# before that call, the function's own callee-saved register copies are recorded.
+# sub_8239A988 LoadJPEGImage, setjmp(r1+720)
+[[midasm_hook]]
+name = "SrSetjmpResume_8239A988"
+address = 0x8239A988
+registers = ["r3", "r13", "r14", "r15", "r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23", "r24", "r25", "r26", "r27", "r28", "r29", "r30", "r31", "f14", "f15", "f16", "f17", "f18", "f19", "f20", "f21", "f22", "f23", "f24", "f25", "f26", "f27", "f28", "f29", "f30", "f31", "cr2", "cr3", "cr4"]
+jump_address_on_true = 0x8239A9DC
+
+[[midasm_hook]]
+name = "SrSetjmpArm_8239A988"
+address = 0x8239A9D8
+registers = ["r3", "r13", "r14", "r15", "r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23", "r24", "r25", "r26", "r27", "r28", "r29", "r30", "r31", "f14", "f15", "f16", "f17", "f18", "f19", "f20", "f21", "f22", "f23", "f24", "f25", "f26", "f27", "f28", "f29", "f30", "f31", "cr2", "cr3", "cr4"]
+
+# sub_8239B700 ImageLoadPng, setjmp(png_ptr)
+[[midasm_hook]]
+name = "SrSetjmpResume_8239B700"
+address = 0x8239B700
+registers = ["r3", "r13", "r14", "r15", "r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23", "r24", "r25", "r26", "r27", "r28", "r29", "r30", "r31", "f14", "f15", "f16", "f17", "f18", "f19", "f20", "f21", "f22", "f23", "f24", "f25", "f26", "f27", "f28", "f29", "f30", "f31", "cr2", "cr3", "cr4"]
+jump_address_on_true = 0x8239B798
+
+[[midasm_hook]]
+name = "SrSetjmpArm_8239B700"
+address = 0x8239B794
+registers = ["r3", "r13", "r14", "r15", "r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23", "r24", "r25", "r26", "r27", "r28", "r29", "r30", "r31", "f14", "f15", "f16", "f17", "f18", "f19", "f20", "f21", "f22", "f23", "f24", "f25", "f26", "f27", "f28", "f29", "f30", "f31", "cr2", "cr3", "cr4"]
+
+# sub_823F20F8 png_create_read_struct, setjmp(png_ptr)
+[[midasm_hook]]
+name = "SrSetjmpResume_823F20F8"
+address = 0x823F20F8
+registers = ["r3", "r13", "r14", "r15", "r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23", "r24", "r25", "r26", "r27", "r28", "r29", "r30", "r31", "f14", "f15", "f16", "f17", "f18", "f19", "f20", "f21", "f22", "f23", "f24", "f25", "f26", "f27", "f28", "f29", "f30", "f31", "cr2", "cr3", "cr4"]
+jump_address_on_true = 0x823F2138
+
+[[midasm_hook]]
+name = "SrSetjmpArm_823F20F8"
+address = 0x823F2134
+registers = ["r3", "r13", "r14", "r15", "r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23", "r24", "r25", "r26", "r27", "r28", "r29", "r30", "r31", "f14", "f15", "f16", "f17", "f18", "f19", "f20", "f21", "f22", "f23", "f24", "f25", "f26", "f27", "f28", "f29", "f30", "f31", "cr2", "cr3", "cr4"]
+
+# sub_827C1170 NewBackendCompile, setjmp(ctx+1040)
+[[midasm_hook]]
+name = "SrSetjmpResume_827C1170"
+address = 0x827C1170
+registers = ["r3", "r13", "r14", "r15", "r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23", "r24", "r25", "r26", "r27", "r28", "r29", "r30", "r31", "f14", "f15", "f16", "f17", "f18", "f19", "f20", "f21", "f22", "f23", "f24", "f25", "f26", "f27", "f28", "f29", "f30", "f31", "cr2", "cr3", "cr4"]
+jump_address_on_true = 0x827C1260
+
+[[midasm_hook]]
+name = "SrSetjmpArm_827C1170"
+address = 0x827C125C
+registers = ["r3", "r13", "r14", "r15", "r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23", "r24", "r25", "r26", "r27", "r28", "r29", "r30", "r31", "f14", "f15", "f16", "f17", "f18", "f19", "f20", "f21", "f22", "f23", "f24", "f25", "f26", "f27", "f28", "f29", "f30", "f31", "cr2", "cr3", "cr4"]
+
+# sub_827C1438 the HLSL back end sibling entry, setjmp(ctx+1040)
+[[midasm_hook]]
+name = "SrSetjmpResume_827C1438"
+address = 0x827C1438
+registers = ["r3", "r13", "r14", "r15", "r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23", "r24", "r25", "r26", "r27", "r28", "r29", "r30", "r31", "f14", "f15", "f16", "f17", "f18", "f19", "f20", "f21", "f22", "f23", "f24", "f25", "f26", "f27", "f28", "f29", "f30", "f31", "cr2", "cr3", "cr4"]
+jump_address_on_true = 0x827C1538
+
+[[midasm_hook]]
+name = "SrSetjmpArm_827C1438"
+address = 0x827C1534
+registers = ["r3", "r13", "r14", "r15", "r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23", "r24", "r25", "r26", "r27", "r28", "r29", "r30", "r31", "f14", "f15", "f16", "f17", "f18", "f19", "f20", "f21", "f22", "f23", "f24", "f25", "f26", "f27", "f28", "f29", "f30", "f31", "cr2", "cr3", "cr4"]
+
+# sub_82858C90 XGraphics microcode compiler, setjmp(state+16)
+[[midasm_hook]]
+name = "SrSetjmpResume_82858C90"
+address = 0x82858C90
+registers = ["r3", "r13", "r14", "r15", "r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23", "r24", "r25", "r26", "r27", "r28", "r29", "r30", "r31", "f14", "f15", "f16", "f17", "f18", "f19", "f20", "f21", "f22", "f23", "f24", "f25", "f26", "f27", "f28", "f29", "f30", "f31", "cr2", "cr3", "cr4"]
+jump_address_on_true = 0x82858D04
+
+[[midasm_hook]]
+name = "SrSetjmpArm_82858C90"
+address = 0x82858D00
+registers = ["r3", "r13", "r14", "r15", "r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23", "r24", "r25", "r26", "r27", "r28", "r29", "r30", "r31", "f14", "f15", "f16", "f17", "f18", "f19", "f20", "f21", "f22", "f23", "f24", "f25", "f26", "f27", "f28", "f29", "f30", "f31", "cr2", "cr3", "cr4"]
+
+# sub_82859260 XGraphics microcode compiler, setjmp(state+16)
+[[midasm_hook]]
+name = "SrSetjmpResume_82859260"
+address = 0x82859260
+registers = ["r3", "r13", "r14", "r15", "r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23", "r24", "r25", "r26", "r27", "r28", "r29", "r30", "r31", "f14", "f15", "f16", "f17", "f18", "f19", "f20", "f21", "f22", "f23", "f24", "f25", "f26", "f27", "f28", "f29", "f30", "f31", "cr2", "cr3", "cr4"]
+jump_address_on_true = 0x828592CC
+
+[[midasm_hook]]
+name = "SrSetjmpArm_82859260"
+address = 0x828592C8
+registers = ["r3", "r13", "r14", "r15", "r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23", "r24", "r25", "r26", "r27", "r28", "r29", "r30", "r31", "f14", "f15", "f16", "f17", "f18", "f19", "f20", "f21", "f22", "f23", "f24", "f25", "f26", "f27", "f28", "f29", "f30", "f31", "cr2", "cr3", "cr4"]
+
+# walksRet markers: after each of the four calls to SystemRunnerStart sub_8271E928
+[[midasm_hook]]
+name = "R1_sub_82177E60_82177EA8"
+address = 0x82177EA8
+after_instruction = true
+
+[[midasm_hook]]
+name = "R1_sub_82177F90_82178050"
+address = 0x82178050
+after_instruction = true
+
+[[midasm_hook]]
+name = "R1_sub_821780C0_82178178"
+address = 0x82178178
+after_instruction = true
+
+[[midasm_hook]]
+name = "R1_sub_821781F8_821782B8"
+address = 0x821782B8
+after_instruction = true
+
+# walkDepth marker: sub_8271E928 before its call into sub_8271E630
+[[midasm_hook]]
+name = "R1_sub_8271E928_8271E9D4"
+address = 0x8271E9D4
+registers = ["r30"]
+
+# lastInit marker: sub_8271F2C8 before the module's vtable[7] call
+[[midasm_hook]]
+name = "R1_sub_8271F2C8_8271F32C"
+address = 0x8271F32C
+registers = ["r31", "ctr"]
+
+# -- R1 batch 1: kernel/r1_hooks_b1.cpp --
+
+
+
+
+
+# -- R1 batch 2: kernel/r1_hooks_b2.cpp --
+
+# R1 batch 2: [[midasm_hook]] entries for kernel/r1_hooks_b2.cpp (ports of 24 forcing splices,
+# behaviour unchanged; registry archive/r1/reg_b2.json). Kernel strong-def overrides in the same
+# file: none left (sub_82600E38, sub_8271E5B0, sub_8271E630, sub_8271E6B8 and sub_827605F8 retired, phase 4).
+
+# sub_826D4930 AptCoreImplGetOrCreate: publish a non-zero env to g_aptEnvVA (not forcing)
+[[midasm_hook]]
+name = "R1_sub_826D4930_826D497C"
+address = 0x826D497C
+registers = ["r3"]
+
+
+# -- R1 batch 3: kernel/r1_hooks_b3.cpp --
+
+# sub_827A1698 CrtDoexit: after _lock(8) jump straight to the unlock, skipping the CRT termination
+[[midasm_hook]]
+name = "R1_sub_827A1698_827A16C0"
+address = 0x827A16C0
+registers = ["r28"]
+jump_address = 0x827A1770
+
+# sub_827A1698 CrtDoexit: skip li r3,0 + KeBugCheck when retcaller is 0
+[[midasm_hook]]
+name = "R1_sub_827A1698_827A1788"
+address = 0x827A1788
+registers = ["r11"]
+jump_address = 0x827A1790
+
+# -- Localization policy (iter-464 codegen lane) --------------------------------
+# XenonRecomp itself runs with the [main] flags above OFF (ctx-style output, the form
+# the post-regen patch scripts and the hand bodies are written in). After assemble +
+# patches, tools/regen/flag_transform.py applies these flags textually to every
+# GENERATED function (identical output to the recompiler's own flag handling: the
+# --equivalence proof), keeps the hand bodies / helpers ctx-style, and inserts the ABI
+# bridges from tools/regen/abi_bridge.json (abi_audit.py). See tools/regen/README.md.
+[localize]
+skip_lr = true
+skip_msr = true
+ctr_as_local = true
+xer_as_local = true
+reserved_as_local = true
+cr_as_local = true
+non_argument_as_local = true
+non_volatile_as_local = true
+# Generated functions kept ctx-style on purpose (treated as hand bodies by the ABI bridges):
+# sub_822C6E30 (cloth tangents) - tools/regen/cloth_capacity.py copies its ctx-style body
+# text into the build (kernel/cloth_capacity.cpp; the body is hash-checked at configure time).
+# R1: the functions that were hand-spliced until R1 (docs/SPLICE_CONVERSION.md) stay
+# ctx-style, exactly as they were, so the committed ABI bridges stay valid.
+keep_ctx_style = [
+  "sub_822C6E30",
+  "_xstart",
+  "sub_820F0048",
+  "sub_820F33E8",
+  "sub_820F34C0",
+  "sub_820FC910",
+  "sub_820FD8C0",
+  "sub_820FD9A8",
+  "sub_820FDCB8",
+  "sub_82106010",
+  "sub_82106280",
+  "sub_8210B1A8",
+  "sub_8210B288",
+  "sub_8210C090",
+  "sub_82110A30",
+  "sub_821110C8",
+  "sub_82111118",
+  "sub_82111400",
+  "sub_82111798",
+  "sub_82111B30",
+  "sub_82111EC8",
+  "sub_82112050",
+  "sub_8211BBE0",
+  "sub_82137670",
+  "sub_821494C0",
+  "sub_821498F8",
+  "sub_82149FF0",
+  "sub_8214AFB8",
+  "sub_8214B930",
+  "sub_8214E2C8",
+  "sub_82150878",
+  "sub_82151560",
+  "sub_821516E0",
+  "sub_8215C740",
+  "sub_8215FA18",
+  "sub_821647C8",
+  "sub_82164818",
+  "sub_821648B8",
+  "sub_821649B8",
+  "sub_82164B58",
+  "sub_82164B60",
+  "sub_821660B8",
+  "sub_8216A1D0",
+  "sub_821715E8",
+  "sub_82173B78",
+  "sub_82174340",
+  "sub_82175618",
+  "sub_821763E0",
+  "sub_82176DF8",
+  "sub_82177E60",
+  "sub_82177F90",
+  "sub_821780C0",
+  "sub_821781F8",
+  "sub_82179230",
+  "sub_8217CEC8",
+  "sub_821808F8",
+  "sub_821824A8",
+  "sub_82182700",
+  "sub_821855B8",
+  "sub_821863A0",
+  "sub_82187460",
+  "sub_82188860",
+  "sub_8218CFE8",
+  "sub_8218F890",
+  "sub_82191D58",
+  "sub_821959D0",
+  "sub_821B9340",
+  "sub_821BAD30",
+  "sub_821BB5F8",
+  "sub_821C87D0",
+  "sub_821C94F0",
+  "sub_821D8A10",
+  "sub_821DC218",
+  "sub_821DC2C8",
+  "sub_821DDD18",
+  "sub_821EB388",
+  "sub_821EB648",
+  "sub_821FDEB0",
+  "sub_8220F278",
+  "sub_82211BD8",
+  "sub_82213FA0",
+  "sub_82216938",
+  "sub_82220EA0",
+  "sub_8222B960",
+  "sub_8225E030",
+  "sub_82263638",
+  "sub_822768E8",
+  "sub_82281CD8",
+  "sub_8228F798",
+  "sub_8229F460",
+  "sub_8229F670",
+  "sub_822A8C68",
+  "sub_822AB748",
+  "sub_822AE160",
+  "sub_822CA4C8",
+  "sub_822CD7D0",
+  "sub_822CDD08",
+  "sub_822D13E0",
+  "sub_822D4BB0",
+  "sub_822D85B0",
+  "sub_822DC840",
+  "sub_822DE210",
+  "sub_822DE6E8",
+  "sub_822EA908",
+  "sub_822EB148",
+  "sub_822EC980",
+  "sub_822F0868",
+  "sub_822F4718",
+  "sub_822F8F68",
+  "sub_822FAE70",
+  "sub_82301BB8",
+  "sub_82308B68",
+  "sub_8230A730",
+  "sub_82318FB0",
+  "sub_823191E8",
+  "sub_823194F0",
+  "sub_82320488",
+  "sub_82325E78",
+  "sub_82357E60",
+  "sub_82362D10",
+  "sub_8236DD90",
+  "sub_8236E618",
+  "sub_823A00C0",
+  "sub_823A0850",
+  "sub_823ACA30",
+  "sub_823AE868",
+  "sub_823AEAB0",
+  "sub_823C8CB8",
+  "sub_823C8CC0",
+  "sub_824680C0",
+  "sub_824687F8",
+  "sub_82468D08",
+  "sub_82468EF8",
+  "sub_8246A1D8",
+  "sub_8246A898",
+  "sub_8246B670",
+  "sub_8246C4C8",
+  "sub_8246D648",
+  "sub_8246DF08",
+  "sub_82473BC8",
+  "sub_82473EB0",
+  "sub_82473F58",
+  "sub_82474398",
+  "sub_824745D0",
+  "sub_82474CB0",
+  "sub_82475050",
+  "sub_82475148",
+  "sub_82475200",
+  "sub_82475680",
+  "sub_82561F28",
+  "sub_825667C8",
+  "sub_8256E7B8",
+  "sub_825A2DF8",
+  "sub_825A3C38",
+  "sub_825BA678",
+  "sub_825BAC58",
+  "sub_825C4B78",
+  "sub_825C58F0",
+  "sub_825C6010",
+  "sub_825C61B0",
+  "sub_825C8A78",
+  "sub_825C9160",
+  "sub_825E3690",
+  "sub_825E3820",
+  "sub_825EED00",
+  "sub_825F0710",
+  "sub_825F7168",
+  "sub_825FC108",
+  "sub_825FC1A0",
+  "sub_825FC2D0",
+  "sub_825FD958",
+  "sub_825FEC88",
+  "sub_825FF140",
+  "sub_82600E38",
+  "sub_82604350",
+  "sub_826045C0",
+  "sub_82605330",
+  "sub_82605F08",
+  "sub_82606328",
+  "sub_826070E0",
+  "sub_82613380",
+  "sub_82621258",
+  "sub_826246A0",
+  "sub_826334C8",
+  "sub_82633A08",
+  "sub_826344F8",
+  "sub_826351B8",
+  "sub_82635968",
+  "sub_826824E8",
+  "sub_82685DD8",
+  "sub_826BF630",
+  "sub_826C0888",
+  "sub_826CC678",
+  "sub_826D1298",
+  "sub_826D4930",
+  "sub_826DECF0",
+  "sub_826E04D0",
+  "sub_826E4D80",
+  "sub_826E52D0",
+  "sub_826E55F8",
+  "sub_826F7D68",
+  "sub_826F9260",
+  "sub_826F92E0",
+  "sub_826FAAC0",
+  "sub_82703EA0",
+  "sub_82709470",
+  "sub_8270F0F8",
+  "sub_8271C0B8",
+  "sub_8271E5A0",
+  "sub_8271E5B0",
+  "sub_8271E630",
+  "sub_8271E6B8",
+  "sub_8271E928",
+  "sub_8271EA20",
+  "sub_8271EB00",
+  "sub_8271ED68",
+  "sub_8271F2C8",
+  "sub_8271F940",
+  "sub_8271FA78",
+  "sub_8271FC18",
+  "sub_8271FE20",
+  "sub_82720090",
+  "sub_82720590",
+  "sub_82720650",
+  "sub_827206B8",
+  "sub_82720B50",
+  "sub_82720C60",
+  "sub_82749BE8",
+  "sub_82755A38",
+  "sub_8275BDB8",
+  "sub_8275F4C8",
+  "sub_827605F8",
+  "sub_82760928",
+  "sub_827609A4",
+  "sub_827623B8",
+  "sub_82762400",
+  "sub_82762480",
+  "sub_82762540",
+  "sub_82762640",
+  "sub_82762B10",
+  "sub_82762E78",
+  "sub_82763BA0",
+  "sub_82763C50",
+  "sub_82763EE8",
+  "sub_82764080",
+  "sub_827641F8",
+  "sub_82764348",
+  "sub_82764510",
+  "sub_82764680",
+  "sub_82764760",
+  "sub_82765350",
+  "sub_827657C8",
+  "sub_82766BE0",
+  "sub_82766C78",
+  "sub_82767688",
+  "sub_827676B0",
+  "sub_82767700",
+  "sub_82767720",
+  "sub_82767DF0",
+  "sub_827684C0",
+  "sub_82768878",
+  "sub_827692B8",
+  "sub_8276A0B0",
+  "sub_8276A4B0",
+  "sub_82773958",
+  "sub_82774230",
+  "sub_82779390",
+  "sub_82787468",
+  "sub_8278C840",
+  "sub_8278CC10",
+  "sub_8278D258",
+  "sub_8278D3C0",
+  "sub_8278D400",
+  "sub_8278D728",
+  "sub_8278E1F8",
+  "sub_8278EEC0",
+  "sub_827908C0",
+  "sub_82790E90",
+  "sub_82792CE0",
+  "sub_82794F60",
+  "sub_82798160",
+  "sub_82798338",
+  "sub_8279EC60",
+  "sub_827A1690",
+  "sub_827A1698",
+  "sub_827A4270",
+  "sub_827A55F8",
+  "sub_827A6228",
+  "sub_827A6298",
+  "sub_827A7398",
+  "sub_827A7420",
+  "sub_827AC350",
+  "sub_827AC358",
+  "sub_827ACD28",
+  "sub_827ACDE8",
+  "sub_827BEB50",
+  "sub_827C1168",
+  "sub_827C1430",
+  "sub_827D2880",
+  "sub_8280DDC0",
+  "sub_8284C600",
+  "sub_828CCE60",
+  "sub_828CF878",
+  "sub_828CFC88",
+  "sub_828D00F0",
+  "sub_828D0968",
+  "sub_828DD240",
+  "sub_828DD828",
+  "sub_828DDA60",
+  "sub_828E4138",
+]
+# Generated functions kept ctx-style by the REGISTERS they touch (iter-465): the XDK codec
+# asm (XMV = VC-1 video, WMA) uses v64-v127 as a register file shared across table-dispatched
+# helpers and transparent orchestrators (constants produced by one function, consumed at entry
+# by another reached through bctrl); only ctx can carry that. Every function referencing
+# ctx.v64..v127 stays ctx-style (471 incl. the __savevmx_64+ helpers); the rest localize.
+keep_ctx_style_regs = ["v64-v127"]
+# iter-466 tick2: game functions that touch v64-v127 only as their own callee-saved scratch
+# (__savevmx_* / __restvmx_* around the body) localize anyway (flag_transform
+# localize_despite_regs): ClothUpdateElementLightMask (5.7% of the guest render thread as a
+# ctx-style body, docs/PERFORMANCE.md 2.9).
+localize_despite_regs = ["sub_823055A8"]

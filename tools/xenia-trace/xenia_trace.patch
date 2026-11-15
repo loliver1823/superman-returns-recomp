@@ -1,0 +1,62 @@
+L9-A: env-gated guest-function-entry trace for the instrumented-Xenia golden oracle.
+
+Adds a per-guest-function-entry trace emit, gated by XENIA_GUEST_TRACE=1, that
+writes fixed-width (guest_pc, lr, r3, r1, thread_id, tag) records to a binary
+file (default xenia_boot.trace). This is the L9-A "golden oracle": a ground-truth
+ordered trace of a working boot to the Superman Returns menu, consumed by the
+L9-C divergence bisector.
+
+The hook lives in GuestFunction::Call (src/xenia/cpu/function.cc), which is the
+backend-agnostic C++ choke point every guest-function entry that re-enters the
+guest from host/kernel code flows through. See tools/xenia-trace/README.md for
+the COVERAGE CAVEAT (guest->guest JIT-internal bl calls bypass this site) and the
+documented JIT-prolog upgrade path for a complete per-function trace.
+
+The on-disk record format is defined in the added header src/xenia/cpu/xenia_trace.h.
+
+Verified against xenia-canary @ 0b4e6c440e91f118b42a5e9e32a6b629ce4c387c
+(2026-06-24). `git apply --check` passes against that revision.
+
+TO APPLY (from the xenia-canary repo root):
+    cp ../../tools/xenia-trace/xenia_trace.h src/xenia/cpu/xenia_trace.h
+    git apply ../../tools/xenia-trace/xenia_trace.patch
+
+(The header is copied in as a plain file rather than carried as a new-file hunk so
+this patch stays small and reviewable. The diff below only touches function.cc.
+xenia_trace.h needs no build-system change: the cpu CMakeLists globs *.h, and the
+header is header-only / included by function.cc which is already in the build.)
+
+---
+diff --git a/src/xenia/cpu/function.cc b/src/xenia/cpu/function.cc
+index c2dcf52..7a64faa 100644
+--- a/src/xenia/cpu/function.cc
++++ b/src/xenia/cpu/function.cc
+@@ -12,6 +12,7 @@
+ #include "xenia/base/logging.h"
+ #include "xenia/cpu/symbol.h"
+ #include "xenia/cpu/thread_state.h"
++#include "xenia/cpu/xenia_trace.h"  // L9-A golden-oracle guest-function trace
+
+ namespace xe {
+ namespace cpu {
+@@ -132,6 +133,20 @@ uint32_t GuestFunction::MapMachineCodeToGuestAddress(
+ bool GuestFunction::Call(ThreadState* thread_state, uint32_t return_address) {
+   // SCOPE_profile_cpu_f("cpu");
+
++  // L9-A: emit a golden-oracle trace record on each guest-function entry.
++  // No-op unless XENIA_GUEST_TRACE=1 is set in the environment. We sample the
++  // guest entry PC (this->address()) plus the key PPC registers BEFORE the call
++  // runs so the L9-C bisector sees the entry state, matching how our recomp
++  // build's call tracer samples entries.
++  if (xe::trace::GuestTracer::Get().enabled()) {
++    auto* ctx = thread_state->context();
++    xe::trace::GuestTracer::Get().EmitFuncEntry(
++        address(),                       // guest_pc (function entry)
++        static_cast<uint32_t>(ctx->lr),  // caller return address
++        ctx->r[3], ctx->r[1],            // r3 (arg0), r1 (stack ptr)
++        thread_state->thread_id());      // interleaving context
++  }
++
+   ThreadState* original_thread_state = ThreadState::Get();
+   if (original_thread_state != thread_state) {
+     ThreadState::Bind(thread_state);

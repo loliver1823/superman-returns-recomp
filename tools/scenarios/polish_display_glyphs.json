@@ -1,0 +1,466 @@
+{
+  "name": "polish-display-glyphs",
+  "purpose": "iter-465 polish lane (docs/PLAYER_BUILD.md 7, docs/CUSTOM_FRONTEND.md 5.9, docs/INPUT_GLYPHS.md 7): ONE background PORT FEATURE roll (natural=false) proving (a) device-matched prompts live with a hot-swap keyboard -> DualShock 4 -> keyboard -> DualShock 4 -> keyboard on the title UI and the MAIN MENU (tools/glyphs/vpad_hotplug.py --plan polish runs beside it: ViGEm pads, so -Gates must carry SR_HARNESS_REAL_INPUT=1 and the roll must hold the game slot), (b) the DISPLAY OPTIONS page from SETTINGS: every row changed with LEFT/RIGHT and applied live (fps target, vsync, window size; display mode stored, the automated window stays windowed), RESOLUTION 2X -> RESTART NOW, (c) the relaunched child at the new scale, NEW GAME, the tutorial, then pause > OPTIONS in game (lane E L-c: the pause menu's own row; the DISPLAY tab's frame rate changed in gameplay, then discarded). Gates: SR_INSTANCE_ID=polish,SR_PORT_FEATURES=1,SR_HARNESS_REAL_INPUT=1; -TimeoutSeconds 1800.",
+  "gates": "SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=30,SR_PRESENT_DUMP_SPARSE_CAP=2000,SR_HIGHFPS_PACE=1",
+  "steps": [
+    {
+      "name": "fe-alive",
+      "await": "\\[NAT_FE\\] #1 natural FE master tick",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "front-end-feature",
+      "expect": "\\[PORT\\] applied custom_frontend",
+      "expectMs": 5000,
+      "optional": true
+    },
+    {
+      "name": "fps-default",
+      "purpose": "item 2: the player default is the display refresh with vsync on",
+      "expect": "\\[HIGHFPS\\] PORT FEATURE on \\(player default\\): mode=monitor .*present-sync=1 tearing=0",
+      "expectMs": 5000,
+      "optional": true
+    },
+    {
+      "name": "settle-title",
+      "await": "\\[NAT_FE\\] #256 natural FE master tick",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "press-start",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 4,
+      "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)",
+      "expectMs": 90000
+    },
+    {
+      "name": "title-ui-tail",
+      "await": "\\[APT_REQ\\] #\\d+ path='\\.\\./common/ButtonHints/XBox360/HintB'",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "title-visible",
+      "requireVisibleMs": 6000,
+      "visibleTimeoutMs": 200000,
+      "dwellMs": 4000
+    },
+    {
+      "name": "kb-title",
+      "purpose": "player 1 = keyboard (the harness ENTER): the title UI's hint bar shows key caps",
+      "dwellMs": 6000
+    },
+    {
+      "name": "pad-title",
+      "purpose": "vpad plugs a DualShock 4 and presses L1 ~20 s after the title UI: PlayStation symbols",
+      "expect": "\\[INPUT\\] player 1 = .*(PS4|DualShock|PlayStation)",
+      "expectMs": 60000,
+      "optional": true,
+      "dwellMs": 12000
+    },
+    {
+      "name": "start-bootflow",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 10000,
+      "expect": "\\[SR_FSCMD\\].*claim LoadCreate",
+      "expectMs": 30000
+    },
+    {
+      "name": "kb-menu",
+      "purpose": "the keyboard (ENTER) took player 1 back: MAIN MENU hints in key caps",
+      "dwellMs": 8000
+    },
+    {
+      "name": "pad-menu",
+      "purpose": "vpad presses L1 12 s after the menu: PlayStation symbols on the MAIN MENU",
+      "dwellMs": 16000
+    },
+    {
+      "name": "down-to-settings",
+      "key": "DOWN",
+      "holdMs": 250,
+      "maxPulses": 2,
+      "gapMs": 1500,
+      "dwellMs": 1500
+    },
+    {
+      "name": "open-settings",
+      "purpose": "lane E L-b: MAIN MENU > OPTIONS opens DISPLAY at once (the Apt page with SR_PC_SETTINGS=0, else the OPTIONS screen)",
+      "key": "A",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*SR_Log 'menu show display'",
+      "expectMs": 10000,
+      "dwellMs": 6000
+    },
+    {
+      "name": "res-1x",
+      "key": "RIGHT",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[DISPLAY_MENU\\] res_scale -> 1 ",
+      "expectMs": 10000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "res-2x",
+      "key": "RIGHT",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[DISPLAY_MENU\\] res_scale -> 2 ",
+      "expectMs": 10000,
+      "dwellMs": 5000
+    },
+    {
+      "name": "to-mode",
+      "key": "DOWN",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "dwellMs": 1500
+    },
+    {
+      "name": "mode-borderless",
+      "key": "RIGHT",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[DISPLAY\\] live: borderless requested; an automated run stays windowed",
+      "expectMs": 10000,
+      "dwellMs": 4000
+    },
+    {
+      "name": "mode-windowed",
+      "key": "LEFT",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[DISPLAY_MENU\\] display_mode -> windowed",
+      "expectMs": 10000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "to-fps",
+      "key": "DOWN",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "dwellMs": 1500
+    },
+    {
+      "name": "fps-unlimited",
+      "key": "RIGHT",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[HIGHFPS\\] live render-loop rate -> 1000\\.0 Hz",
+      "expectMs": 10000,
+      "dwellMs": 8000
+    },
+    {
+      "name": "fps-30",
+      "key": "RIGHT",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[HIGHFPS\\] live render-loop rate -> 30\\.0 Hz",
+      "expectMs": 10000,
+      "dwellMs": 8000
+    },
+    {
+      "name": "fps-60",
+      "key": "RIGHT",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[HIGHFPS\\] live render-loop rate -> 60\\.0 Hz",
+      "expectMs": 10000,
+      "dwellMs": 8000
+    },
+    {
+      "name": "fps-120",
+      "key": "RIGHT",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[HIGHFPS\\] live render-loop rate -> 120\\.0 Hz",
+      "expectMs": 10000,
+      "dwellMs": 6000
+    },
+    {
+      "name": "fps-display",
+      "key": "RIGHT",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[DISPLAY_MENU\\] target_fps -> monitor",
+      "expectMs": 10000,
+      "dwellMs": 4000
+    },
+    {
+      "name": "to-vsync",
+      "key": "DOWN",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "dwellMs": 1500
+    },
+    {
+      "name": "vsync-off",
+      "key": "RIGHT",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[HIGHFPS\\] live \\(settings menu\\): target_fps=monitor vsync=off .*present-sync=0 tearing=1",
+      "expectMs": 10000,
+      "dwellMs": 6000
+    },
+    {
+      "name": "vsync-on",
+      "key": "RIGHT",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[HIGHFPS\\] live \\(settings menu\\): target_fps=monitor vsync=on .*present-sync=1 tearing=0",
+      "expectMs": 10000,
+      "dwellMs": 4000
+    },
+    {
+      "name": "to-size",
+      "key": "DOWN",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "dwellMs": 1500
+    },
+    {
+      "name": "size-1600",
+      "key": "RIGHT",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[DISPLAY\\] live \\(settings menu\\): windowed, window 1600x900",
+      "expectMs": 10000,
+      "dwellMs": 8000
+    },
+    {
+      "name": "size-1280",
+      "key": "LEFT",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[DISPLAY\\] live \\(settings menu\\): windowed, window 1280x720",
+      "expectMs": 10000,
+      "dwellMs": 4000
+    },
+    {
+      "name": "up-to-res",
+      "key": "UP",
+      "holdMs": 250,
+      "maxPulses": 4,
+      "gapMs": 1500,
+      "dwellMs": 2000
+    },
+    {
+      "name": "open-restart",
+      "key": "A",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*SR_Log 'menu show displayrestart'",
+      "expectMs": 10000,
+      "dwellMs": 5000
+    },
+    {
+      "name": "restart-now",
+      "key": "A",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[MODMENU\\] RESTART NOW -> SDL_QUIT",
+      "expectMs": 15000
+    },
+    {
+      "name": "relaunching",
+      "expect": "\\[MODMENU\\] relaunching the exe",
+      "expectMs": 15000
+    },
+    {
+      "name": "follow-child",
+      "followRestart": true,
+      "timeoutMs": 60000
+    },
+    {
+      "name": "child-fe-alive",
+      "await": "\\[NAT_FE\\] #1 natural FE master tick",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "child-scale",
+      "purpose": "the restarted game draws at the RESOLUTION chosen in the menu",
+      "expect": "\\[RES_SCALE\\] draw resolution scale 2x2",
+      "expectMs": 5000
+    },
+    {
+      "name": "child-settle-title",
+      "await": "\\[NAT_FE\\] #256 natural FE master tick",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "child-press-start",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 4,
+      "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)",
+      "expectMs": 90000
+    },
+    {
+      "name": "child-title-ui-tail",
+      "await": "\\[APT_REQ\\] #\\d+ path='\\.\\./common/ButtonHints/XBox360/HintB'",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "child-title-visible",
+      "requireVisibleMs": 6000,
+      "visibleTimeoutMs": 200000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "child-start-bootflow",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 10000,
+      "expect": "\\[SR_FSCMD\\].*claim LoadCreate",
+      "expectMs": 30000
+    },
+    {
+      "name": "child-menu-visible",
+      "dwellMs": 5000
+    },
+    {
+      "name": "new-game",
+      "key": "A",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*answer cppId=\\S+ button=0",
+      "expectMs": 15000
+    },
+    {
+      "name": "game-starts",
+      "expect": "\\[APT_REQ\\] #\\d+ path='screens/hud/main_hud'",
+      "expectMs": 300000
+    },
+    {
+      "name": "tutorial",
+      "purpose": "the opening FMV and the tutorial intro (prompts in key caps)",
+      "dwellMs": 90000
+    },
+    {
+      "name": "pause",
+      "purpose": "ENTER = START (the harness keymap: Escape is BACK = the map)",
+      "key": "ENTER",
+      "holdMs": 250,
+      "maxPulses": 12,
+      "gapMs": 10000,
+      "expect": "\\[SR_FSCMD\\].*SR_Log 'pause install'",
+      "expectFresh": true,
+      "expectMs": 9000,
+      "dwellMs": 5000
+    },
+    {
+      "name": "up-to-options",
+      "purpose": "lane E L-c: RESUME -> (wrap) QUIT GAME -> OPTIONS (the hidden PHOTO MODE slot is skipped)",
+      "key": "UP",
+      "holdMs": 250,
+      "maxPulses": 2,
+      "gapMs": 1200,
+      "dwellMs": 2500
+    },
+    {
+      "name": "open-display-ig",
+      "key": "A",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[PC_SETTINGS\\] shown \\(IG",
+      "expectMs": 10000,
+      "dwellMs": 4000
+    },
+    {
+      "name": "tab-display-ig",
+      "purpose": "every open starts on GAME (lane E L-b): RB twice = DISPLAY",
+      "key": "RB",
+      "holdMs": 160,
+      "maxPulses": 2,
+      "gapMs": 900,
+      "expect": "\\[PC_SETTINGS\\] tab DISPLAY",
+      "expectMs": 8000,
+      "dwellMs": 1500
+    },
+    {
+      "name": "to-bottom-ig",
+      "key": "DOWN",
+      "holdMs": 160,
+      "maxPulses": 12,
+      "gapMs": 300,
+      "dwellMs": 1000
+    },
+    {
+      "name": "to-fps-ig",
+      "purpose": "PERFORMANCE OVERLAY -> GAMMA -> BRIGHTNESS -> VSYNC -> FRAME RATE LIMIT",
+      "key": "UP",
+      "holdMs": 160,
+      "maxPulses": 4,
+      "gapMs": 400,
+      "dwellMs": 1500
+    },
+    {
+      "name": "fps-down-ig",
+      "key": "LEFT",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[PC_SETTINGS\\] preview target_fps = |\\[HIGHFPS\\] live render-loop rate -> ",
+      "expectMs": 10000,
+      "dwellMs": 4000
+    },
+    {
+      "name": "fps-down-2-ig",
+      "key": "LEFT",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[PC_SETTINGS\\] preview target_fps = |\\[HIGHFPS\\] live render-loop rate -> ",
+      "expectFresh": true,
+      "expectMs": 10000,
+      "dwellMs": 5000
+    },
+    {
+      "name": "leave-ig",
+      "purpose": "B: APPLY CHANGES? -> DISCARD (the frame rate goes back)",
+      "key": "B",
+      "holdMs": 160,
+      "maxPulses": 1,
+      "dwellMs": 2000
+    },
+    {
+      "name": "to-discard-ig",
+      "key": "RIGHT",
+      "holdMs": 160,
+      "maxPulses": 1,
+      "dwellMs": 800
+    },
+    {
+      "name": "discard-ig",
+      "key": "A",
+      "holdMs": 160,
+      "maxPulses": 1,
+      "expect": "\\[PC_SETTINGS\\] (close|revert)",
+      "expectMs": 8000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "closed-ig",
+      "expect": "\\[GAME_OPTIONS\\] _global\\.SRPause\\.SR_OptionsClosed\\(0",
+      "expectSince": "leave-ig",
+      "expectMs": 10000,
+      "optional": true
+    },
+    {
+      "name": "resume",
+      "key": "B",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "dwellMs": 30000
+    }
+  ]
+}

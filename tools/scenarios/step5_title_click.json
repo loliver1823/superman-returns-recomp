@@ -1,0 +1,33 @@
+{
+  "name": "step5-title-click",
+  "purpose": "Lane E E5c (RELEASE_PLAN step 5): the cursor's title click is the game's own START (the START control through the PC action layer), so the front end's pad / keyboard input is armed as by a pressed START. Port features on, the census and the cursor log on, audio null, the harness mouse feed (no desktop cursor). Title -> a MOUSE click (the game's own START: [MOUSE_UI] press START) -> the boot flow's claim -> MAIN MENU (NEW GAME focused, ShowMenu(0)) -> DOWN x2 from the harness keyboard (each reaches the menu: menu key=40) -> A opens SETTINGS (menu button=2) -> B back -> DOWN x2 -> A = EXIT -> DOWN -> A = YES: a clean exit. Before E5c (the r5 PC roll of 2026-10-23) the click was a bare gEH.HandleEvent(301): ActivePadListener (+16) never armed and the keyboard never reached the menu.",
+  "gates": "SR_PORT_FEATURES=1,SR_MENU_CENSUS=1,SR_MOUSE_UI_LOG=1,SR_AUDIO_SINK=null,SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=20,SR_PRESENT_DUMP_SPARSE_CAP=900",
+  "steps": [
+    {"name": "fe-alive", "await": "\\[NAT_FE\\] #1 natural FE master tick", "timeoutMs": 180000},
+    {"name": "settle-title", "await": "\\[NAT_FE\\] #256 natural FE master tick", "timeoutMs": 180000},
+    {"name": "press-start", "key": "ENTER", "holdMs": 2000, "holdUntilConfirmed": true, "maxPulses": 4, "gapMs": 12000,
+     "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)", "expectMs": 90000},
+    {"name": "title-ui-tail", "await": "\\[APT_REQ\\] #15 path='\\.\\./common/ButtonHints/XBox360/HintB'", "timeoutMs": 240000},
+    {"name": "title-visible", "requireVisibleMs": 8000, "visibleTimeoutMs": 200000, "dwellMs": 6000},
+    {"name": "title-click", "purpose": "E5c: a click anywhere on the title = the game's own START (the PC action layer), not a bare Apt key. armed=0: the front end's own input was NOT armed at the click (the preliminary ENTER did not arm it), so the keyboard steps below are armed by the click's START. The proof after the click is behavioural (the coordinator, E5c r2): the keyboard's DOWN reaches the menu and A opens SETTINGS.",
+     "mouse": "move 560,480; move 640,520; wait 1500; click 640,520",
+     "expect": "\\[MOUSE_UI\\] press START \\(title click = START.*front-end input armed=0\\)", "expectMs": 30000},
+    {"name": "claim", "expect": "\\[SR_FSCMD\\].*claim LoadCreate", "expectSince": "title-click", "expectMs": 30000},
+    {"name": "menu-census", "expect": "\\[MENU_CENSUS\\].*page='MAIN MENU'.*cancel=1", "expectSince": "claim", "expectMs": 20000, "dwellMs": 3000},
+    {"name": "down-reaches-menu", "purpose": "E5c: the harness keyboard's DOWN reaches the menu after a mouse START (the r5 roll: no key did).",
+     "key": "DOWN", "holdMs": 2000, "holdUntilConfirmed": true, "maxPulses": 1,
+     "expect": "\\[SR_FSCMD\\].*menu key=40", "expectFresh": true, "expectMs": 10000, "dwellMs": 1500},
+    {"name": "down-again", "key": "DOWN", "holdMs": 2000, "holdUntilConfirmed": true, "maxPulses": 1,
+     "expect": "\\[SR_FSCMD\\].*menu key=40", "expectFresh": true, "expectMs": 10000, "dwellMs": 1500},
+    {"name": "open-settings", "key": "A", "holdMs": 2000, "holdUntilConfirmed": true, "maxPulses": 1,
+     "expect": "\\[SR_FSCMD\\].*menu button=2", "expectMs": 10000},
+    {"name": "settings-census", "purpose": "lane E L-b: OPTIONS is one screen (the host overlay)", "expect": "\\[PC_SETTINGS\\] shown \\(FE", "expectSince": "open-settings", "expectMs": 15000, "dwellMs": 3000},
+    {"name": "back-from-settings", "key": "B", "holdMs": 2000, "holdUntilConfirmed": true, "maxPulses": 1, "expect": "\\[PC_SETTINGS\\] close", "expectMs": 10000},
+    {"name": "menu-again", "expect": "\\[MENU_CENSUS\\].*page='MAIN MENU'", "expectSince": "back-from-settings", "expectMs": 15000, "dwellMs": 3000},
+    {"name": "down-to-exit", "key": "DOWN", "holdMs": 2000, "holdUntilConfirmed": true, "maxPulses": 2, "gapMs": 1500, "dwellMs": 2000, "purpose": "SETTINGS is focused again (ShowMenu(2)); two rows down = EXIT."},
+    {"name": "exit", "key": "A", "holdMs": 2000, "holdUntilConfirmed": true, "maxPulses": 1, "expect": "\\[SR_FSCMD\\].*menu button=4", "expectMs": 10000, "dwellMs": 4000},
+    {"name": "down-to-yes-exit", "key": "DOWN", "holdMs": 2000, "holdUntilConfirmed": true, "maxPulses": 1, "dwellMs": 2000},
+    {"name": "yes-exit", "key": "A", "holdMs": 2000, "holdUntilConfirmed": true, "maxPulses": 1, "expect": "\\[SR_FSCMD\\].*SR_Quit", "expectMs": 10000},
+    {"name": "exit-clean", "expectExitCode": 0, "exitTimeoutMs": 2000}
+  ]
+}

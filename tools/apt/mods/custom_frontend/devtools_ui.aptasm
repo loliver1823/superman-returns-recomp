@@ -1,0 +1,624 @@
+; iter-464 the in-game Dev Tools menu - the Apt renderer (docs/DEVTOOLS_DESIGN.md 13 "Access",
+; docs/CUSTOM_FRONTEND.md 5.7). Since the modmenu lane it renders EVERY host-driven page: the
+; Dev Tools pages and the MODS pages (kernel/host_pages.hpp routes by page id; the command is
+; SR_Menu, SR_DevMenu being its older name). The object keeps its name, SRDevTools. Appended to the small BistroBaseScreen class InitAction of
+; each movie that opens the menu (SCRPRESSSTART sprite 60: the front end's SETTINGS panel;
+; SCRPAUSEMENU sprite 3: the pause menu's MORE OPTIONS panel), so it runs on every load and
+; its names do not crowd the class block's one-byte ConstantPool.
+;
+; Every page is a REAL game popup: FlowMgr.ShowGenPop -> ScrGenPop (DisplayWell, BasicButton
+; rows, the game's font and colours). The pages themselves come from the host
+; (kernel/devtools_menu.cpp) through the FSCommand bridge:
+;   fscommand("SR_Menu", "open <page> FE|IG" | "press <page> <row>" | "back <page>" |
+;             "adjust <page> <row> -1|1")
+;   -> FlowMgr.SR_DTBegin(page, title, body), FlowMgr.SR_DTItem(row, label, kind) per row,
+;      FlowMgr.SR_DTEnd(rows, focus, action): action 1 show the page, 2 the rows changed in
+;      place (LEFT / RIGHT on a toggle or slider), 0 close the menu (back to the caller)
+; The three reply members are bound on FlowMgr only around the fscommand (Cmd).
+;
+;   _global.SRDevTools.Open(page, ctx, owner, retFn, retArg)
+;       owner = the caller's mod object (SRFrontEnd / SRPause): its OnReady installs the
+;       ScrGenPop input hook, and on close the menu calls owner[retFn](retArg)
+;   PopupKey(popup, keyCode) -> the key to pass on, or -1 (consumed): called by the owner's
+;       ScrGenPop input hook for the menu's popups: Enter = A after 400 ms, Esc = B,
+;       LEFT / RIGHT on a toggle or slider row = "adjust" in place
+;   Teardown()  the movie's ExitScreen: deletes every method but itself (ExitScreen deletes it)
+    op_71
+    EA_GetNamedMember 'SRDevTools'
+    op_76
+    Equals2
+    Not
+    If dt_have
+    op_71
+    EA_PushConstByte 'SRDevTools'
+    EA_PushZero
+    EA_PushConstByte 'Object'
+    NewObject
+    SetMember
+dt_have:
+    op_71
+    EA_GetNamedMember 'SRDevTools'
+    StoreRegister 1
+    Pop
+
+; Open(page, ctx, owner, retFn, retArg)
+    Push [reg1]
+    EA_PushConstByte 'Open'
+    .func2 ''(r3 'page', r4 'ctx', r5 'owner', r6 'retFn', r7 'retArg') flags=0x80129
+        Push [reg1]
+        EA_PushConstByte 'owner'
+        Push [reg5]
+        SetMember
+        Push [reg1]
+        EA_PushConstByte 'retFn'
+        Push [reg6]
+        SetMember
+        Push [reg1]
+        EA_PushConstByte 'retArg'
+        Push [reg7]
+        SetMember
+        EA_PushConstByte 'open '
+        Push [reg3]
+        Add2
+        EA_PushConstByte ' '
+        Add2
+        Push [reg4]
+        Add2
+        EA_PushOne
+        Push [reg1]
+        EA_CallNamedMethodPop 'Cmd'
+    .end
+    SetMember
+
+; Cmd(s) -> the host's action (1 show, 2 in place, 0 close; undefined = no answer)
+    Push [reg1]
+    EA_PushConstByte 'Cmd'
+    .func2 ''(r3 's') flags=0x50129
+        Push [reg2]
+        EA_GetNamedMember 'FlowMgr'
+        StoreRegister 4
+        Pop
+        Push [reg4]
+        EA_PushConstByte 'SR_DTBegin'
+        Push [reg1]
+        EA_GetNamedMember 'OnBegin'
+        SetMember
+        Push [reg4]
+        EA_PushConstByte 'SR_DTItem'
+        Push [reg1]
+        EA_GetNamedMember 'OnItem'
+        SetMember
+        Push [reg4]
+        EA_PushConstByte 'SR_DTEnd'
+        Push [reg1]
+        EA_GetNamedMember 'OnEnd'
+        SetMember
+        Push [reg1]
+        EA_PushConstByte 'action'
+        op_76
+        SetMember
+        EA_PushConstByte 'FSCommand:SR_Menu'
+        Push [reg3]
+        GetURL2
+        Push [reg4]
+        EA_PushConstByte 'SR_DTBegin'
+        Delete
+        Pop
+        Push [reg4]
+        EA_PushConstByte 'SR_DTItem'
+        Delete
+        Pop
+        Push [reg4]
+        EA_PushConstByte 'SR_DTEnd'
+        Delete
+        Pop
+        Push [reg1]
+        EA_GetNamedMember 'action'
+        EA_PushOne
+        Equals2
+        Not
+        If cm_n1
+        EA_PushConstByte 'Show'
+        EA_PushOne
+        Push [reg1]
+        EA_CallNamedMethodPop 'Defer'
+cm_n1:
+        Push [reg1]
+        EA_GetNamedMember 'action'
+        EA_PushZero
+        Equals2
+        Not
+        If cm_n0
+        EA_PushConstByte 'Close'
+        EA_PushOne
+        Push [reg1]
+        EA_CallNamedMethodPop 'Defer'
+cm_n0:
+        Push [reg1]
+        EA_GetNamedMember 'action'
+        Return
+    .end
+    SetMember
+
+; OnBegin(page, title, body) - invoked as FlowMgr.SR_DTBegin (this = FlowMgr)
+    Push [reg1]
+    EA_PushConstByte 'OnBegin'
+    .func2 ''(r3 'page', r4 'title', r5 'body') flags=0x70129
+        Push [reg2]
+        EA_GetNamedMember 'SRDevTools'
+        StoreRegister 6
+        Pop
+        Push [reg6]
+        EA_PushConstByte 'page'
+        Push [reg3]
+        SetMember
+        Push [reg6]
+        EA_PushConstByte 'title'
+        Push [reg4]
+        SetMember
+        Push [reg6]
+        EA_PushConstByte 'body'
+        Push [reg5]
+        SetMember
+        Push [reg6]
+        EA_PushConstByte 'labels'
+        EA_PushZero
+        InitArray
+        SetMember
+        Push [reg6]
+        EA_PushConstByte 'kinds'
+        EA_PushZero
+        InitArray
+        SetMember
+    .end
+    SetMember
+
+; OnItem(row, label, kind) - FlowMgr.SR_DTItem
+    Push [reg1]
+    EA_PushConstByte 'OnItem'
+    .func2 ''(r3 'row', r4 'label', r5 'kind') flags=0x70129
+        Push [reg2]
+        EA_GetNamedMember 'SRDevTools'
+        StoreRegister 6
+        Pop
+        Push [reg6]
+        EA_GetNamedMember 'labels'
+        Push [reg3]
+        Push [reg4]
+        SetMember
+        Push [reg6]
+        EA_GetNamedMember 'kinds'
+        Push [reg3]
+        Push [reg5]
+        SetMember
+    .end
+    SetMember
+
+; OnEnd(rows, focus, action) - FlowMgr.SR_DTEnd
+    Push [reg1]
+    EA_PushConstByte 'OnEnd'
+    .func2 ''(r3 'rows', r4 'focus', r5 'act') flags=0x70129
+        Push [reg2]
+        EA_GetNamedMember 'SRDevTools'
+        StoreRegister 6
+        Pop
+        Push [reg6]
+        EA_PushConstByte 'n'
+        Push [reg3]
+        SetMember
+        Push [reg6]
+        EA_PushConstByte 'focus'
+        Push [reg4]
+        SetMember
+        Push [reg6]
+        EA_PushConstByte 'action'
+        Push [reg5]
+        SetMember
+    .end
+    SetMember
+
+; Show(): the page in the game's popup chrome; B = back (canCancel true)
+    Push [reg1]
+    EA_PushConstByte 'Show'
+    .func2 ''() flags=0x30129
+        EA_PushConstByte 'FSCommand:SR_Log'
+        EA_PushConstByte 'menu show '
+        Push [reg1]
+        EA_GetNamedMember 'page'
+        Add2
+        GetURL2
+        EA_PushShort 29153
+        op_73
+        op_73
+        Push [reg1]
+        Push [reg1]
+        EA_GetNamedMember 'OnReady'
+        Push [reg1]
+        EA_GetNamedMember 'OnButton'
+        Push [reg1]
+        EA_GetNamedMember 'labels'
+        Push [reg1]
+        EA_GetNamedMember 'focus'
+        Push [reg1]
+        EA_GetNamedMember 'n'
+        Push [reg1]
+        EA_GetNamedMember 'body'
+        Push [reg1]
+        EA_GetNamedMember 'title'
+        EA_PushByte 11
+        Push [reg2]
+        EA_GetNamedMember 'FlowMgr'
+        EA_CallNamedMethodPop 'ShowGenPop'
+    .end
+    SetMember
+
+; OnReady(): the popup's readyCallBack (context = SRDevTools)
+    Push [reg1]
+    EA_PushConstByte 'OnReady'
+    .func2 ''() flags=0x30129
+        Push [reg1]
+        EA_PushConstByte 'shownAt'
+        GetTime
+        SetMember
+        EA_PushZero
+        Push [reg1]
+        EA_GetNamedMember 'owner'
+        EA_CallNamedMethodPop 'OnReady'
+    .end
+    SetMember
+
+; OnButton(popup, button): A = press, B (-1) = back; the popup closes after this returns
+    Push [reg1]
+    EA_PushConstByte 'OnButton'
+    .func2 ''(r3 'popup', r4 'button') flags=0x50129
+        EA_PushConstByte 'FSCommand:SR_Log'
+        EA_PushConstByte 'menu '
+        Push [reg1]
+        EA_GetNamedMember 'page'
+        Add2
+        EA_PushConstByte ' button='
+        Add2
+        Push [reg4]
+        Add2
+        GetURL2
+        Push [reg4]
+        EA_PushZero
+        Less2
+        Not
+        If ob_press
+        EA_PushConstByte 'back '
+        Push [reg1]
+        EA_GetNamedMember 'page'
+        Add2
+        EA_PushOne
+        Push [reg1]
+        EA_CallNamedMethodPop 'Cmd'
+        op_76
+        Return
+ob_press:
+        EA_PushConstByte 'press '
+        Push [reg1]
+        EA_GetNamedMember 'page'
+        Add2
+        EA_PushConstByte ' '
+        Add2
+        Push [reg4]
+        Add2
+        EA_PushOne
+        Push [reg1]
+        EA_CallNamedMethodPop 'Cmd'
+    .end
+    SetMember
+
+; Close(): back to the caller: owner[retFn](retArg)
+    Push [reg1]
+    EA_PushConstByte 'Close'
+    .func2 ''() flags=0x30129
+        GetURL 'FSCommand:SR_Log', 'menu close'
+        Push [reg1]
+        EA_GetNamedMember 'retArg'
+        EA_PushOne
+        Push [reg1]
+        EA_GetNamedMember 'owner'
+        Push [reg1]
+        EA_GetNamedMember 'retFn'
+        CallMethod
+        Pop
+    .end
+    SetMember
+
+; PopupKey(popup, keyCode) -> key or -1. reg5 INPUTCODE, reg6 dir, reg7 row, reg8 scratch
+    Push [reg1]
+    EA_PushConstByte 'PopupKey'
+    .func2 ''(r3 'popup', r4 'keyCode') flags=0x90129
+        Push [reg2]
+        EA_GetNamedMember 'INPUTCODE'
+        StoreRegister 5
+        Pop
+        Push [reg4]
+        Push [reg5]
+        EA_GetNamedMember 'START'
+        Equals2
+        Not
+        If pk_nstart
+        GetTime
+        Push [reg1]
+        EA_GetNamedMember 'shownAt'
+        Subtract
+        EA_PushShort 400
+        Greater
+        If pk_start_ok
+        EA_PushZero
+        EA_PushOne
+        Subtract
+        Return
+pk_start_ok:
+        Push [reg5]
+        EA_GetNamedMember 'CROSS'
+        Return
+pk_nstart:
+        Push [reg4]
+        Push [reg5]
+        EA_GetNamedMember 'SELECT'
+        Equals2
+        Not
+        If pk_nsel
+        Push [reg5]
+        EA_GetNamedMember 'TRIANGLE'
+        Return
+pk_nsel:
+        EA_PushZero
+        StoreRegister 6
+        Pop
+        Push [reg4]
+        Push [reg5]
+        EA_GetNamedMember 'LEFT'
+        Equals2
+        If pk_left
+        Push [reg4]
+        Push [reg5]
+        EA_GetNamedMember 'LAS_LEFT'
+        Equals2
+        Not
+        If pk_nleft
+pk_left:
+        EA_PushZero
+        EA_PushOne
+        Subtract
+        StoreRegister 6
+        Pop
+pk_nleft:
+        Push [reg4]
+        Push [reg5]
+        EA_GetNamedMember 'RIGHT'
+        Equals2
+        If pk_right
+        Push [reg4]
+        Push [reg5]
+        EA_GetNamedMember 'LAS_RIGHT'
+        Equals2
+        Not
+        If pk_nright
+pk_right:
+        EA_PushOne
+        StoreRegister 6
+        Pop
+pk_nright:
+        Push [reg6]
+        EA_PushZero
+        Equals2
+        Not
+        If pk_dir
+        Push [reg4]
+        Return
+pk_dir:
+        EA_PushZero
+        Push [reg3]
+        EA_GetNamedMember 'mFM'
+        EA_PushConstByte 'getSelectedIndex'
+        CallMethod
+        StoreRegister 7
+        Pop
+        Push [reg1]
+        EA_GetNamedMember 'kinds'
+        Push [reg7]
+        GetMember
+        StoreRegister 8
+        Pop
+        Push [reg8]
+        EA_PushOne
+        Equals2
+        If pk_adj
+        Push [reg8]
+        EA_PushByte 2
+        Equals2
+        If pk_adj
+        Push [reg4]
+        Return
+pk_adj:
+        EA_PushConstByte 'adjust '
+        Push [reg1]
+        EA_GetNamedMember 'page'
+        Add2
+        EA_PushConstByte ' '
+        Add2
+        Push [reg7]
+        Add2
+        EA_PushConstByte ' '
+        Add2
+        Push [reg6]
+        Add2
+        EA_PushOne
+        Push [reg1]
+        EA_PushConstByte 'Cmd'
+        CallMethod
+        StoreRegister 8
+        Pop
+        Push [reg8]
+        EA_PushByte 2
+        Equals2
+        Not
+        If pk_close
+        Push [reg1]
+        EA_GetNamedMember 'labels'
+        Push [reg7]
+        GetMember
+        EA_PushOne
+        Push [reg3]
+        EA_PushConstByte 'PopupBtn'
+        Push [reg7]
+        Add2
+        GetMember
+        EA_CallNamedMethodPop 'SetText'
+        EA_PushZero
+        EA_PushOne
+        Subtract
+        Return
+pk_close:
+        Push [reg3]
+        EA_PushOne
+        Push [reg2]
+        EA_GetNamedMember 'gPopupMgr'
+        EA_CallNamedMethodPop 'ClosePopup'
+        EA_PushZero
+        EA_PushOne
+        Subtract
+        Return
+    .end
+    SetMember
+
+; Defer(fn) / RunDeferred(): one deferred step (a popup shown inside a ScrGenPop callback is lost)
+    Push [reg1]
+    EA_PushConstByte 'Defer'
+    .func2 ''(r3 'fn') flags=0x40129
+        Push [reg1]
+        EA_GetNamedMember 'deferId'
+        op_76
+        Equals2
+        If dd_clear
+        Push [reg1]
+        EA_GetNamedMember 'deferId'
+        EA_PushOne
+        EA_PushConstByte 'clearInterval'
+        CallFunction
+        Pop
+dd_clear:
+        Push [reg1]
+        EA_PushConstByte 'deferFn'
+        Push [reg3]
+        SetMember
+        Push [reg1]
+        EA_PushConstByte 'deferId'
+        EA_PushByte 20
+        EA_PushConstByte 'RunDeferred'
+        Push [reg1]
+        EA_PushByte 3
+        EA_PushConstByte 'setInterval'
+        CallFunction
+        SetMember
+    .end
+    SetMember
+
+    Push [reg1]
+    EA_PushConstByte 'RunDeferred'
+    .func2 ''() flags=0x30129
+        Push [reg1]
+        EA_GetNamedMember 'deferId'
+        EA_PushOne
+        EA_PushConstByte 'clearInterval'
+        CallFunction
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'deferId'
+        op_76
+        SetMember
+        Push [reg1]
+        EA_GetNamedMember 'owner'
+        op_76
+        Equals2
+        If dr_end
+        EA_PushZero
+        Push [reg1]
+        Push [reg1]
+        EA_GetNamedMember 'deferFn'
+        CallMethod
+        Pop
+dr_end:
+    .end
+    SetMember
+
+; Teardown(): the movie's ExitScreen; cancels a deferred step, forgets the owner and deletes
+; every other method (ExitScreen deletes Teardown itself after it returned)
+    Push [reg1]
+    EA_PushConstByte 'Teardown'
+    .func2 ''() flags=0x30129
+        Push [reg1]
+        EA_GetNamedMember 'deferId'
+        op_76
+        Equals2
+        If dt_nodefer
+        Push [reg1]
+        EA_GetNamedMember 'deferId'
+        EA_PushOne
+        EA_PushConstByte 'clearInterval'
+        CallFunction
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'deferId'
+        op_76
+        SetMember
+dt_nodefer:
+        Push [reg1]
+        EA_PushConstByte 'owner'
+        op_76
+        SetMember
+        Push [reg1]
+        EA_PushConstByte 'Open'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'Cmd'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'OnBegin'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'OnItem'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'OnEnd'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'Show'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'OnReady'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'OnButton'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'Close'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'PopupKey'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'Defer'
+        Delete
+        Pop
+        Push [reg1]
+        EA_PushConstByte 'RunDeferred'
+        Delete
+        Pop
+    .end
+    SetMember

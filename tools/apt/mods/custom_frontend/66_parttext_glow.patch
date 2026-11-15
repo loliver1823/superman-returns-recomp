@@ -1,0 +1,82 @@
+# Lane E (RELEASE_PLAN step 5, E5b; owner Q1 (a); coordinator F2: Apt-side): the hovered hint's label glows, and the
+# GUEST owns the glow (Astra E5b r7: no host-side record of a colour or of an object can survive the guest freeing a
+# label and reusing its address). PartText.SetFontColor(fontColor) (dump: 0x0A12-0x0A56: this.mFontColor = fontColor;
+# this.SetTextFormat()) gains two values only kernel/mouse_ui.cpp passes, both above every 24-bit colour:
+#   16777218 (0x1000002, kGlowOn):      keep the own colour on the label itself (this.srOwn, once) and show the
+#                                       cursor's gold 0xFFC83C (16762940);
+#   16777217 (0x1000001, kGlowRestore): put back exactly what THIS object recorded and forget it; with no record, do
+#                                       nothing at all;
+#   anything else (the game's own call):  the record is void (the game's colour stands), then the game's body runs.
+# So a restore only ever undoes the cursor's own glow on that very object: a label the game recoloured, or another
+# PartText at the same address, has no record. Part of the custom_frontend port feature (players; off on natural rolls);
+# the cursor only hovers hints whose ButtonIcon carries srIcon (65_buttonicon_id.patch, the same feature).
+# Patched in MAIN, not in PARTTEXT (E5b r13; E3-E6 r3's finding): MAIN (_level0, loaded first) exports __Packages.PartText
+# and registers its copy first, so the PARTTEXT movie's copy never runs (patch_movie.py, THE FIRST-REGISTRAR RULE).
+# MAIN's SetFontColor is the same code (reg1 this, reg2 fontColor, flags 0x30029, 38 bytes).
+movie MAIN
+# SetFontColor(fontColor) (reg1 this, reg2 fontColor):
+#   if (fontColor == 16777218) {
+#     if (this.srOwn == undefined) this.srOwn = this.mFontColor;
+#     fontColor = 16762940;
+#   } else if (fontColor == 16777217) {
+#     if (this.srOwn == undefined) return;
+#     fontColor = this.srOwn;
+#     delete this.srOwn;
+#   } else {
+#     delete this.srOwn;
+#   }
+# The snippet writes register 2 (fontColor) on purpose: the game's body below then stores the value it chose (patch_movie
+# warns about it, as it does for every prepend that writes an argument register).
+prepend-to function SetFontColor in PartText
+    Push [reg2]
+    EA_PushLong 16777218
+    Equals2
+    Not
+    If srglow_notOn
+    Push [reg1]
+    EA_GetNamedMember 'srOwn'
+    op_76
+    Equals2
+    Not
+    If srglow_keep
+    Push [reg1]
+    EA_PushConstByte 'srOwn'
+    Push [reg1]
+    EA_GetNamedMember 'mFontColor'
+    SetMember
+srglow_keep:
+    EA_PushLong 16762940
+    StoreRegister 2
+    Pop
+    Jump srglow_done
+srglow_notOn:
+    Push [reg2]
+    EA_PushLong 16777217
+    Equals2
+    Not
+    If srglow_game
+    Push [reg1]
+    EA_GetNamedMember 'srOwn'
+    op_76
+    Equals2
+    Not
+    If srglow_restore
+    op_76
+    Return
+srglow_restore:
+    Push [reg1]
+    EA_GetNamedMember 'srOwn'
+    StoreRegister 2
+    Pop
+    Push [reg1]
+    EA_PushConstByte 'srOwn'
+    Delete
+    Pop
+    Jump srglow_done
+srglow_game:
+    Push [reg1]
+    EA_PushConstByte 'srOwn'
+    Delete
+    Pop
+srglow_done:
+end

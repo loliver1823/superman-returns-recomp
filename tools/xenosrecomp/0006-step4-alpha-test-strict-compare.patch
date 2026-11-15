@@ -1,0 +1,44 @@
+diff --git a/XenosRecomp/shader_recompiler.cpp b/XenosRecomp/shader_recompiler.cpp
+index 4aaf53c..28ad5ae 100644
+--- a/XenosRecomp/shader_recompiler.cpp
++++ b/XenosRecomp/shader_recompiler.cpp
+@@ -2261,14 +2261,35 @@ float4 XeVfLoad(uint slot, uint addr, int offsetDwords, uint fmt, bool isSigned,
+                         out += "{\n";
+                         indent();
+                         out += "\tuint xeAlphaMask = g_AlphaTest & 7u;\n";
++                        // superman (step 4, 0006): the compare in INTEGER arithmetic on the float bits. DXC marks every
++                        // float compare `fast` (it may assume no NaN), so `!=` alone did not guarantee Xenia's unordered
++                        // NOT_EQUAL. Here NaN (either side) is unordered - NOT_EQUAL passes, LESS / EQUAL / GREATER fail;
++                        // denormals are flushed to zero first, as DXBC float compares flush their inputs (Xenia's epilogue
++                        // is DXBC); the rest compare as sign-magnitude keys, so -0 == +0 and +-inf order as IEEE.
+                         indent();
+-                        out += "\tbool xeAlphaPass = xeAlphaMask == 5u ? (oC0.w != g_AlphaThreshold) :\n";
++                        out += "\tuint xeAlphaA = asuint(oC0.w), xeAlphaR = asuint(g_AlphaThreshold);\n";
+                         indent();
+-                        out += "\t\t(((xeAlphaMask & 1u) != 0u && oC0.w < g_AlphaThreshold) ||\n";
++                        out += "\tuint xeAlphaAm = xeAlphaA & 0x7FFFFFFFu, xeAlphaRm = xeAlphaR & 0x7FFFFFFFu;\n";
+                         indent();
+-                        out += "\t\t ((xeAlphaMask & 2u) != 0u && oC0.w == g_AlphaThreshold) ||\n";
++                        out += "\tbool xeAlphaUnord = xeAlphaAm > 0x7F800000u || xeAlphaRm > 0x7F800000u;\n";
+                         indent();
+-                        out += "\t\t ((xeAlphaMask & 4u) != 0u && oC0.w > g_AlphaThreshold));\n";
++                        out += "\tint xeAlphaKa = int(xeAlphaAm < 0x00800000u ? 0u : xeAlphaAm);\n";
++                        indent();
++                        out += "\tint xeAlphaKr = int(xeAlphaRm < 0x00800000u ? 0u : xeAlphaRm);\n";
++                        indent();
++                        out += "\txeAlphaKa = (xeAlphaA & 0x80000000u) != 0u ? -xeAlphaKa : xeAlphaKa;\n";
++                        indent();
++                        out += "\txeAlphaKr = (xeAlphaR & 0x80000000u) != 0u ? -xeAlphaKr : xeAlphaKr;\n";
++                        indent();
++                        out += "\tbool xeAlphaEq = !xeAlphaUnord && xeAlphaKa == xeAlphaKr;\n";
++                        indent();
++                        out += "\tbool xeAlphaPass = xeAlphaMask == 5u ? !xeAlphaEq :\n";
++                        indent();
++                        out += "\t\t(((xeAlphaMask & 1u) != 0u && !xeAlphaUnord && xeAlphaKa < xeAlphaKr) ||\n";
++                        indent();
++                        out += "\t\t ((xeAlphaMask & 2u) != 0u && xeAlphaEq) ||\n";
++                        indent();
++                        out += "\t\t ((xeAlphaMask & 4u) != 0u && !xeAlphaUnord && xeAlphaKa > xeAlphaKr));\n";
+                         indent();
+                         out += "\tif (!xeAlphaPass) discard;\n";
+                         indent();

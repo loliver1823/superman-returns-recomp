@@ -1,0 +1,47 @@
+diff --git a/src/xenia/emulator.cc b/src/xenia/emulator.cc
+index 22cd252..1e9b000 100644
+--- a/src/xenia/emulator.cc
++++ b/src/xenia/emulator.cc
+@@ -297,7 +297,11 @@ X_STATUS Emulator::Setup(
+   }
+ 
+   // Add inputSystem to UI
+-  imgui_drawer_->LoadInputSystem(input_system_.get());
++  // Null-guarded for headless tools (trace-dump/trace-viewer pass no window,
++  // so no imgui drawer exists). Guard added for superman-recomp oracle use.
++  if (imgui_drawer_) {
++    imgui_drawer_->LoadInputSystem(input_system_.get());
++  }
+ 
+   XELOGI("{}: Initializing VFS...", __func__);
+   // Bring up the virtual filesystem used by the kernel.
+@@ -323,7 +327,10 @@ X_STATUS Emulator::Setup(
+   result = graphics_system_->Setup(
+       processor_.get(), kernel_state_.get(),
+       display_window_ ? &display_window_->app_context() : nullptr,
+-      display_window_ != nullptr);
++      // superman-recomp fix: always request presentation; with no window the
++      // presenter is created offscreen (see GraphicsSystem::Setup), which the
++      // headless trace-dump/trace-viewer tools need for CaptureGuestOutput.
++      true);
+   if (result) {
+     XELOGE("{}: Failed to setup graphics_system!", __func__);
+     return result;
+diff --git a/src/xenia/gpu/pm4_command_processor_declare.h b/src/xenia/gpu/pm4_command_processor_declare.h
+index 93a9aaf..3b792c8 100644
+--- a/src/xenia/gpu/pm4_command_processor_declare.h
++++ b/src/xenia/gpu/pm4_command_processor_declare.h
+@@ -9,7 +9,12 @@ virtual uint32_t ExecutePrimaryBuffer(uint32_t start_index, uint32_t end_index)
+ virtual bool ExecutePacket() PM4_OVERRIDE;
+ 
+ public:
+-void ExecutePacket(uint32_t ptr, uint32_t count);
++// superman-recomp fix: virtual so TracePlayer (which holds a base
++// CommandProcessor*) dispatches into the derived backend's PM4 walker.
++// Non-virtual, the base walker runs and its qualified
++// COMMAND_PROCESSOR::IssueDraw statically binds to the base stub that
++// returns false -> every trace-playback draw "Failed in backend".
++virtual void ExecutePacket(uint32_t ptr, uint32_t count) PM4_OVERRIDE;
+ 
+ protected:
+ XE_NOINLINE

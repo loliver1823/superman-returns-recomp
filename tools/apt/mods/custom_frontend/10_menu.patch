@@ -1,0 +1,30 @@
+# custom_frontend step 4 (docs/CUSTOM_FRONTEND.md sections 3, 4, 5.1): the main menu.
+#
+# ScrPressStart claims the game's own C++ "LOAD A GAME?" (LoadCreate) popup through a
+# FlowMgr.CppShowPopup member hook and shows NEW GAME / LOAD GAME / SETTINGS / EXIT in the
+# game's own popup chrome (FlowMgr.ShowGenPop -> ScrGenPop / DisplayWell / BasicButton).
+# NEW GAME and LOAD GAME answer that popup with the game's own button indices (0 and 1)
+# through GlobalAdapter.CppPopupComplete, exactly as the natural FlowMgr.CppCallback does.
+# EXIT asks first, then fscommand("SR_Quit") (kernel/mod_bridge.cpp).
+#
+# Lifetime rule: every function the game can reach (the CppShowPopup hook, the ScrGenPop
+# HandleInput wrapper) is installed in ScrPressStart.InitGui and removed again in
+# ScrPressStart.ExitScreen, so nothing outside the loaded ScrPressStart ever calls code
+# owned by it. The game's own ExitScreen does the same for its class: it calls
+# Object.registerClass("ScrPressStart", undefined) (ScrPressStart.as 0x04567) and then
+# `delete _global.ScrPressStart` (0x04569-0x04577, reg2 = _global), so the class
+# InitAction's guard `if (!!_global.ScrPressStart)` re-runs the class body on every load.
+# The mod appends after that guarded block, so it runs on every load either way. The
+# functions are re-bound on every load, and ExitScreen deletes them again after Uninstall
+# (exitscreen_head.aptasm; build_custom_frontend checks the list), so only plain state
+# (fetched, inSettings, pendingId, lastAnswer, ...) survives in _global.SRFrontEnd.
+movie SCRPRESSSTART
+append-to action initaction:ScrPressStart file=srfrontend.aptasm
+append-to function InitGui in ScrPressStart file=initgui_tail.aptasm
+prepend-to function ExitScreen in ScrPressStart file=exitscreen_head.aptasm
+# step 7: the universal options are re-applied when the game leaves the front end
+# (NEW GAME after applyOptions, LOAD after the save's options were restored).
+prepend-to function LoadComplete in ScrPressStart file=loadcomplete_head.aptasm
+# iter-464: the Dev Tools renderer, in the small BistroBaseScreen InitAction (sprite 60; the
+# class block's one-byte ConstantPool is kept for the menu's own names)
+append-to action initaction:BistroBaseScreen file=devtools_ui.aptasm

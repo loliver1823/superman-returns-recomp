@@ -1,0 +1,153 @@
+# p2.zpd (docs/NATIVE_ROADMAP.md P2.12): a SAVE-STARTED Metropolis session that keeps threat markers on screen from far
+# away, so the HUD's glow occlusion query (HudGlowOcclusionQuery_sub_82304058: on-screen markers farther than their
+# type's distance - 200 units for metro events, robots, bosses, meteors, fires, blimps, objective starts) fires. For
+# perf_run --from-save on archive/saves/12_ch12_after_bizarro1 (tools/perf/native_proof.py plan `zpd`, ZPD_SEED).
+# zpd6 (2026-10-15): the seed moved from 04_ch04_dark_metal, and the 16 blind density-soak flight cycles became 5
+# blocks of chapter_seeds.py verify's own play (look around, take off, fly with turns, hover, punch, fly, land). The
+# seed library's load checks, that play once (~45 s) on exe 2087ca4acdb4: seed 12 zpd +30 (a far marker ahead of the
+# spawn - the seed's screenshot - and more around it), seed 04 zpd +0 in both checks; zpd5's strict `on` / `cppm4`
+# rolls on seed 04 issued no query at all.
+# The prelude is flicker_gate.py's SAVE_PRELUDE (perf_run's drive loads the save and enters METROPOLIS; nothing is
+# pressed before the HUD request), then any gameplay context + a 7 s settle. Every mouse command blocks for its
+# duration (harness_play.py): a block is ~46 s, five ~3.8 minutes (perf_run --dwell 260).
+# (no '#' inside a command: harness_play.py strips everything after one as a comment)
+await \[SR_FSCMD\].*answer cppId=\S+ button=1 1500
+await \[APT_(REQ|SCREEN)\].*path='screens/hud/main_hud' 900
+await \[PC_CONTROLS\] context gameplay 240
+wait 7000
+keymap player
+sample start
+# the flicker gate's span window opens here (SR_PRESENT_DUMP_FROM_MARK=1; flicker_gate --tape: the zpd gate plays this
+# tape, both its rolls must issue queries); the other rolls do not read the mark
+mark dump
+# block 1: look around at the spawn (the marker ahead), take off, fly with turns, hover, punch, fly, land
+wait 4000
+mouse 1200 0 3000
+wait 1000
+mouse 1200 0 3000
+mouse 0 -300 1000
+wait 2000
+tap Space 200
+wait 3000
+down W
+mouse 1500 0 6000
+wait 4000
+up W
+down Left Ctrl
+wait 1000
+up Left Ctrl
+click left 150
+wait 800
+click left 150
+down W
+mouse -1500 0 6000
+wait 4000
+up W
+tap Space 1500
+wait 5000
+sample block-1
+# block 2: the same play, the turns the other way
+wait 2000
+mouse -1200 0 3000
+wait 1000
+mouse -1200 0 3000
+mouse 0 300 1000
+wait 2000
+tap Space 200
+wait 3000
+down W
+mouse -1500 0 6000
+wait 4000
+up W
+down Left Ctrl
+wait 1000
+up Left Ctrl
+click left 150
+wait 800
+click left 150
+down W
+mouse 1500 0 6000
+wait 4000
+up W
+tap Space 1500
+wait 5000
+sample block-2
+# block 3
+wait 2000
+mouse 1200 0 3000
+wait 1000
+mouse 1200 0 3000
+mouse 0 -300 1000
+wait 2000
+tap Space 200
+wait 3000
+down W
+mouse 1000 0 6000
+wait 4000
+up W
+down Left Ctrl
+wait 1000
+up Left Ctrl
+click left 150
+wait 800
+click left 150
+down W
+mouse -1000 0 6000
+wait 4000
+up W
+tap Space 1500
+wait 5000
+sample block-3
+# block 4
+wait 2000
+mouse -1200 0 3000
+wait 1000
+mouse -1200 0 3000
+mouse 0 300 1000
+wait 2000
+tap Space 200
+wait 3000
+down W
+mouse -1000 0 6000
+wait 4000
+up W
+down Left Ctrl
+wait 1000
+up Left Ctrl
+click left 150
+wait 800
+click left 150
+down W
+mouse 1000 0 6000
+wait 4000
+up W
+tap Space 1500
+wait 5000
+sample block-4
+# block 5
+wait 2000
+mouse 1200 0 3000
+wait 1000
+mouse 1200 0 3000
+mouse 0 -300 1000
+wait 2000
+tap Space 200
+wait 3000
+down W
+mouse 1500 0 6000
+wait 4000
+up W
+down Left Ctrl
+wait 1000
+up Left Ctrl
+click left 150
+wait 800
+click left 150
+down W
+mouse -1500 0 6000
+wait 4000
+up W
+tap Space 1500
+wait 5000
+sample block-5
+releaseall

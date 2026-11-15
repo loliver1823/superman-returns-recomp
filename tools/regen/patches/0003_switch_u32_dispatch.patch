@@ -1,0 +1,19 @@
+diff --git a/XenonRecomp/recompiler.cpp b/XenonRecomp/recompiler.cpp
+index 8bc3b34..a501c4d 100644
+--- a/XenonRecomp/recompiler.cpp
++++ b/XenonRecomp/recompiler.cpp
+@@ -700,7 +700,13 @@ bool Recompiler::Recompile(
+     case PPC_INST_BCTR:
+         if (switchTable != config.switchTables.end())
+         {
+-            println("\tswitch ({}.u64) {{", r(switchTable->second.r));
++            // Dispatch on the low 32 bits: guest switch indices are 32-bit
++            // (rlwinm-masked), and the upper half of the 64-bit register can
++            // legitimately carry garbage (e.g. lbz char 0xFF interpreted as -1,
++            // +1 => 0x100000000 with the index in bits 32..63 masked away on
++            // hardware). Dispatching on u64 makes clang's unchecked jump table
++            // read wild memory for such values.
++            println("\tswitch ({}.u32) {{", r(switchTable->second.r));
+ 
+             for (size_t i = 0; i < switchTable->second.labels.size(); i++)
+             {

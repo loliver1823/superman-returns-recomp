@@ -1,0 +1,113 @@
+{
+  "name": "mouse-natural",
+  "purpose": "iter-464 mouse cursor (docs/MOUSE_CURSOR.md 8), natural game (no mod: -Gates SR_MODS=0): the title's PRESS START by a click anywhere, the game's own LOAD A GAME? popup by hover + click, gameplay (cursor hidden), the pause menu by hover + click, AUDIO OPTIONS (slider drag), GAMEPLAY OPTIONS (toggle arrows), CONTROLLER OPTIONS (toggle), right click = back, RESUME by click, then the map (BACK key) and right click out. The very first PRESS START (before MAIN loads) stays a keyboard press. Every mouse action is confirmed by the game's own reaction ([APT_SCREEN] screen loads) or by the cursor's own [MOUSE_UI] press log. Stage coordinates (1280x720) from the AS inventory; the [MOUSE_UI] snapshot lines log the live item rects. Run with -Gates SR_MODS=0 -TimeoutSeconds 900.",
+  "gates": "SR_MOUSE_UI_LOG=1,SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=15,SR_PRESENT_DUMP_SPARSE_CAP=1500",
+  "steps": [
+    { "name": "fe-alive", "await": "\\[NAT_FE\\] #1 natural FE master tick", "timeoutMs": 180000 },
+    { "name": "settle-title", "await": "\\[NAT_FE\\] #256 natural FE master tick", "timeoutMs": 180000 },
+    {
+      "name": "press-start", "key": "ENTER", "holdMs": 250, "maxPulses": 4, "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)", "expectMs": 90000
+    },
+    { "name": "title-ui-tail", "await": "\\[APT_REQ\\] #15 path='\\.\\./common/ButtonHints/XBox360/HintB'", "timeoutMs": 240000 },
+    { "name": "title-visible", "requireVisibleMs": 8000, "visibleTimeoutMs": 200000, "dwellMs": 6000 },
+    {
+      "name": "title-click", "purpose": "Wake the cursor with a real move, then click anywhere = START (ScrPressStart.HandleInput).",
+      "mouse": "move 560,480; move 640,520; wait 1500; click 640,520",
+      "expect": "\\[APT_SCREEN\\] path='screens/misc/ScrGenPop'", "expectMs": 30000
+    },
+    { "name": "popup-visible", "purpose": "The natural LOAD A GAME? popup; the snapshot logs its rows.", "dwellMs": 5000 },
+    {
+      "name": "popup-hover", "purpose": "Hover the second row, then the first: focus follows with D-pad presses.",
+      "mouse": "move 600,420; move 640,425; wait 2500; move 640,388; wait 2500",
+      "expect": "\\[MOUSE_UI\\] press 0x000[12] \\(focus\\)", "expectMs": 15000, "expectFresh": true, "optional": true
+    },
+    {
+      "name": "popup-click-new", "purpose": "Click row 0 = START NEW GAME (CROSS on button 0).",
+      "mouse": "click 640,388",
+      "expect": "\\[APT_SCREEN\\] path='screens/hud/main_hud'", "expectMs": 150000
+    },
+    {
+      "name": "gameplay-hidden", "purpose": "In gameplay the cursor is hidden (no target screen): a move must log an inactive snapshot.",
+      "mouse": "move 300,300; move 900,500; wait 2000",
+      "expect": "\\[MOUSE_UI\\] snapshot #\\d+ valid=1 active=0", "expectMs": 20000, "optional": true, "dwellMs": 20000
+    },
+    {
+      "name": "pause", "key": "ENTER", "holdMs": 400, "maxPulses": 3, "gapMs": 6000,
+      "expect": "\\[APT_SCREEN\\] path='screens/misc/ScrPauseMenu'", "expectMs": 20000
+    },
+    { "name": "pause-visible", "dwellMs": 3000 },
+    {
+      "name": "pause-hover", "purpose": "Wake + hover down the list (STATISTICS, MOVES LIST, AUDIO).",
+      "mouse": "move 600,330; move 640,339; wait 2500; move 640,377; wait 2500; move 640,491; wait 3000",
+      "expect": "\\[MOUSE_UI\\] press 0x0002 \\(focus\\)", "expectMs": 15000, "expectFresh": true, "optional": true
+    },
+    {
+      "name": "pause-click-audio", "mouse": "click 640,491",
+      "expect": "\\[APT_SCREEN\\] path='screens/misc/ScrAudioOpt'", "expectMs": 20000, "expectFresh": true
+    },
+    { "name": "audio-visible", "dwellMs": 3000 },
+    {
+      "name": "audio-drag", "purpose": "Drag the MUSIC slider from section 9 to section 3: LEFT presses until mCurrentValue = 3.",
+      "mouse": "move 860,290; wait 1500; drag 885,290 775,290; wait 2000",
+      "expect": "\\[MOUSE_UI\\] press 0x000[48] \\(slider\\)", "expectMs": 15000, "expectFresh": true, "optional": true
+    },
+    {
+      "name": "audio-sfx-arrow", "purpose": "Click the SFX slider's right arrow: focus SFX (DOWN), then one RIGHT.",
+      "mouse": "click 920,328; wait 3000",
+      "expect": "\\[MOUSE_UI\\] press 0x0008 \\(arrow", "expectMs": 15000, "expectFresh": true, "optional": true
+    },
+    {
+      "name": "audio-back", "purpose": "Right click = B: back to the pause menu.", "mouse": "rclick",
+      "expect": "\\[APT_SCREEN\\] path='screens/misc/ScrPauseMenu'", "expectMs": 20000, "expectFresh": true
+    },
+    { "name": "pause-again", "dwellMs": 2500 },
+    {
+      "name": "pause-click-gameplay", "mouse": "move 600,410; click 640,415",
+      "expect": "\\[APT_SCREEN\\] path='screens/misc/ScrGameplayOpt'", "expectMs": 20000, "expectFresh": true
+    },
+    { "name": "gameplay-opt-visible", "dwellMs": 3000 },
+    {
+      "name": "toggle-arrows", "purpose": "Hover AUTO CENTER, click its right arrow, then the left arrow (value back).",
+      "mouse": "move 500,306; wait 2500; click 851,306; wait 2500; click 636,306; wait 2500",
+      "expect": "\\[MOUSE_UI\\] press 0x000[48] \\(arrow", "expectMs": 15000, "expectFresh": true, "optional": true
+    },
+    {
+      "name": "gameplay-opt-back", "mouse": "rclick",
+      "expect": "\\[APT_SCREEN\\] path='screens/misc/ScrPauseMenu'", "expectMs": 20000, "expectFresh": true
+    },
+    { "name": "pause-third", "dwellMs": 2500 },
+    {
+      "name": "pause-click-controller", "mouse": "move 600,450; click 640,453",
+      "expect": "\\[APT_SCREEN\\] path='screens/misc/ScrControllerOpt'", "expectMs": 20000, "expectFresh": true
+    },
+    { "name": "controller-opt-visible", "dwellMs": 3000 },
+    {
+      "name": "controller-toggle", "purpose": "Click the CONFIG value: RIGHT (the toggle wraps), then back to the original with three more.",
+      "mouse": "click 700,213; wait 2500; click 700,213; wait 2500; click 700,213; wait 2500; click 700,213; wait 2500",
+      "expect": "\\[MOUSE_UI\\] press 0x0008 \\(arrow/value", "expectMs": 15000, "expectFresh": true, "optional": true
+    },
+    {
+      "name": "controller-back", "mouse": "rclick",
+      "expect": "\\[APT_SCREEN\\] path='screens/misc/ScrPauseMenu'", "expectMs": 20000, "expectFresh": true
+    },
+    { "name": "pause-fourth", "dwellMs": 2500 },
+    {
+      "name": "resume", "purpose": "Click RESUME GAME (btn1): the pause closes, the cursor hides.",
+      "mouse": "move 600,210; click 640,205",
+      "expect": "\\[MOUSE_UI\\] snapshot #\\d+ valid=1 active=0", "expectMs": 20000, "expectFresh": true
+    },
+    { "name": "gameplay-again", "mouse": "move 400,400; move 800,300", "dwellMs": 8000 },
+    {
+      "name": "map", "purpose": "BACK opens the map (a back-only surface: the cursor shows, right click leaves).",
+      "key": "ESCAPE", "holdMs": 400, "maxPulses": 2, "gapMs": 6000,
+      "expect": "\\[APT_SCREEN\\] path='screens/misc/ScrMap'", "expectMs": 20000, "optional": true
+    },
+    { "name": "map-visible", "mouse": "move 500,300; move 640,360", "dwellMs": 5000, "optional": true },
+    {
+      "name": "map-back", "mouse": "rclick; wait 4000; rclick",
+      "expect": "\\[MOUSE_UI\\] press 0x2000", "expectMs": 15000, "expectFresh": true, "optional": true
+    },
+    { "name": "observe-after", "dwellMs": 15000 }
+  ]
+}

@@ -1,0 +1,36 @@
+#!/bin/sh
+# iter-464 credits: every submodule / vendored tree / ported file / dependency / shipped asset
+# needs a data/credits.json entry in the same commit (docs/README.md "Credits and licences").
+# ~1 s. Skipped where the checker is absent (branches forked before iter-464).
+if [ -f scripts/check_credits.py ] && [ -f data/credits.json ]; then
+  python scripts/check_credits.py --quiet
+  if [ "$?" = "1" ]; then
+    echo "COMMIT BLOCKED: credits are stale (items above). Add/extend the data/credits.json entry"
+    echo "  (+ its <!-- credits:ID --> section in CREDITS.md / THIRD_PARTY_LICENSES.md) in this commit."
+    echo "  see: python scripts/check_credits.py --report ; python scripts/test_check_credits.py"
+    exit 1
+  fi
+fi
+# No-regression gate on ungated forcing. Blocks a commit that RAISES the forcing count above
+# the committed baseline. Lower it (burndown) and update the baseline. R1: the count is the
+# UNGATED write sites plus the `live` / `conditional` band-aid hooks on generated code
+# (docs/OVERRIDES.json default_exe; scripts/audit_forcing.py hooks_report).
+cur=$(python scripts/audit_forcing.py --count 2>/dev/null)
+base=$(cat scripts/forcing_baseline_count.txt 2>/dev/null || echo 9999)
+case "$cur" in ''|*[!0-9]*) exit 0;; esac   # checker unavailable -> don't block
+if [ "$cur" -gt "$base" ]; then
+  echo "COMMIT BLOCKED: forcing (ungated sites + live/conditional hooks) rose $base -> $cur."
+  echo "  see: python scripts/audit_forcing.py --flagged"
+  echo "  gate it behind forcingAllowed(), or allowlist it (with a reason) in audit_forcing.py,"
+  echo "  or if truly intended, update scripts/forcing_baseline_count.txt."
+  exit 1
+fi
+# R1 (docs/SPLICE_CONVERSION.md): there are no hand-edited guest bodies; a splice file coming
+# back (tools/regen/splice_bodies.json, splice_list.txt, interstitial_blocks.json) blocks.
+if ! python scripts/audit_forcing.py --splice-ratchet >/dev/null 2>&1; then
+  echo "COMMIT BLOCKED: a splice file is back (the build pastes no hand-edited guest bodies)."
+  echo "  see: python scripts/audit_forcing.py --splice-ratchet"
+  exit 1
+fi
+[ "$cur" -lt "$base" ] && echo "note: ungated forcing DROPPED $base -> $cur — update scripts/forcing_baseline_count.txt"
+exit 0

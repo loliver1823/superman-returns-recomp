@@ -1,0 +1,179 @@
+{
+  "name": "player-wholerun",
+  "purpose": "iter-465 player lane (docs/PLAYER_BUILD.md): the owner's path through the combined player build as ONE background roll, PORT FEATURE (natural=false): boot -> intro movies -> title (cursor) -> custom MAIN MENU (cursor hover moves the focus) -> MODS (mouse click: the mod library) -> GET MORE MODS (click) -> RESTART NOW (click) -> RESTART NOW? (click) -> the process relaunches itself (followRestart: the roll keeps driving the child) -> title -> MAIN MENU -> NEW GAME -> the tutorial for a long gameplay window (tools/player/gameplay_play.txt drives keyboard + mouse-look through the harness channel meanwhile). Content root = the sr_drive tree (empty mods/: the library shows the built-ins; SR_MOD_LIBRARY=0 restores the old Apt pages this scenario no longer drives). Run with -Gates SR_INSTANCE_ID=player,SR_PORT_FEATURES=1 plus the display/fps gates under test; -TimeoutSeconds 1500.",
+  "gates": "SR_KB_PAD_OBS=1,SR_MOUSE_UI_LOG=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_WITH_CURSOR=1",
+  "steps": [
+    {
+      "name": "fe-alive",
+      "await": "\\[NAT_FE\\] #1 natural FE master tick",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "front-end-feature",
+      "expect": "\\[PORT\\] applied custom_frontend",
+      "expectMs": 5000,
+      "optional": true
+    },
+    {
+      "name": "settle-title",
+      "await": "\\[NAT_FE\\] #256 natural FE master tick",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "press-start",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 4,
+      "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)",
+      "expectMs": 90000
+    },
+    {
+      "name": "title-ui-tail",
+      "await": "\\[APT_REQ\\] #\\d+ path='\\.\\./common/ButtonHints/XBox360/HintB'",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "title-visible",
+      "requireVisibleMs": 6000,
+      "visibleTimeoutMs": 200000,
+      "dwellMs": 4000
+    },
+    {
+      "name": "title-cursor",
+      "purpose": "The host cursor appears on a menu screen after a move (no click: a click on the title = START).",
+      "mouse": "move 560,470; wait 800; move 600,500; wait 800; move 640,520; wait 2500"
+    },
+    {
+      "name": "start-bootflow",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 10000,
+      "expect": "\\[SR_FSCMD\\].*claim LoadCreate",
+      "expectMs": 30000
+    },
+    {
+      "name": "menu-visible",
+      "purpose": "MAIN MENU: NEW GAME / LOAD GAME / OPTIONS / MODS / EXIT; the cursor rests on NEW GAME (focus follows the cursor).",
+      "mouse": "move 640,560; wait 1500; move 660,580; wait 2000; moveitem 0; wait 2000",
+      "dwellMs": 3000
+    },
+    {
+      "name": "hover-mods",
+      "purpose": "The cursor moves to MODS (row 3): the selection follows it. Since iter-466 controls2 the cursor calls the surface's own method ('[MOUSE_UI] call selectNextItem() (focus)'); the older builds pressed the D-pad ('press 0x0002 (focus)').",
+      "mouse": "moveitem 1; wait 800; moveitem 2; wait 800; moveitem 3; wait 2000",
+      "expect": "\\[MOUSE_UI\\] (press 0x000[12]|call \\S+) \\(focus\\)",
+      "expectFresh": true,
+      "expectMs": 15000
+    },
+    {
+      "name": "open-mods",
+      "purpose": "A mouse click opens MODS: the mod library (docs/MODS.md 'The mod library', iter-465 modlib) over the MAIN MENU.",
+      "mouse": "clickitem 3",
+      "expect": "\\[MODLIB\\] shown \\(FE",
+      "expectMs": 30000,
+      "dwellMs": 4000
+    },
+    {
+      "name": "mods-get-more",
+      "purpose": "Click the GET MORE MODS tab (stage 570,53). With an empty mods/ the LIBRARY page shows the two built-ins and the how-to-install hint.",
+      "mouse": "move 560,60; wait 1500; click 570,53",
+      "expect": "\\[MODLIB\\] tab GET MORE MODS",
+      "expectMs": 20000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "restart-ask",
+      "purpose": "Click RESTART NOW on GET MORE MODS (stage 300,548; it loads what is in the mods folder): the RESTART NOW? question opens.",
+      "mouse": "move 300,548; wait 1500; click 300,548",
+      "expect": "\\[MODLIB\\] restart asked",
+      "expectMs": 20000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "restart-now",
+      "purpose": "Click RESTART NOW in the question (stage 525,394): the MODS menu's relaunch path.",
+      "mouse": "move 525,394; wait 1500; click 525,394",
+      "expect": "\\[MODMENU\\] RESTART NOW -> SDL_QUIT",
+      "expectMs": 20000
+    },
+    {
+      "name": "relaunching",
+      "expect": "\\[MODMENU\\] relaunching the exe",
+      "expectMs": 15000
+    },
+    {
+      "name": "follow-child",
+      "purpose": "The parent exits 0; from here every step drives the relaunched child.",
+      "followRestart": true,
+      "timeoutMs": 60000
+    },
+    {
+      "name": "child-fe-alive",
+      "await": "\\[NAT_FE\\] #1 natural FE master tick",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "child-settle-title",
+      "await": "\\[NAT_FE\\] #256 natural FE master tick",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "child-press-start",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 4,
+      "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)",
+      "expectMs": 90000
+    },
+    {
+      "name": "child-title-ui-tail",
+      "await": "\\[APT_REQ\\] #\\d+ path='\\.\\./common/ButtonHints/XBox360/HintB'",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "child-title-visible",
+      "requireVisibleMs": 6000,
+      "visibleTimeoutMs": 200000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "child-start-bootflow",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 10000,
+      "expect": "\\[SR_FSCMD\\].*claim LoadCreate",
+      "expectMs": 30000
+    },
+    {
+      "name": "child-menu-visible",
+      "purpose": "The cursor wakes on the MAIN MENU (its item snapshot is logged after a move).",
+      "mouse": "move 640,560; wait 1500; move 660,580; wait 2000",
+      "dwellMs": 2000
+    },
+    {
+      "name": "new-game",
+      "purpose": "A mouse click on NEW GAME (row 0): the cursor walks the focus there, then clicks (= A). At ~10 fps a hover walk is slow, so a keyboard A could land on a row the walk has not left yet.",
+      "mouse": "moveitem 0; wait 2500; clickitem 0",
+      "expect": "\\[SR_FSCMD\\].*answer cppId=\\S+ button=0",
+      "expectMs": 30000
+    },
+    {
+      "name": "game-starts",
+      "expect": "\\[APT_REQ\\] #\\d+ path='screens/hud/main_hud'",
+      "expectMs": 240000
+    },
+    {
+      "name": "gameplay",
+      "purpose": "Gameplay window: tools/player/gameplay_play.txt (harness_play.py, started beside this roll) walks, looks, takes off and flies with the PLAYER keymap + mouse.",
+      "dwellMs": 240000
+    }
+  ]
+}

@@ -1,0 +1,230 @@
+# era matrix R4 (tools/perf/era_matrix.py): seed 12 fixed view, ordinary legacy Up input, the HUD-glow ZPD queries.
+# Copied from Codex final_native_acceptance_r4_fixed_view.play (sha256 db4b3c88..., from zpd_full_bake_short.play).
+# Fixed view, ordinary legacy Up power-selection input; no flight or mouse.
+# Measured inputs remain inputs, not a guarantee of query activity or idle state.
+# era matrix (lane E 2026-10-17): BEFORE the fixed view, a net-zero mouse look on the player keymap (and a take-off
+# only if the look logs no mode) so the game logs a gameplay context WITH a mode - era_census's ingame era for a
+# save roll. A seed load at the plaza spawn logs only `mode -` while Superman idles (lane E pilot r3p1: seed 17,
+# 75 s idle, no moded line), and s1c1's R4 got its moded lines from the walk tape it played, not from idling.
+# The view is fixed from `sample stationary-start` on, as before.
+await \[SR_FSCMD\].*answer cppId=\S+ button=1 1500
+await \[APT_(REQ|SCREEN)\].*path='screens/hud/main_hud' 900
+await \[PC_CONTROLS\] context gameplay 240
+wait 5000
+keymap player
+mouse 400 0 800
+mouse -400 0 800
+expect \[PC_CONTROLS\] context gameplay .*mode [a-z] 15
+ifmiss tap Space 200
+ifmiss expect \[PC_CONTROLS\] context gameplay .*mode [a-z] 20
+wait 6000
+releaseall
+keymap legacy
+# tools/era-r4 (orchestrator 2026-10-17): the query-producing event BEFORE the fixed view. The HUD-glow occlusion
+# queries (HudGlowOcclusionQuery_82304058) run only while the metro event's threat markers are on screen, and the seed
+# does not force that event: in the acceptance matrix accJ (exe pair f1379269fc82 / bd8765cb69fe) 2 of 4 R4 rolls
+# never started it (no ENEMIES REMAINING HUD, 0 queries) and failed the row's ZPD clause for a route reason. The wait is
+# the first [NATIVE_ZPD] census line with issued > 0 (the census repeats with cumulative counts, so an event that began
+# during the mode witness is seen too), bounded at 300 s. A miss is recorded (expect), not fatal: era_matrix grades the
+# roll INCOMPLETE with precondition_unmet (never PASS) and `roll` re-acquires the row (every acquisition kept).
+expect \[NATIVE_ZPD\] census mode=\S+ issued=[1-9] 300
+sample stationary-start
+mark dump
+press Up 100 active-001
+wait 2400
+press Up 100 active-002
+wait 2400
+press Up 100 active-003
+wait 2400
+press Up 100 active-004
+wait 2400
+press Up 100 active-005
+wait 2400
+press Up 100 active-006
+wait 2400
+press Up 100 active-007
+wait 2400
+press Up 100 active-008
+wait 2400
+press Up 100 active-009
+wait 2400
+press Up 100 active-010
+wait 2400
+press Up 100 active-011
+wait 2400
+press Up 100 active-012
+wait 2400
+press Up 100 active-013
+wait 2400
+press Up 100 active-014
+wait 2400
+press Up 100 active-015
+wait 2400
+press Up 100 active-016
+wait 2400
+press Up 100 active-017
+wait 2400
+press Up 100 active-018
+wait 2400
+press Up 100 active-019
+wait 2400
+press Up 100 active-020
+wait 2400
+press Up 100 active-021
+wait 2400
+press Up 100 active-022
+wait 2400
+press Up 100 active-023
+wait 2400
+press Up 100 active-024
+wait 2400
+press Up 100 active-025
+wait 2400
+press Up 100 active-026
+wait 2400
+press Up 100 active-027
+wait 2400
+press Up 100 active-028
+wait 2400
+press Up 100 active-029
+wait 2400
+press Up 100 active-030
+wait 2400
+press Up 100 active-031
+wait 2400
+press Up 100 active-032
+wait 2400
+press Up 100 active-033
+wait 2400
+press Up 100 active-034
+wait 2400
+press Up 100 active-035
+wait 2400
+press Up 100 active-036
+wait 2400
+press Up 100 active-037
+wait 2400
+press Up 100 active-038
+wait 2400
+press Up 100 active-039
+wait 2400
+press Up 100 active-040
+wait 2400
+press Up 100 active-041
+wait 2400
+press Up 100 active-042
+wait 2400
+press Up 100 active-043
+wait 2400
+press Up 100 active-044
+wait 2400
+press Up 100 active-045
+wait 2400
+press Up 100 active-046
+wait 2400
+press Up 100 active-047
+wait 2400
+press Up 100 active-048
+wait 2400
+press Up 100 active-049
+wait 2400
+press Up 100 active-050
+wait 2400
+press Up 100 active-051
+wait 2400
+press Up 100 active-052
+wait 2400
+press Up 100 active-053
+wait 2400
+press Up 100 active-054
+wait 2400
+press Up 100 active-055
+wait 2400
+press Up 100 active-056
+wait 2400
+press Up 100 active-057
+wait 2400
+press Up 100 active-058
+wait 2400
+press Up 100 active-059
+wait 2400
+press Up 100 active-060
+wait 2400
+press Up 100 active-061
+wait 2400
+press Up 100 active-062
+wait 2400
+press Up 100 active-063
+wait 2400
+press Up 100 active-064
+wait 2400
+press Up 100 active-065
+wait 2400
+press Up 100 active-066
+wait 2400
+press Up 100 active-067
+wait 2400
+press Up 100 active-068
+wait 2400
+press Up 100 active-069
+wait 2400
+press Up 100 active-070
+wait 2400
+press Up 100 active-071
+wait 2400
+press Up 100 active-072
+wait 2400
+press Up 100 active-073
+wait 2400
+press Up 100 active-074
+wait 2400
+press Up 100 active-075
+wait 2400
+press Up 100 active-076
+wait 2400
+press Up 100 active-077
+wait 2400
+press Up 100 active-078
+wait 2400
+press Up 100 active-079
+wait 2400
+press Up 100 active-080
+wait 2400
+press Up 100 active-081
+wait 2400
+press Up 100 active-082
+wait 2400
+press Up 100 active-083
+wait 2400
+press Up 100 active-084
+wait 2400
+press Up 100 active-085
+wait 2400
+press Up 100 active-086
+wait 2400
+press Up 100 active-087
+wait 2400
+press Up 100 active-088
+wait 2400
+press Up 100 active-089
+wait 2400
+press Up 100 active-090
+wait 2400
+press Up 100 active-091
+wait 2400
+press Up 100 active-092
+wait 2400
+press Up 100 active-093
+wait 2400
+press Up 100 active-094
+wait 2400
+press Up 100 active-095
+wait 2400
+press Up 100 active-096
+wait 2400
+press Up 100 active-097
+wait 2400
+press Up 100 active-098
+wait 2400
+releaseall
+sample stationary-complete

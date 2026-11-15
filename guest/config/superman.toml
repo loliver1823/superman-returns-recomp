@@ -1,0 +1,62 @@
+# Superman Returns (Xbox 360) - XenonRecomp config
+# Paths relative to this config file
+
+[main]
+file_path = "../../Superman Returns (USA)/default.xex"
+out_directory_path = "../ppc"
+switch_table_file_path = "superman_switch_tables.toml"
+
+# Disable optimizations for first pass (recommended until running)
+skip_lr = false
+skip_msr = false
+ctr_as_local = false
+xer_as_local = false
+reserved_as_local = false
+cr_as_local = false
+non_argument_as_local = false
+non_volatile_as_local = false
+
+# Register save/restore - found via XenonRecomp --find-save-restore guest/config/superman.toml
+restgprlr_14_address = 0x8279E440
+savegprlr_14_address = 0x8279E3F0
+restfpr_14_address = 0x8279F23C
+savefpr_14_address = 0x8279F1F0
+restvmx_14_address = 0x8279E9C8
+savevmx_14_address = 0x8279E730
+restvmx_64_address = 0x8279EA5C
+savevmx_64_address = 0x8279E7C4
+
+# Explicit function boundaries for mid-function entry points
+# 0x827609A4 is called as a continuation (game stores return address, later calls it as entry)
+# It's inside sub_82760928 but game jumps to it directly
+#
+# iter-28 corruption-class investigation: discovered 4 unmapped-stub-call targets
+# in pre-iter-27 logs that turned out to be real functions Ghidra auto-analysis
+# missed AND XenonRecomp didn't lift. Same recurring class as sub_827A0000 etc.
+# Added to the explicit-function list so a future XenonRecomp regeneration
+# auto-translates them. iter-28's stubs (sub_8246D5C8, sub_8246D6C8, sub_827AC440,
+# sub_827A0000) in ppc_missing_recomp_stubs.cpp can be removed once these are
+# auto-generated from these toml entries.
+functions = [
+  { address = 0x827609A4, size = 0x54 },   # continuation point -> end of sub_82760928
+  # iter-463 charter (burndown item 11): the four iter-27/28 entries
+  # 0x827A0000 / 0x8246D5C8 / 0x8246D6C8 / 0x827AC440 are DELETED - none is a
+  # function start (a CRT errno store, two return addresses and a branch
+  # target inside other functions); they were garbage-vtable targets of the
+  # heap-corruption era. See tools/regen/hand/ppc_missing_recomp_stubs.cpp.
+  # iter-28 corruption-class investigation — turned out NOT to be corruption.
+  # All 4 unmapped targets in this batch are real Ghidra-missed functions.
+  # The "unaligned" 0x82479082 was a red herring: PPC_LOOKUP_FUNC shifts off
+  # the low 2 bits, so it actually dispatches to the function at 0x82479080;
+  # that function was just also missing. Currently unstubbed (don't fire in
+  # post-iter-28 dispatch paths) but should auto-translate on next regen.
+  { address = 0x82605680, size = 0x34 },   # vtable method, caller's r31 = this
+  { address = 0x82110000, size = 0x54 },   # state-bits update on object at r30 (modifies +0x124|+0x44|+0x128|+0x11C)
+  { address = 0x82110180, size = 0x134 },  # GPU ring buffer write (uses __imp__VdGlobalDevice + 0x4DF4 vtable)
+  { address = 0x82479080, size = 0x24 },   # constant returner: returns 0xFFFFFFFF805000A8
+]
+
+# Invalid instructions - skip padding, exception handlers
+invalid_instructions = [
+  { data = 0x00000000, size = 4 },
+]

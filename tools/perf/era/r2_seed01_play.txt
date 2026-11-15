@@ -1,0 +1,46 @@
+# era matrix R2 (tools/perf/era_matrix.py): seed 01 -> CinematicLoisAsks -> the chapter-2 save -> Warworld.
+# Copied from Codex final_native_acceptance_census_r2_seed01_play.txt (sha256 478b046f..., = emu-stage1 archive/s1/census/census_r2_seed01_play.txt).
+# s1 census R2 (DRAFT, archive/s1/census): perf_run --from-save <dev>/archive/saves/01_ch01_after_mstobj03. The load
+# lands straight in the HUD (no carousel), then the game's own CinematicLoisAsks FMV (~120 s: verify roll 01 of
+# 2026-10-14 23:30:50 -> movie#7 EOM wall=119.99s at 23:32:54), then the Warworld arena (FAVORED GLADIATOR HUD).
+# Nothing is pressed until that FMV has ended and Superman is on foot in the arena (A / START would skip it), then
+# flicker_play.txt's actions in the arena. The prelude is flicker_gate.py SAVE_PRELUDE's (nothing before the LOAD
+# GAME answer can match).
+# (no '#' inside a command: harness_play.py strips everything after one - hence movie. not movie# below)
+await \[SR_FSCMD\].*answer cppId=\S+ button=1 1500
+await \[APT_(REQ|SCREEN)\].*path='screens/hud/main_hud' 900
+# era matrix (lane E 2026-10-17): the FMV's end is the EOM record OR the chapter boundary's save that follows it
+# (era_census seed01: the save after the cinematic) - the release exe compiles [MOVIE_PACE] out, so an await on the
+# EOM alone would time out there and fail the tape.
+await \[MOVIE_PACE\] movie.\d+ EOM wall=(?:[3-9]\d|\d{3,})\.\d+s|\[SR_FSCMD\] .\d+ SR_SaveEvent 'save' 600
+await \[PC_CONTROLS\] context gameplay .*mode [a-z] 240
+wait 5000
+keymap player
+sample arena
+down W
+watch 1500 walk
+wait 1500
+up W
+mouse 900 0 1500
+watch 1500 look-right
+sample walk-done
+mouse -900 0 1500
+mouse 0 -250 800
+watch 1500 look-back
+down W
+down Left Shift
+wait 2500
+up Left Shift
+up W
+sample sprint-done
+down Left Ctrl
+wait 1000
+up Left Ctrl
+click left 150
+wait 800
+click left 150
+sample actions
+mouse -600 0 3000
+wait 2000
+sample end
+releaseall

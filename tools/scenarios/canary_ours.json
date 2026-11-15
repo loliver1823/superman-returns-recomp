@@ -1,0 +1,19 @@
+{
+  "name": "canary-ours",
+  "purpose": "iter-467 canary lane: OUR side of the Xenia Canary side-by-side (tools/perf/canary_compare.py; docs/CANARY_COMPARISON.md). The natural retail front end, pressed exactly where the Xenia side presses: NOTHING until the guest requests the title (screens/bootflow/ScrPressStart; boot load time = launch -> that request, intro movies unskipped, as on Xenia), a 10 s title dwell (the title scene), START, the game's own LOAD A GAME? popup, A = START NEW GAME (Xenia: DOWN A = continue without a profile), then the route tape (SR_INPUT_REPLAY, anchored on the guest's main_hud request like tools/xenia_pad_tape.py on Xenia) for its length. No present dumps: a dump is a synchronous readback on the render thread and would land in the frame-time census. Run it through canary_compare.py, which sets the gates (SR_INPUT_REPLAY, SR_PERF_STATS, SR_HIGHFPS, SR_RES_SCALE, SR_WINDOW_SIZE, SR_AUDIO_SINK=null, SR_LOG=player, SR_MODS=0).",
+  "gates": "SR_KB_PAD_OBS=1",
+  "steps": [
+    { "name": "title", "await": "\\[APT_SCREEN\\] path='screens/bootflow/ScrPressStart'", "timeoutMs": 300000 },
+    { "name": "title-dwell", "purpose": "The title scene: PRESS START over the 3D city, measured on both sides.", "dwellMs": 10000 },
+    {
+      "name": "start-bootflow", "key": "ENTER", "holdMs": 250, "maxPulses": 3, "gapMs": 6000,
+      "expect": "\\[APT_SCREEN\\] path='screens/misc/ScrGenPop'", "expectMs": 30000
+    },
+    { "name": "popup-visible", "purpose": "The natural LOAD A GAME? popup.", "dwellMs": 6000 },
+    {
+      "name": "start-new-game", "key": "A", "holdMs": 250, "maxPulses": 2, "gapMs": 8000,
+      "expect": "\\[APT_SCREEN\\] path='screens/hud/main_hud'", "expectMs": 120000
+    },
+    { "name": "route", "purpose": "The route tape plays from the main_hud anchor (opening FMV, gameplay on foot, flight, the pause menu); canary_compare.py stops the roll after it.", "dwellMs": 175000 }
+  ]
+}

@@ -1,0 +1,61 @@
+# XENIA_GUEST_TRACE_VAS list for the iter-463 burndown oracle (tools/xenia-trace/README.md).
+# A tag-0 record at a VA means Xenia JIT-compiled a function STARTING there, i.e. the
+# guest really called/branched to it as a function. Mid-function VAs are only ever
+# entered that way (the JIT creates a function at a call target on demand).
+#
+# --- item 11: tools/regen/hand/ppc_missing_recomp_stubs.cpp stub VAs ---------------
+0x828D0EC8  # stub, inside sub_828D0E60; no mapping, no direct caller (link filler)
+0x828D0F54  # stub, inside sub_828D0E60; no mapping, no direct caller (link filler)
+0x82765994  # stub, inside luaV_execute_sub_827657C8
+0x827A0000  # stub (writes *r11=r10), inside sub_8279FF48 (CRT errno path)
+0x8246D5C8  # stub, RETURN ADDRESS after bl 8246D5FC inside RtlFreeHeap_sub_8246D368
+0x8246D6C8  # stub, branch target inside sub_8246D650 (li r3,0; b 8246DE64)
+0x827AC440  # stub, RETURN ADDRESS after bl 827AC468 inside sub_827AC358
+0x827A177C  # stub, RETURN ADDRESS inside CrtDoexit_sub_827A1698
+0x82762680  # stub, RETURN ADDRESS inside luaD_growstack_sub_82762640
+0x8276070C  # stub, RETURN ADDRESS inside lstring_newlstr_sub_827606E0
+0x82766C30  # stub, RETURN ADDRESS inside sub_82766BE0
+0x82766CA0  # stub, RETURN ADDRESS inside luaO_pushvfstring_sub_82766C78
+0x827A60FC  # stub, RETURN ADDRESS (after bl RtlFreeHeap) inside Crt_Free_sub_827A60D0
+0x827C1D80  # stub (fake byte getter), inside sub_827C1D60
+0x824B9560  # stub (r3=0), VMX code inside AudioScaleSamplesToNormalizedFloat_sub_824B9330
+0x823A5198  # stub (r3=0), inside TexDitherPack2101010_sub_823A4D88
+0x822F6F28  # stub (skips LZCOUNT check), inside sub_822F6F20
+0x8215BDF8  # stub (r3=0), inside sub_8215BDC0
+0x8215BE38  # stub (r3=0), inside sub_8215BE18
+0x8215BE40  # stub (r3=0), inside sub_8215BE18
+0x8215BEA8  # stub (r3=0)
+#
+# --- item 10: PPC_CALL_INDIRECT_FUNC fixed-VA special cases ------------------------
+0x827B0400  # real function: CRT C-initializer (__xi table 0x82910E7C) - no-op'd by the macro
+0x827A7B28  # real function: CRT terminator (__xt table 0x82910E8C) - no-op'd by the macro
+0x8276A520  # RETURN ADDRESS inside luaG_typeerror_sub_8276A4B0
+0x827648B4  # RETURN ADDRESS inside luaV_tostring_sub_82764830
+0x822979C4  # PPC_FAKE_HASH_ENTRY_VA, RETURN ADDRESS inside sub_82297938
+0x82100400  # kAllocatorSlot0StubVA (item 1) - .text, never a function start
+0x827609A4  # CONTROL: existing toml continuation entry (is it a real Xenia entry?)
+#
+# --- item 10: lr 0x82722E34 and the other out-of-range call sites' functions -------
+0x82722DB8  # InputContext_UpdateCommands (lr 0x82722E24/E34)
+0x82722E50  # InputContext_DispatchActiveCommands (lr 0x82722EA4)
+0x82724590  # InputCommandChord_UpdateChildAndAge (lr 0x827245C4/D8)
+0x8229A0F0  # InputContext dtor (lr 0x8229A140)
+0x82721E68  # InputMgr_DispatchQueuedInput (caller of 82722DB8)
+0x827623B8  # luaD_throw (lr 0x827623F8 panic bctrl)
+#
+# --- native-roadmap liveness VAs -----------------------------------------------------
+0x82119980
+0x82119E68
+0x821236E0
+0x82786B60
+0x820FC478
+0x82845780
+0x82845958
+0x82845B38
+0x8210DF38  # D3DDeviceBeginZPass
+0x8210E1A0  # D3DDeviceEndZPass (Q3)
+0x8210D400  # D3DDeviceSetPredication (Q4 hint)
+#
+# --- positive control: always called ---------------------------------------------------
+# 0x8246D368 RtlFreeHeap dropped: a per-free fflush'ed record slows Xenia; 0x827B0400 (CRT init, once at boot)
+# and the per-frame InputContext entries are the positive controls

@@ -1,0 +1,495 @@
+{
+  "name": "step5-options-game",
+  "purpose": "Lane E L-b (RELEASE_PLAN step 5; STEP5_PLAN 10, owner q14d): ONE OPTIONS screen with the GAME tab first. Port features on, audio null, the harness keyboard (the OPTIONS overlay polls the harness channel itself). FRONT END: MAIN MENU > OPTIONS opens the OPTIONS overlay directly (no Apt SETTINGS panel), after the game's own getters reported its options (SR_GameOptionsLive 'FE ..'). GAME tab: INVERT LOOK previewed (the game's own setters through ApplyStore: 'apply why=3 ... match=true'), APPLY stores it, B closes back to the menu. NEW GAME re-applies the store (apply why=1 match=true). IN GAME (lane E L-c: OPTIONS is the pause menu's own row): pause > OPTIONS opens the same screen over the pause menu; the live report has invY=1 (the front end's change is the game's own state in game); CHEATS is listed in game (LB from GAME wraps to it) and its first row goes to the game, which refuses it before Warworld (the game's own rule); back on GAME, INVERT LOOK off is previewed and APPLIED through SRPause; B closes it (SR_OptionsClosed(0): the pause menu, OPTIONS focused). The write reached the game (the coordinator's check, no retail screen): RESUME into gameplay, pause, OPTIONS again - the game's own getters, read at the open, report invY=0; CONTROLS > VIEW PAD LAYOUT closes the screen and the pause menu's opener shows the game's own CONTROLLER OPTIONS (its pad diagram); its B returns to the pause menu (OPTIONS focused). Then QUIT GAME > QUIT TO TITLE, START, NEW GAME (the universal store re-applied: apply why=1 match=true), pause, OPTIONS: the getters report invY=0 again.",
+  "gates": "SR_PORT_FEATURES=1,SR_MENU_CENSUS=1,SR_AUDIO_SINK=null,SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=20,SR_PRESENT_DUMP_SPARSE_CAP=1500",
+  "steps": [
+    {
+      "name": "fe-alive",
+      "await": "\\[NAT_FE\\] #1 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "settle-title",
+      "await": "\\[NAT_FE\\] #256 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "press-start",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 4,
+      "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)",
+      "expectMs": 90000
+    },
+    {
+      "name": "title-ui-tail",
+      "await": "\\[APT_REQ\\] #15 path='\\.\\./common/ButtonHints/XBox360/HintB'",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "title-visible",
+      "requireVisibleMs": 8000,
+      "visibleTimeoutMs": 200000,
+      "dwellMs": 6000
+    },
+    {
+      "name": "start-bootflow",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 10000,
+      "expect": "\\[SR_FSCMD\\].*claim LoadCreate",
+      "expectMs": 30000
+    },
+    {
+      "name": "menu-census",
+      "purpose": "the MAIN MENU is up with its five rows (the census line gives counts, not labels - the Ally lb2 roll; that the third row is OPTIONS is proven by its own open below)",
+      "expect": "\\[MENU_CENSUS\\] .*screen=ScrGenPop page='MAIN MENU' .* items=5 ",
+      "expectSince": "start-bootflow",
+      "expectMs": 20000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "down-to-options",
+      "key": "DOWN",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 2,
+      "gapMs": 1500,
+      "dwellMs": 1500
+    },
+    {
+      "name": "open-options",
+      "key": "A",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*menu button=2",
+      "expectMs": 10000
+    },
+    {
+      "name": "live-report-fe",
+      "purpose": "the game's own getters, right before the open",
+      "expect": "\\[SR_FSCMD\\].*SR_GameOptionsLive 'FE \\d+' -> noted",
+      "expectSince": "open-options",
+      "expectMs": 10000
+    },
+    {
+      "name": "options-shown-fe",
+      "expect": "\\[PC_SETTINGS\\] shown \\(FE",
+      "expectSince": "open-options",
+      "expectMs": 15000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "preview-invert-on",
+      "purpose": "GAME is the first tab, INVERT LOOK its first row",
+      "key": "RIGHT",
+      "holdMs": 160,
+      "maxPulses": 1,
+      "dwellMs": 1500,
+      "expect": "\\[PC_SETTINGS\\] preview game_invert_y = on",
+      "expectMs": 8000
+    },
+    {
+      "name": "setters-fe",
+      "purpose": "the next Apt pump calls the opener's own SR_GameOptions (a preview: stored -1)",
+      "expect": "\\[GAME_OPTIONS\\] _global\\.SRFrontEnd\\.SR_GameOptions\\(\\d+, -1\\) called",
+      "expectSince": "preview-invert-on",
+      "expectMs": 8000
+    },
+    {
+      "name": "applied-by-game-fe",
+      "purpose": "ApplyStore: the game's own setters, the live options now match",
+      "expect": "\\[SR_FSCMD\\].*apply why=3 store=\\d+ now=\\d+ match=true",
+      "expectSince": "preview-invert-on",
+      "expectMs": 8000
+    },
+    {
+      "name": "apply-fe",
+      "key": "Y",
+      "holdMs": 160,
+      "maxPulses": 1,
+      "dwellMs": 2000,
+      "expect": "\\[PC_SETTINGS\\] game_invert_y = on \\(applied, stored\\)",
+      "expectMs": 8000
+    },
+    {
+      "name": "stored-fe",
+      "expect": "\\[GAME_OPTIONS\\] _global\\.SRFrontEnd\\.SR_GameOptions\\(\\d+, \\d+\\) called .*invY=1",
+      "expectSince": "apply-fe",
+      "expectMs": 8000
+    },
+    {
+      "name": "close-fe",
+      "key": "B",
+      "holdMs": 160,
+      "maxPulses": 1,
+      "dwellMs": 3000,
+      "expect": "\\[PC_SETTINGS\\] close",
+      "expectMs": 8000
+    },
+    {
+      "name": "menu-again",
+      "expect": "\\[MENU_CENSUS\\].*page='MAIN MENU'",
+      "expectSince": "close-fe",
+      "expectMs": 15000,
+      "dwellMs": 2000
+    },
+    {
+      "name": "up-to-new",
+      "key": "UP",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 2,
+      "gapMs": 1500,
+      "dwellMs": 1500
+    },
+    {
+      "name": "new-game",
+      "key": "A",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*apply why=1 store=\\d+ now=\\d+ match=true",
+      "expectMs": 15000
+    },
+    {
+      "name": "game-starts",
+      "expect": "\\[APT_REQ\\] #\\d+ path='screens/hud/main_hud'",
+      "expectMs": 180000
+    },
+    {
+      "name": "play",
+      "dwellMs": 30000
+    },
+    {
+      "name": "pause",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 18,
+      "gapMs": 10000,
+      "expect": "\\[SR_FSCMD\\].*SR_Log 'pause install'",
+      "expectFresh": true,
+      "expectMs": 10000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "up-to-options",
+      "purpose": "RESUME -> (wrap) QUIT GAME -> OPTIONS (the hidden PHOTO MODE slot is skipped; lane E L-c)",
+      "key": "UP",
+      "holdMs": 250,
+      "maxPulses": 2,
+      "gapMs": 1200,
+      "dwellMs": 2500
+    },
+    {
+      "name": "open-options-ig",
+      "key": "A",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[PC_SETTINGS\\] shown \\(IG",
+      "expectMs": 10000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "live-report-ig",
+      "purpose": "in game the game's own options carry the front end's change",
+      "expect": "\\[SR_FSCMD\\].*SR_GameOptionsLive 'IG \\d+' -> noted \\(.*invY=1",
+      "expectSince": "up-to-options",
+      "expectMs": 10000
+    },
+    {
+      "name": "tab-cheats",
+      "purpose": "CHEATS is listed in game: LB from GAME wraps to it",
+      "key": "LB",
+      "holdMs": 160,
+      "maxPulses": 1,
+      "dwellMs": 1500,
+      "expect": "\\[PC_SETTINGS\\] tab CHEATS",
+      "expectMs": 8000
+    },
+    {
+      "name": "cheat-row",
+      "key": "A",
+      "holdMs": 160,
+      "maxPulses": 1,
+      "dwellMs": 2500,
+      "expect": "\\[CHEATS\\] code 3 chosen",
+      "expectMs": 8000
+    },
+    {
+      "name": "cheat-the-games-rule",
+      "purpose": "the game's own matcher condition: no cheats before Warworld",
+      "expect": "\\[CHEATS\\] code 3 refused by the game's own check",
+      "expectSince": "cheat-row",
+      "expectMs": 8000
+    },
+    {
+      "name": "tab-game",
+      "key": "RB",
+      "holdMs": 160,
+      "maxPulses": 1,
+      "dwellMs": 1500,
+      "expect": "\\[PC_SETTINGS\\] tab GAME",
+      "expectMs": 8000
+    },
+    {
+      "name": "preview-invert-off",
+      "key": "RIGHT",
+      "holdMs": 160,
+      "maxPulses": 1,
+      "dwellMs": 1500,
+      "expect": "\\[PC_SETTINGS\\] preview game_invert_y = off",
+      "expectMs": 8000
+    },
+    {
+      "name": "setters-ig",
+      "expect": "\\[GAME_OPTIONS\\] _global\\.SRPause\\.SR_GameOptions\\(\\d+, -1\\) called",
+      "expectSince": "preview-invert-off",
+      "expectMs": 8000
+    },
+    {
+      "name": "applied-by-game-ig",
+      "expect": "\\[SR_FSCMD\\].*apply why=3 store=\\d+ now=\\d+ match=true",
+      "expectSince": "preview-invert-off",
+      "expectMs": 8000
+    },
+    {
+      "name": "apply-ig",
+      "key": "Y",
+      "holdMs": 160,
+      "maxPulses": 1,
+      "dwellMs": 2000,
+      "expect": "\\[PC_SETTINGS\\] game_invert_y = off \\(applied, stored\\)",
+      "expectMs": 8000
+    },
+    {
+      "name": "close-ig",
+      "key": "B",
+      "holdMs": 160,
+      "maxPulses": 1,
+      "dwellMs": 3000,
+      "expect": "\\[PC_SETTINGS\\] close",
+      "expectMs": 8000
+    },
+    {
+      "name": "closed-ig",
+      "purpose": "the screen is gone: the pause menu's own SR_OptionsClosed(0), OPTIONS focused again",
+      "expect": "\\[GAME_OPTIONS\\] _global\\.SRPause\\.SR_OptionsClosed\\(0",
+      "expectSince": "close-ig",
+      "expectMs": 10000,
+      "dwellMs": 2000
+    },
+    {
+      "name": "resume",
+      "purpose": "B on the pause menu: back to gameplay (the game resets its focus to RESUME)",
+      "key": "B",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "dwellMs": 8000
+    },
+    {
+      "name": "pause-again",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 18,
+      "gapMs": 10000,
+      "expect": "\\[SR_FSCMD\\].*SR_Log 'pause install'",
+      "expectFresh": true,
+      "expectMs": 10000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "up-to-options-2",
+      "key": "UP",
+      "holdMs": 250,
+      "maxPulses": 2,
+      "gapMs": 1200,
+      "dwellMs": 2500
+    },
+    {
+      "name": "open-options-ig-2",
+      "key": "A",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[PC_SETTINGS\\] shown \\(IG",
+      "expectMs": 10000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "read-back-after-play",
+      "purpose": "the coordinator's check (replaces the retail GAMEPLAY OPTIONS capture): after gameplay the game's own getters, read at this open, return the APPLIED off - the write reached the game",
+      "expect": "\\[SR_FSCMD\\].*SR_GameOptionsLive 'IG \\d+' -> noted \\(.*invY=0",
+      "expectSince": "up-to-options-2",
+      "expectMs": 10000
+    },
+    {
+      "name": "tab-controls-ig",
+      "key": "RB",
+      "holdMs": 160,
+      "maxPulses": 1,
+      "dwellMs": 1500,
+      "expect": "\\[PC_SETTINGS\\] tab CONTROLS",
+      "expectMs": 8000
+    },
+    {
+      "name": "view-pad-layout-ig",
+      "purpose": "the first CONTROLS row: the screen closes, then the pause menu's opener shows the game's own CONTROLLER OPTIONS (SwitchScreen, as its own row does)",
+      "key": "A",
+      "holdMs": 160,
+      "maxPulses": 1,
+      "dwellMs": 6000,
+      "expect": "\\[GAME_OPTIONS\\] _global\\.SRPause\\.SR_OptionsClosed\\(1: VIEW PAD LAYOUT\\) called",
+      "expectMs": 15000
+    },
+    {
+      "name": "controller-screen-ig",
+      "expect": "\\[APT_SCREEN\\] path='[^']*ScrControllerOpt'",
+      "expectSince": "view-pad-layout-ig",
+      "expectMs": 15000,
+      "dwellMs": 6000
+    },
+    {
+      "name": "controller-back-ig",
+      "purpose": "the screen's own B in pause mode: back to the pause menu (the exit captures the options)",
+      "key": "B",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*SR_SetSettings 'ScrControllerOpt PAUSEMENU \\d+' -> stored",
+      "expectMs": 15000,
+      "dwellMs": 4000
+    },
+    {
+      "name": "pause-after-diagram",
+      "purpose": "the pause menu again, OPTIONS focused (PauseSelectedItem = btn7)",
+      "expect": "\\[SR_FSCMD\\].*SR_Log 'pause install'",
+      "expectSince": "controller-back-ig",
+      "expectMs": 15000,
+      "dwellMs": 2000
+    },
+    {
+      "name": "down-to-quit",
+      "purpose": "OPTIONS -> QUIT GAME (the hidden PHOTO MODE slot is skipped)",
+      "key": "DOWN",
+      "holdMs": 200,
+      "maxPulses": 1,
+      "dwellMs": 1500
+    },
+    {
+      "name": "open-quit",
+      "key": "A",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[APT_SCREEN\\] path='screens/misc/ScrGenPop'",
+      "expectFresh": true,
+      "expectMs": 10000,
+      "dwellMs": 2500,
+      "purpose": "QUIT GAME -> the two-choice popup's own screen request (fresh; the census gives counts, not labels)"
+    },
+    {
+      "name": "quit-to-menu",
+      "purpose": "QUIT TO TITLE (the default): the game's own quit",
+      "key": "A",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*SR_Log 'pause quit button=0'",
+      "expectMs": 10000
+    },
+    {
+      "name": "title-again",
+      "purpose": "the game's own return to the front end (femenu_quit.json fe-reloaded)",
+      "expect": "\\[SR_FSCMD\\].*SR_Log 'install' saveFlow\\+16=[1-9]",
+      "expectSince": "quit-to-menu",
+      "expectMs": 120000,
+      "dwellMs": 15000
+    },
+    {
+      "name": "start-again",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 10000,
+      "expect": "\\[XAM_PROFILE\\] #3 ",
+      "expectMs": 30000,
+      "dwellMs": 8000
+    },
+    {
+      "name": "new-game-2",
+      "purpose": "NEW GAME re-applies the universal store (now invert look OFF)",
+      "key": "A",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*apply why=1 store=\\d+ now=\\d+ match=true",
+      "expectFresh": true,
+      "expectMs": 15000
+    },
+    {
+      "name": "game-starts-2",
+      "purpose": "the second start: the HUD screen is already loaded, so it is shown again ([APT_SCREEN] seen >= 2) without a new [APT_REQ] (the Ally roll 482); either form counts, since new-game-2",
+      "expect": "\\[APT_REQ\\] #\\d+ path='screens/hud/main_hud'|\\[APT_SCREEN\\] path='screens/hud/main_hud' seen=\\d+",
+      "expectSince": "new-game-2",
+      "expectMs": 180000
+    },
+    {
+      "name": "play-2",
+      "dwellMs": 30000
+    },
+    {
+      "name": "pause-3",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 18,
+      "gapMs": 10000,
+      "expect": "\\[SR_FSCMD\\].*SR_Log 'pause install'",
+      "expectFresh": true,
+      "expectMs": 10000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "up-to-options-3",
+      "key": "UP",
+      "holdMs": 250,
+      "maxPulses": 2,
+      "gapMs": 1200,
+      "dwellMs": 2500
+    },
+    {
+      "name": "open-options-ig-3",
+      "key": "A",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[PC_SETTINGS\\] shown \\(IG",
+      "expectMs": 10000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "read-back-after-new-game",
+      "purpose": "the coordinator's check: after NEW GAME the game's own getters return the stored OFF (the universal store re-applied it)",
+      "expect": "\\[SR_FSCMD\\].*SR_GameOptionsLive 'IG \\d+' -> noted \\(.*invY=0",
+      "expectSince": "up-to-options-3",
+      "expectMs": 10000
+    },
+    {
+      "name": "close-ig-3",
+      "key": "B",
+      "holdMs": 160,
+      "maxPulses": 1,
+      "dwellMs": 3000,
+      "expect": "\\[PC_SETTINGS\\] close",
+      "expectMs": 8000
+    },
+    {
+      "name": "observe",
+      "dwellMs": 5000
+    }
+  ]
+}

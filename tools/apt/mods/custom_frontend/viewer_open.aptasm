@@ -1,0 +1,9 @@
+; _global.SRViewer.Open(this): re-lay out this page as the COSTUME VIEWER (when the host has it on)
+    Push [reg1]
+    EA_PushOne
+    Push [reg2]
+    Push ['SRViewer']
+    GetMember
+    Push ['Open']
+    CallMethod
+    Pop

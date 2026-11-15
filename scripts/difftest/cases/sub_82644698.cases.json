@@ -1,0 +1,7 @@
+[
+  { "case_id": "zero",   "va": "0x82644698", "regs": { "r4": "0x0" },        "expect": { "r3": "0x0" } },
+  { "case_id": "four",   "va": "0x82644698", "regs": { "r4": "0x4" },        "expect": { "r3": "0x0" } },
+  { "case_id": "one",    "va": "0x82644698", "regs": { "r4": "0x1" },        "expect": { "r3": "0xfffffffd" } },
+  { "case_id": "sixteen","va": "0x82644698", "regs": { "r4": "0x10" },       "expect": { "r3": "0xc" } },
+  { "case_id": "max",    "va": "0x82644698", "regs": { "r4": "0xffffffff" }, "expect": { "r3": "0xfffffffb" } }
+]

@@ -1,0 +1,12 @@
+# tools/oracle/ours_seed_pass.py: the harness_play tape of a matched "no input" roll (the Xenia seed pass presses
+# nothing after the anchor either). perf_run --from-save's own drive does the LOAD GAME presses and METROPOLIS on a
+# carousel landing; this tape only waits (a tape must complete, perf_run.PLAY_FAILED_EXIT) and records the read-back
+# pad state at the HUD and later, the receipt that no input reached the game.
+# (no '#' inside a command: harness_play.py strips everything after one as a comment)
+await \[SR_FSCMD\].*answer cppId=\S+ button=1 1500
+await \[APT_(REQ|SCREEN)\].*path='screens/hud/main_hud' 900
+sample hud
+wait 30000
+sample idle30
+wait 30000
+sample idle60

@@ -1,0 +1,72 @@
+{
+  "format": 1,
+  "id": "custom_frontend",
+  "name": "Custom front end",
+  "description": "MAIN MENU (NEW GAME / LOAD GAME / SETTINGS / EXIT) in the game's own popup chrome, universal settings, MODS and Dev Tools pages, and the pause menu (docs/CUSTOM_FRONTEND.md).",
+  "option": null,
+  "recipe": "tools/apt/mods/custom_frontend",
+  "base": {
+    "DATA/ui.AST": {
+      "size": 89595420,
+      "toc_sha256": "035c8facc80645f4ecd584c2db09089f0a11a1f32f8b5993b6549b8add7daaec"
+    }
+  },
+  "assets": [
+    {
+      "asset": "DATA/_workinprogress/custom_frontend/MAIN.ast",
+      "base": "DATA/ui.AST:MAIN",
+      "patch": "MAIN.srpatch"
+    },
+    {
+      "asset": "DATA/_workinprogress/custom_frontend/MAIN_HUD.ast",
+      "base": "DATA/ui.AST:MAIN_HUD",
+      "patch": "MAIN_HUD.srpatch"
+    },
+    {
+      "asset": "DATA/_workinprogress/custom_frontend/SCRPRESSSTART.ast",
+      "base": "DATA/ui.AST:SCRPRESSSTART",
+      "patch": "SCRPRESSSTART.srpatch"
+    },
+    {
+      "asset": "DATA/_workinprogress/custom_frontend/SCRSAVELOAD.ast",
+      "base": "DATA/ui.AST:SCRSAVELOAD",
+      "patch": "SCRSAVELOAD.srpatch"
+    },
+    {
+      "asset": "DATA/_workinprogress/custom_frontend/SCRGAMEPLAYOPT.ast",
+      "base": "DATA/ui.AST:SCRGAMEPLAYOPT",
+      "patch": "SCRGAMEPLAYOPT.srpatch"
+    },
+    {
+      "asset": "DATA/_workinprogress/custom_frontend/SCRPAUSEMENU.ast",
+      "base": "DATA/ui.AST:SCRPAUSEMENU",
+      "patch": "SCRPAUSEMENU.srpatch"
+    },
+    {
+      "asset": "DATA/_workinprogress/custom_frontend/SCRAUDIOOPT.ast",
+      "base": "DATA/ui.AST:SCRAUDIOOPT",
+      "patch": "SCRAUDIOOPT.srpatch"
+    },
+    {
+      "asset": "DATA/_workinprogress/custom_frontend/SCRCONTROLLEROPT.ast",
+      "base": "DATA/ui.AST:SCRCONTROLLEROPT",
+      "patch": "SCRCONTROLLEROPT.srpatch"
+    },
+    {
+      "asset": "DATA/_workinprogress/custom_frontend/SCRCOSTUMES.ast",
+      "base": "DATA/ui.AST:SCRCOSTUMES",
+      "patch": "SCRCOSTUMES.srpatch"
+    }
+  ],
+  "assets_sha256": {
+    "DATA/_workinprogress/custom_frontend/MAIN.ast": "ab58332011d14219f39e648f4966286447239dd22f4c67e360d6cab397311771",
+    "DATA/_workinprogress/custom_frontend/MAIN_HUD.ast": "e4fad2dc5e0dac96b0f1d1c6a1e97ca1378715363c329edefeb403163894bab2",
+    "DATA/_workinprogress/custom_frontend/SCRAUDIOOPT.ast": "56500b042236bb7f80c24f0bd83698f029c3a6d75c30078ea834c338bfb200a6",
+    "DATA/_workinprogress/custom_frontend/SCRCONTROLLEROPT.ast": "b3ead9492d31a9d0f022f179c793a7d818960240e94d1b3059eda2b02d0da8e6",
+    "DATA/_workinprogress/custom_frontend/SCRCOSTUMES.ast": "643c0a07719e46d8731d5cb4e719715fd5ee385feabf0ed11d5e9e5506a6cd42",
+    "DATA/_workinprogress/custom_frontend/SCRGAMEPLAYOPT.ast": "e521f44409d9bc7e91c9426e170b8ed668cac1042a13e264f78287a372ab6c5a",
+    "DATA/_workinprogress/custom_frontend/SCRPAUSEMENU.ast": "f3f4f1f554f25c5fba9d1c7ed3b2383a332a161880281af032ebc1e87b05ebf3",
+    "DATA/_workinprogress/custom_frontend/SCRPRESSSTART.ast": "88b7bccf561af3746dd8beba3a4bdfdfd317667229b5f8513edc4fee6e63cfda",
+    "DATA/_workinprogress/custom_frontend/SCRSAVELOAD.ast": "a35ac42d9c2d5bbce735737146a351570465453d840915686f3e5e7e201c0a50"
+  }
+}

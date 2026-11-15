@@ -1,0 +1,61 @@
+; Included expression (.include): pushes ONE number, the game's current options packed
+; as kernel/mod_bridge.hpp describes (bits 0-3 music, 4-7 SFX, 8-9 control scheme,
+; 10 X inversion, 11 Y inversion, 12 auto-center, 13 vibration), read through the
+; game's own SettingsAdapter getters. Stack-only (no registers written), so it can be
+; spliced into any function whose reg2 = _global (DefineFunction2 flags 0x..129).
+;   SA.GetMusicVol() + SA.GetSFXVol()*16 + SA.GetControlScheme()*256
+;     + SA.GetXInversion()*1024 + SA.GetYInversion()*2048 + SA.GetAutoCenter()*4096
+;     + SA.GetRumble()*8192
+    EA_PushZero
+    Push [reg2]
+    EA_GetNamedMember 'SettingsAdapter'
+    EA_PushConstByte 'GetMusicVol'
+    CallMethod
+    EA_PushZero
+    Push [reg2]
+    EA_GetNamedMember 'SettingsAdapter'
+    EA_PushConstByte 'GetSFXVol'
+    CallMethod
+    EA_PushByte 16
+    Multiply
+    Add2
+    EA_PushZero
+    Push [reg2]
+    EA_GetNamedMember 'SettingsAdapter'
+    EA_PushConstByte 'GetControlScheme'
+    CallMethod
+    EA_PushShort 256
+    Multiply
+    Add2
+    EA_PushZero
+    Push [reg2]
+    EA_GetNamedMember 'SettingsAdapter'
+    EA_PushConstByte 'GetXInversion'
+    CallMethod
+    EA_PushShort 1024
+    Multiply
+    Add2
+    EA_PushZero
+    Push [reg2]
+    EA_GetNamedMember 'SettingsAdapter'
+    EA_PushConstByte 'GetYInversion'
+    CallMethod
+    EA_PushShort 2048
+    Multiply
+    Add2
+    EA_PushZero
+    Push [reg2]
+    EA_GetNamedMember 'SettingsAdapter'
+    EA_PushConstByte 'GetAutoCenter'
+    CallMethod
+    EA_PushShort 4096
+    Multiply
+    Add2
+    EA_PushZero
+    Push [reg2]
+    EA_GetNamedMember 'SettingsAdapter'
+    EA_PushConstByte 'GetRumble'
+    CallMethod
+    EA_PushShort 8192
+    Multiply
+    Add2

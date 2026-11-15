@@ -1,0 +1,23 @@
+{
+  "format": 1,
+  "name": "Map Example",
+  "author": "Superman Recomp",
+  "version": "1.0.0",
+  "category": "missions",
+  "description": "One custom event on the pause map (docs/MODS.md, Map markers and maps for mods).",
+  "map": {
+    "format": 1,
+    "maps": [{
+      "id": "metropolis",
+      "types": [{"id": "example_event", "label": "EXAMPLE EVENTS", "icon": "ring", "color": "40FF80"}],
+      "markers": [{
+        "id": "example.rooftop", "type": "example_event", "pos": [-2158, 1614, -284],
+        "name": "ROOFTOP RESCUE", "detail": "A custom event at the Daily Planet.",
+        "show": {"bit": "objectiveStatus", "index": 6},
+        "completed": {"lua": "ExampleRooftopDone"},
+        "record": {"lua": "ExampleRooftopBest", "format": "time_ms", "label": "BEST TIME", "when": "completed"},
+        "after_complete": "keep"
+      }]
+    }]
+  }
+}

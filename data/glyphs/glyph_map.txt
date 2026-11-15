@@ -1,0 +1,232 @@
+# Button-prompt glyph map (iter-464 input lane; docs/INPUT_GLYPHS.md).
+# Read by gfx/glyph_subst.cpp from <exe dir>/data/glyphs/ (CMake copies this folder next to
+# the exe). A texture pack may restyle prompts by editing this file and its PNGs.
+#
+#   canvas <n>                      replacement texture size (square, full mip chain)
+#   tex <id> <fmt> <w> <h> <len> <fnv1a64>
+#       a game icon texture: Xenos format, size, and FNV-1a-64 of its first <len> guest bytes
+#       (generated and checked against ui.AST by tools/glyphs/glyph_map.py --print / --check)
+#   use <set> <tex id> <recipe> [extent] [dx dy]
+#       set:    ps4 | ps5 | switch | keyboard   (xbox = the game's own 360 icons, always)
+#       recipe: keep | blank | png:<path> | key:<Control> | cluster:<Up>,<Left>,<Down>,<Right>
+#               key: = the key or mouse input bound to that 360 control in the current
+#               context (kernel/host_input.hpp promptInputFor: the controls lane's input.ini)
+#       extent: the visible glyph's size as a fraction of the texture (match the original's
+#               opaque extent); dx dy shift it by texture fractions
+#   keyglyph <input name, spaces as _> <path>   keyboard/mouse art per input: SDL key names,
+#               Mouse1..Mouse5 (left, right, middle, X1, X2), WheelUp, WheelDown, Wheel,
+#               MouseMove (the mouse drives the control: mouse-look on the right stick)
+#   keydefault <path>                           an input with no art of its own, or unbound
+#
+# Art: Julio Cacko, "FREE Input Prompts Pack" (CC0 1.0) - juliocacko_input_prompts/SOURCE.md.
+
+canvas 128
+
+# ── the game's prompt icons (ui.AST image characters) ─────────────────────────
+tex hint_a 20 32 32 1024 6878085af9de4dc1
+tex hint_b 20 32 32 1024 70de3759e44979c4
+tex hint_x 20 32 32 1024 d3065c7e11a6a7bf
+tex hint_y 20 32 32 1024 d45b0f5e010fc881
+tex hint_lb 20 32 32 1024 a9f6d262f58ff0a7
+tex hint_rb 20 32 32 1024 114d38f02e498aa3
+tex hint_lt 20 32 32 1024 f98d534b640da1cb
+tex hint_rt 20 32 32 1024 0ffd28cf187d7eb8
+tex hint_start 20 32 32 1024 658a64f97929ee29
+tex hint_back 20 32 32 1024 2986b4e5f829f985
+tex hint_dpad 20 32 32 1024 3db134901d10227e
+tex hint_ls_label 20 32 32 1024 001a5bc4a7ab60a6
+tex hint_rs_label 20 32 32 1024 675c8011a4c6c692
+tex hint_stick 20 32 32 1024 e9299732ce88be8e
+tex big_a 20 64 64 4096 e69119d7681748aa
+tex big_b 20 64 64 4096 b82d6ca55ebd9815
+tex big_x 20 64 64 4096 b9dc77baf05d4dfe
+tex big_y 20 64 64 4096 d896f4f2a9d6fc2a
+tex powers_dpad 20 64 64 4096 3c71a42d93eaa51d
+
+# ── PlayStation 4 (DualShock 4; DualShock 3 too) ───────────────────────────────
+use ps4 hint_a png:juliocacko_input_prompts/P4Gamepad/T_P4_Cross_Color.png 0.88
+use ps4 hint_b png:juliocacko_input_prompts/P4Gamepad/T_P4_Circle_Color.png 0.88
+use ps4 hint_x png:juliocacko_input_prompts/P4Gamepad/T_P4_Square_Color.png 0.88
+use ps4 hint_y png:juliocacko_input_prompts/P4Gamepad/T_P4_Triangle_Color.png 0.88
+use ps4 hint_lb png:juliocacko_input_prompts/P4Gamepad/T_P4_L1.png 0.94
+use ps4 hint_rb png:juliocacko_input_prompts/P4Gamepad/T_P4_R1.png 0.94
+use ps4 hint_lt png:juliocacko_input_prompts/P4Gamepad/T_P4_L2.png 0.94
+use ps4 hint_rt png:juliocacko_input_prompts/P4Gamepad/T_P4_R2.png 0.94
+use ps4 hint_start png:juliocacko_input_prompts/P4Gamepad/T_P4_Options.png 0.97
+use ps4 hint_back png:juliocacko_input_prompts/P4Gamepad/T_P4_Share.png 0.80
+use ps4 hint_dpad png:juliocacko_input_prompts/P4Gamepad/T_P4_Dpad.png 0.94
+use ps4 powers_dpad png:juliocacko_input_prompts/P4Gamepad/T_P4_Dpad.png 0.80
+use ps4 big_a png:juliocacko_input_prompts/P4Gamepad/T_P4_Cross_Color.png 0.90
+use ps4 big_b png:juliocacko_input_prompts/P4Gamepad/T_P4_Circle_Color.png 0.90
+use ps4 big_x png:juliocacko_input_prompts/P4Gamepad/T_P4_Square_Color.png 0.90
+use ps4 big_y png:juliocacko_input_prompts/P4Gamepad/T_P4_Triangle_Color.png 0.90
+
+# ── PlayStation 5 (DualSense) ──────────────────────────────────────────────────
+use ps5 hint_a png:juliocacko_input_prompts/P5Gamepad/T_P5_Cross_Color.png 0.88
+use ps5 hint_b png:juliocacko_input_prompts/P5Gamepad/T_P5_Circle_Color.png 0.88
+use ps5 hint_x png:juliocacko_input_prompts/P5Gamepad/T_P5_Square_Color.png 0.88
+use ps5 hint_y png:juliocacko_input_prompts/P5Gamepad/T_P5_Triangle_Color.png 0.88
+use ps5 hint_lb png:juliocacko_input_prompts/P5Gamepad/T_P5_L1.png 0.94
+use ps5 hint_rb png:juliocacko_input_prompts/P5Gamepad/T_P5_R1.png 0.94
+use ps5 hint_lt png:juliocacko_input_prompts/P5Gamepad/T_P5_L2.png 0.94
+use ps5 hint_rt png:juliocacko_input_prompts/P5Gamepad/T_P5_R2.png 0.94
+use ps5 hint_start png:juliocacko_input_prompts/P5Gamepad/T_P5_Options.png 0.97
+use ps5 hint_back png:juliocacko_input_prompts/P5Gamepad/T_P5_Share.png 0.80
+use ps5 hint_dpad png:juliocacko_input_prompts/P5Gamepad/T_P5_Dpad.png 0.94
+use ps5 powers_dpad png:juliocacko_input_prompts/P5Gamepad/T_P5_Dpad.png 0.80
+use ps5 big_a png:juliocacko_input_prompts/P5Gamepad/T_P5_Cross_Color.png 0.90
+use ps5 big_b png:juliocacko_input_prompts/P5Gamepad/T_P5_Circle_Color.png 0.90
+use ps5 big_x png:juliocacko_input_prompts/P5Gamepad/T_P5_Square_Color.png 0.90
+use ps5 big_y png:juliocacko_input_prompts/P5Gamepad/T_P5_Triangle_Color.png 0.90
+
+# ── Nintendo Switch (Pro controller, Joy-Con pair) ─────────────────────────────
+# Face buttons are POSITIONAL (SDL3 gamepad buttons are SOUTH/EAST/WEST/NORTH; SDL2 needed
+# SDL_GAMECONTROLLER_USE_BUTTON_LABELS=0):
+# the 360's A is the south button, labelled B on a Switch pad, so its prompt shows B.
+use switch hint_a png:juliocacko_input_prompts/SGamepad/T_S_B.png 0.88
+use switch hint_b png:juliocacko_input_prompts/SGamepad/T_S_A.png 0.88
+use switch hint_x png:juliocacko_input_prompts/SGamepad/T_S_Y.png 0.88
+use switch hint_y png:juliocacko_input_prompts/SGamepad/T_S_X.png 0.88
+use switch hint_lb png:juliocacko_input_prompts/SGamepad/T_S_LB.png 0.90
+use switch hint_rb png:juliocacko_input_prompts/SGamepad/T_S_RB.png 0.90
+use switch hint_lt png:juliocacko_input_prompts/SGamepad/T_S_LT.png 0.90
+use switch hint_rt png:juliocacko_input_prompts/SGamepad/T_S_RT.png 0.90
+use switch hint_start png:juliocacko_input_prompts/SGamepad/T_S_Plus.png 0.80
+use switch hint_back png:juliocacko_input_prompts/SGamepad/T_S_Minus.png 0.80
+use switch hint_dpad png:juliocacko_input_prompts/SGamepad/T_S_Dpad.png 0.94
+use switch powers_dpad png:juliocacko_input_prompts/SGamepad/T_S_Dpad.png 0.80
+use switch big_a png:juliocacko_input_prompts/SGamepad/T_S_B.png 0.90
+use switch big_b png:juliocacko_input_prompts/SGamepad/T_S_A.png 0.90
+use switch big_x png:juliocacko_input_prompts/SGamepad/T_S_Y.png 0.90
+use switch big_y png:juliocacko_input_prompts/SGamepad/T_S_X.png 0.90
+
+# ── Keyboard + mouse: the input bound to each 360 control (promptInputFor) ─────
+use keyboard hint_a key:A 0.88
+use keyboard hint_b key:B 0.88
+use keyboard hint_x key:X 0.88
+use keyboard hint_y key:Y 0.88
+use keyboard hint_lb key:LB 0.88
+use keyboard hint_rb key:RB 0.88
+use keyboard hint_lt key:LT 0.88
+use keyboard hint_rt key:RT 0.88
+use keyboard hint_start key:Start 0.95
+use keyboard hint_back key:Back 0.88
+use keyboard hint_dpad cluster:DpadUp,DpadLeft,DpadDown,DpadRight 1.0
+use keyboard powers_dpad cluster:DpadUp,DpadLeft,DpadDown,DpadRight 0.92
+use keyboard hint_ls_label cluster:LStickUp,LStickLeft,LStickDown,LStickRight 1.0
+use keyboard hint_rs_label cluster:RStickUp,RStickLeft,RStickDown,RStickRight 1.0
+use keyboard hint_stick blank
+use keyboard big_a key:A 0.90
+use keyboard big_b key:B 0.90
+use keyboard big_x key:X 0.90
+use keyboard big_y key:Y 0.90
+
+# ── keyboard art (Keyboard_Mouse/White) per SDL scancode name ──────────────────
+keydefault juliocacko_input_prompts/Keyboard_Mouse/Blanks/T_Blank_White_Normal.png
+keyglyph A juliocacko_input_prompts/Keyboard_Mouse/White/T_A_Key_White.png
+keyglyph B juliocacko_input_prompts/Keyboard_Mouse/White/T_B_Key_White.png
+keyglyph C juliocacko_input_prompts/Keyboard_Mouse/White/T_C_Key_White.png
+keyglyph D juliocacko_input_prompts/Keyboard_Mouse/White/T_D_Key_White.png
+keyglyph E juliocacko_input_prompts/Keyboard_Mouse/White/T_E_Key_White.png
+keyglyph F juliocacko_input_prompts/Keyboard_Mouse/White/T_F_Key_White.png
+keyglyph G juliocacko_input_prompts/Keyboard_Mouse/White/T_G_Key_White.png
+keyglyph H juliocacko_input_prompts/Keyboard_Mouse/White/T_H_Key_White.png
+keyglyph I juliocacko_input_prompts/Keyboard_Mouse/White/T_I_Key_White.png
+keyglyph J juliocacko_input_prompts/Keyboard_Mouse/White/T_J_Key_White.png
+keyglyph K juliocacko_input_prompts/Keyboard_Mouse/White/T_K_Key_White.png
+keyglyph L juliocacko_input_prompts/Keyboard_Mouse/White/T_L_Key_White.png
+keyglyph M juliocacko_input_prompts/Keyboard_Mouse/White/T_M_Key_White.png
+keyglyph N juliocacko_input_prompts/Keyboard_Mouse/White/T_N_Key_White.png
+keyglyph O juliocacko_input_prompts/Keyboard_Mouse/White/T_O_Key_White.png
+keyglyph P juliocacko_input_prompts/Keyboard_Mouse/White/T_P_Key_White.png
+keyglyph Q juliocacko_input_prompts/Keyboard_Mouse/White/T_Q_Key_White.png
+keyglyph R juliocacko_input_prompts/Keyboard_Mouse/White/T_R_Key_White.png
+keyglyph S juliocacko_input_prompts/Keyboard_Mouse/White/T_S_Key_White.png
+keyglyph T juliocacko_input_prompts/Keyboard_Mouse/White/T_T_Key_White.png
+keyglyph U juliocacko_input_prompts/Keyboard_Mouse/White/T_U_Key_White.png
+keyglyph V juliocacko_input_prompts/Keyboard_Mouse/White/T_V_Key_White.png
+keyglyph W juliocacko_input_prompts/Keyboard_Mouse/White/T_W_Key_White.png
+keyglyph X juliocacko_input_prompts/Keyboard_Mouse/White/T_X_Key_White.png
+keyglyph Y juliocacko_input_prompts/Keyboard_Mouse/White/T_Y_Key_White.png
+keyglyph Z juliocacko_input_prompts/Keyboard_Mouse/White/T_Z_Key_White.png
+keyglyph 0 juliocacko_input_prompts/Keyboard_Mouse/White/T_0_Key_White.png
+keyglyph 1 juliocacko_input_prompts/Keyboard_Mouse/White/T_1_Key_White.png
+keyglyph 2 juliocacko_input_prompts/Keyboard_Mouse/White/T_2_Key_White.png
+keyglyph 3 juliocacko_input_prompts/Keyboard_Mouse/White/T_3_Key_White.png
+keyglyph 4 juliocacko_input_prompts/Keyboard_Mouse/White/T_4_Key_White.png
+keyglyph 5 juliocacko_input_prompts/Keyboard_Mouse/White/T_5_Key_White.png
+keyglyph 6 juliocacko_input_prompts/Keyboard_Mouse/White/T_6_Key_White.png
+keyglyph 7 juliocacko_input_prompts/Keyboard_Mouse/White/T_7_Key_White.png
+keyglyph 8 juliocacko_input_prompts/Keyboard_Mouse/White/T_8_Key_White.png
+keyglyph 9 juliocacko_input_prompts/Keyboard_Mouse/White/T_9_Key_White.png
+keyglyph Keypad_0 juliocacko_input_prompts/Keyboard_Mouse/White/T_0_Key_White.png
+keyglyph Keypad_1 juliocacko_input_prompts/Keyboard_Mouse/White/T_1_Key_White.png
+keyglyph Keypad_2 juliocacko_input_prompts/Keyboard_Mouse/White/T_2_Key_White.png
+keyglyph Keypad_3 juliocacko_input_prompts/Keyboard_Mouse/White/T_3_Key_White.png
+keyglyph Keypad_4 juliocacko_input_prompts/Keyboard_Mouse/White/T_4_Key_White.png
+keyglyph Keypad_5 juliocacko_input_prompts/Keyboard_Mouse/White/T_5_Key_White.png
+keyglyph Keypad_6 juliocacko_input_prompts/Keyboard_Mouse/White/T_6_Key_White.png
+keyglyph Keypad_7 juliocacko_input_prompts/Keyboard_Mouse/White/T_7_Key_White.png
+keyglyph Keypad_8 juliocacko_input_prompts/Keyboard_Mouse/White/T_8_Key_White.png
+keyglyph Keypad_9 juliocacko_input_prompts/Keyboard_Mouse/White/T_9_Key_White.png
+keyglyph Keypad_* juliocacko_input_prompts/Keyboard_Mouse/White/T_Asterisk_Key_White.png
+keyglyph Keypad_+ juliocacko_input_prompts/Keyboard_Mouse/White/T_Plus_Tall_Key_White.png
+keyglyph Keypad_- juliocacko_input_prompts/Keyboard_Mouse/White/T_Minus_Key_White.png
+keyglyph Keypad_/ juliocacko_input_prompts/Keyboard_Mouse/White/T_Slash_Key_White.png
+keyglyph Keypad_Enter juliocacko_input_prompts/Keyboard_Mouse/White/T_Enter_Tall_Key_White.png
+keyglyph Return juliocacko_input_prompts/Keyboard_Mouse/White/T_Enter_Key_White.png
+keyglyph Escape juliocacko_input_prompts/Keyboard_Mouse/White/T_Esc_Key_White.png
+keyglyph Backspace juliocacko_input_prompts/Keyboard_Mouse/White/T_BackSpace_Key_White.png
+keyglyph Tab juliocacko_input_prompts/Keyboard_Mouse/White/T_Tab_Key_White.png
+keyglyph Space juliocacko_input_prompts/Keyboard_Mouse/White/T_Space_Key_White.png
+keyglyph CapsLock juliocacko_input_prompts/Keyboard_Mouse/White/T_CapsLock_Key_White.png
+keyglyph Numlock juliocacko_input_prompts/Keyboard_Mouse/White/T_NumLock_Key_White.png
+keyglyph PrintScreen juliocacko_input_prompts/Keyboard_Mouse/White/T_PrtScrn_Key_White.png
+keyglyph Insert juliocacko_input_prompts/Keyboard_Mouse/White/T_Ins_Key_White.png
+keyglyph Delete juliocacko_input_prompts/Keyboard_Mouse/White/T_Del_Key_White.png
+keyglyph Home juliocacko_input_prompts/Keyboard_Mouse/White/T_Home_Key_White.png
+keyglyph End juliocacko_input_prompts/Keyboard_Mouse/White/T_End_Key_White.png
+keyglyph PageUp juliocacko_input_prompts/Keyboard_Mouse/White/T_PageUp_Key_White.png
+keyglyph PageDown juliocacko_input_prompts/Keyboard_Mouse/White/T_PageDown_Key_White.png
+keyglyph Up juliocacko_input_prompts/Keyboard_Mouse/White/T_Up_Key_White.png
+keyglyph Down juliocacko_input_prompts/Keyboard_Mouse/White/T_Down_Key_White.png
+keyglyph Left juliocacko_input_prompts/Keyboard_Mouse/White/T_Left_Key_White.png
+keyglyph Right juliocacko_input_prompts/Keyboard_Mouse/White/T_Right_Key_White.png
+keyglyph Left_Shift juliocacko_input_prompts/Keyboard_Mouse/White/T_Shift_Key_White.png
+keyglyph Right_Shift juliocacko_input_prompts/Keyboard_Mouse/White/T_Shift_Key_White.png
+keyglyph Left_Ctrl juliocacko_input_prompts/Keyboard_Mouse/White/T_Crtl_Key_White.png
+keyglyph Right_Ctrl juliocacko_input_prompts/Keyboard_Mouse/White/T_Crtl_Key_White.png
+keyglyph Left_Alt juliocacko_input_prompts/Keyboard_Mouse/White/T_Alt_Key_White.png
+keyglyph Right_Alt juliocacko_input_prompts/Keyboard_Mouse/White/T_Alt_Key_White.png
+keyglyph F1 juliocacko_input_prompts/Keyboard_Mouse/White/T_F1_Key_White.png
+keyglyph F2 juliocacko_input_prompts/Keyboard_Mouse/White/T_F2_Key_White.png
+keyglyph F3 juliocacko_input_prompts/Keyboard_Mouse/White/T_F3_Key_White.png
+keyglyph F4 juliocacko_input_prompts/Keyboard_Mouse/White/T_F4_Key_White.png
+keyglyph F5 juliocacko_input_prompts/Keyboard_Mouse/White/T_F5_Key_White.png
+keyglyph F6 juliocacko_input_prompts/Keyboard_Mouse/White/T_F6_Key_White.png
+keyglyph F7 juliocacko_input_prompts/Keyboard_Mouse/White/T_F7_Key_White.png
+keyglyph F8 juliocacko_input_prompts/Keyboard_Mouse/White/T_F8_Key_White.png
+keyglyph F9 juliocacko_input_prompts/Keyboard_Mouse/White/T_F9_Key_White.png
+keyglyph F10 juliocacko_input_prompts/Keyboard_Mouse/White/T_F10_Key_White.png
+keyglyph F11 juliocacko_input_prompts/Keyboard_Mouse/White/T_F11_Key_White.png
+keyglyph F12 juliocacko_input_prompts/Keyboard_Mouse/White/T_F12_Key_White.png
+keyglyph - juliocacko_input_prompts/Keyboard_Mouse/White/T_Minus_Key_White.png
+keyglyph = juliocacko_input_prompts/Keyboard_Mouse/White/T_Plus_Key_White.png
+keyglyph [ juliocacko_input_prompts/Keyboard_Mouse/White/T_Brackets_L_Key_White.png
+keyglyph ] juliocacko_input_prompts/Keyboard_Mouse/White/T_Brackets_R_Key_White.png
+keyglyph ; juliocacko_input_prompts/Keyboard_Mouse/White/T_Semicolon_Key_White.png
+keyglyph ' juliocacko_input_prompts/Keyboard_Mouse/White/T_Quotation_Key_White.png
+keyglyph ` juliocacko_input_prompts/Keyboard_Mouse/White/T_Tilde_Key_White.png
+keyglyph , juliocacko_input_prompts/Keyboard_Mouse/White/T_Keyboard_R_Key_White-1.png
+keyglyph . juliocacko_input_prompts/Keyboard_Mouse/White/T_Keyboard_R_Key_White.png
+keyglyph / juliocacko_input_prompts/Keyboard_Mouse/White/T_Slash_Key_White.png
+# ── mouse (the controls lane's inputs: docs/PC_CONTROLS.md section 7) ─────────
+keyglyph Mouse1 juliocacko_input_prompts/Keyboard_Mouse/White/T_Mouse_Left_Key_White.png
+keyglyph Mouse2 juliocacko_input_prompts/Keyboard_Mouse/White/T_Mouse_Right_Key_White.png
+keyglyph Mouse3 juliocacko_input_prompts/Keyboard_Mouse/White/T_Mouse_Middle_Key_White.png
+keyglyph Mouse4 juliocacko_input_prompts/Keyboard_Mouse/White/T_Mouse_Simple_Key_White.png
+keyglyph Mouse5 juliocacko_input_prompts/Keyboard_Mouse/White/T_Mouse_Simple_Key_White.png
+keyglyph WheelUp juliocacko_input_prompts/Keyboard_Mouse/White/T_Mouse_Scroll_Up_Key_Dark_Key_White.png
+keyglyph WheelDown juliocacko_input_prompts/Keyboard_Mouse/White/T_Mouse_Scroll_Down_Key_Dark_Key_White.png
+keyglyph Wheel juliocacko_input_prompts/Keyboard_Mouse/White/T_Mouse_Scroll_Key_Dark_Key_White.png
+keyglyph MouseMove juliocacko_input_prompts/Keyboard_Mouse/White/T_Mouse_XY_Key_White.png

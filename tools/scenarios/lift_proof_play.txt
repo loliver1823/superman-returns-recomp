@@ -1,0 +1,13 @@
+# iter-465 playthrough lane: companion of lift_proof.json (tools/controls/harness_play.py).
+# The race picked in SIDE MISSIONS starts; F10 (SKIP) ends it; Superman is lifted clear of its start circle;
+# 20 s later F10 again must be refused 'nothing_active' (the game did not restart the race).
+await \[APT_REQ\] .*path='screens/hud/main_hud' 1500
+await \[DEVTOOL\] levelskip armed plan=.*menu_side_95 1500
+await \[DEVTOOL\] act=levelskip\.reach args=95 FastFlyer 600
+wait 25000
+tap F10 300
+await \[DEVTOOL\] act=levelskip\.lift|refused act=levelskip\.lift 120
+wait 20000
+tap F10 300
+await \[DEVTOOL\] refused act=levelskip\.skip_mission|skip_mission ticket=\d+ active 60
+sample done

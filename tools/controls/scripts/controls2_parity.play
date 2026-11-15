@@ -1,0 +1,123 @@
+# iter-466 controls2: THE PARITY ROLL (docs/PC_CONTROLS.md 2.6). Keys (player keymap, through the
+# action layer) and a ViGEm Xbox 360 pad (the game's native pad path) do the same actions in the same
+# session; tools/controls/parity_trace.py compares what the game's commands answered for each pair
+# (<out>/actions.jsonl). The mouse cursor drives the front end and the pause menu by direct calls.
+# Run: tools/controls/play_roll.ps1 (SR_PORT_FEATURES=1, SR_HARNESS_VPAD=1, the cursor feed).
+keymap legacy
+await \[NAT_FE\] .256 natural FE master tick 300
+tap_until RETURN 250 12000 4 \[APT_LOADMOVIE\].*\("main"\)
+await \[APT_REQ\] \S+ path='\.\./common/ButtonHints/XBox360/HintB' 240
+wait 10000
+vplug
+wait 3000
+# ── the title: Enter = INTERFACE_A through the action layer (ScrPressStart takes CROSS)
+keymap player
+press RETURN 300 title-enter
+expect claim LoadCreate 20
+ifmiss tap_try RETURN 300 3000 4 claim LoadCreate
+wait 5000
+# ── MAIN MENU by the mouse: wake the cursor, click SETTINGS (row 2), right-click = back
+cursor move 600 300
+cursor move 640 320
+wait 1500
+cclickitem 2
+expect menu button=2|MOUSE_UI\] call gEH.HandleEvent\(302\) 10
+wait 3000
+cursor move 600 200
+cclick 640 360 right
+expect MOUSE_UI\] call gEH.HandleEvent\(304\) 10
+wait 3000
+# NEW GAME (row 0) by the mouse: hover moves the focus with the focus manager's own step
+cursor move 640 330
+wait 800
+chover 0
+expect MOUSE_UI\] call select(Next|Previous)Item 10
+wait 1500
+cclickitem 0
+expect answer cppId=\S+ button=0 10
+ifmiss keymap legacy
+ifmiss tap Z 250
+keymap player
+await \[APT_REQ\] \S+ path='screens/hud/main_hud' 180
+wait 20000
+await_ctx 2 300
+wait 6000
+# ── gameplay pairs: KEY first, then the same action on the PAD (2 s apart)
+press W 900 key-move
+wait 2000
+vstick l 0 32767 900 pad-move
+wait 2500
+button left down
+watch 400 key-attack
+button left up
+wait 2000
+vpress X 400 pad-attack
+wait 2500
+press E 300 key-pickup
+wait 2000
+vpress A 300 pad-pickup
+wait 2500
+press LEFT SHIFT 800 key-superspeed
+wait 2500
+vpress RB 800 pad-superspeed
+wait 2500
+press 2 300 key-power-freeze
+wait 2000
+vpress RIGHT 300 pad-power-freeze
+wait 2500
+press F 500 key-superpower
+wait 3000
+vtrigger r 500 pad-superpower
+wait 3000
+press LEFT ALT 300 key-dodge
+wait 2500
+press SPACE 300 key-takeoff
+wait 5000
+press SPACE 300 key-land
+wait 6000
+vpress Y 300 pad-takeoff
+wait 5000
+vpress Y 300 pad-land
+wait 6000
+# ── pause: Esc (key) / START (pad); back: Esc (key) / B (pad)
+press ESCAPE 300 key-pause
+expect SR_Log 'pause install' 10
+wait 3000
+# the pause menu by the mouse: hover row 1 (a focus step), then right-click = back (closes it)
+cursor move 600 300
+cursor move 640 320
+wait 1000
+chover 1
+expect MOUSE_UI\] call select(Next|Previous)Item 10
+wait 1500
+cclick 640 360 right
+expect PC_CONTROLS\] context gameplay 10
+ifmiss press ESCAPE 300 key-back
+wait 3000
+vpress START 300 pad-pause
+expect SR_Log 'pause install' 10
+wait 3000
+vpress B 300 pad-back
+expect PC_CONTROLS\] context gameplay 10
+wait 3000
+press ESCAPE 300 key-pause2
+expect SR_Log 'pause install' 10
+wait 2500
+press ESCAPE 300 key-back2
+expect PC_CONTROLS\] context gameplay 10
+wait 3000
+# ── map: M (key) / BACK (pad); back: Esc / B
+press M 300 key-map
+expect PC_CONTROLS\] context menu 10
+wait 3000
+press ESCAPE 300 key-map-back
+expect PC_CONTROLS\] context gameplay 10
+wait 3000
+vpress BACK 300 pad-map
+expect PC_CONTROLS\] context menu 10
+wait 3000
+vpress B 300 pad-map-back
+expect PC_CONTROLS\] context gameplay 10
+wait 4000
+vunplug
+wait 2000

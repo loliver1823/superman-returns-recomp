@@ -1,0 +1,149 @@
+{
+  "name": "mouse-femenu",
+  "purpose": "iter-464 mouse cursor (docs/MOUSE_CURSOR.md 8) on the custom front end (-Gates SR_MODS=custom_frontend): a click anywhere on the title, the MAIN MENU popup (hover sweep + a click on OPTIONS: lane E L-b, the OPTIONS screen - INVERT LOOK on its GAME tab, APPLY, close by keys; the cursor on the retail option screens is in game now), LOAD GAME (the slot picker, right click back), EXIT -> YES by the mouse: exit code 0. Gates SR_MOUSE_UI_LOG=1 (the cursor's log).",
+  "gates": "SR_MENU_CENSUS=1,SR_MOUSE_UI_LOG=1,SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=10,SR_PRESENT_DUMP_SPARSE_CAP=1500",
+  "steps": [
+    {
+      "name": "fe-alive",
+      "await": "\\[NAT_FE\\] #1 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "settle-title",
+      "await": "\\[NAT_FE\\] #256 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "press-start",
+      "key": "ENTER",
+      "holdMs": 250,
+      "maxPulses": 4,
+      "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)",
+      "expectMs": 90000
+    },
+    {
+      "name": "title-ui-tail",
+      "await": "\\[APT_REQ\\] #15 path='\\.\\./common/ButtonHints/XBox360/HintB'",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "title-visible",
+      "requireVisibleMs": 8000,
+      "visibleTimeoutMs": 200000,
+      "dwellMs": 10000
+    },
+    {
+      "name": "title-click",
+      "mouse": "move 560,480; move 640,520; wait 1500; click 640,520",
+      "expect": "\\[SR_FSCMD\\].*claim LoadCreate",
+      "expectMs": 30000
+    },
+    {
+      "name": "menu-visible",
+      "dwellMs": 5000
+    },
+    {
+      "name": "menu-sweep",
+      "purpose": "A slow vertical sweep over the 5 rows: focus follows; the snapshot lines log every row rect.",
+      "mouse": "move 640,300; wait 1000; move 640,340; wait 2000; move 640,372; wait 2000; move 640,404; wait 2000; move 640,436; wait 2000; move 640,468; wait 2000; move 640,500; wait 1500",
+      "expect": "\\[MOUSE_UI\\] press 0x000[12] \\(focus\\)",
+      "expectMs": 20000,
+      "expectFresh": true,
+      "optional": true
+    },
+    {
+      "name": "menu-click-options",
+      "mouse": "click 640,398",
+      "expect": "\\[SR_FSCMD\\].*menu button=2",
+      "expectMs": 20000,
+      "expectFresh": true,
+      "purpose": "lane E L-b: a click on OPTIONS (row 2) opens the OPTIONS screen; the five-row popup's row 2 is y 377.8..417.8 (the [MOUSE_UI] snapshot rects), its centre 398 is in no other row"
+    },
+    {
+      "name": "options-shown",
+      "expect": "\\[PC_SETTINGS\\] shown \\(FE",
+      "expectSince": "menu-click-options",
+      "expectMs": 15000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "invert-on",
+      "key": "RIGHT",
+      "holdMs": 160,
+      "maxPulses": 1,
+      "dwellMs": 1500,
+      "expect": "\\[PC_SETTINGS\\] preview game_invert_y = on",
+      "expectMs": 8000
+    },
+    {
+      "name": "apply",
+      "key": "Y",
+      "holdMs": 160,
+      "maxPulses": 1,
+      "dwellMs": 2000,
+      "expect": "\\[PC_SETTINGS\\] game_invert_y = on \\(applied, stored\\)",
+      "expectMs": 8000
+    },
+    {
+      "name": "options-close",
+      "key": "B",
+      "holdMs": 160,
+      "maxPulses": 1,
+      "dwellMs": 3000,
+      "expect": "\\[PC_SETTINGS\\] close",
+      "expectMs": 8000
+    },
+    {
+      "name": "menu-again",
+      "expect": "\\[MENU_CENSUS\\].*page='MAIN MENU'.* sel=2 ",
+      "expectSince": "options-close",
+      "expectMs": 15000,
+      "dwellMs": 2000
+    },
+    {
+      "name": "menu-click-load",
+      "mouse": "move 600,366; click 640,366",
+      "expect": "\\[SR_FSCMD\\].*answer cppId=\\S+ button=1",
+      "expectMs": 20000,
+      "expectFresh": true,
+      "purpose": "LOAD GAME (row 1: y 345.8..385.8, its centre 366 is in no other row)"
+    },
+    {
+      "name": "slots-visible",
+      "mouse": "move 600,300; wait 1500; move 640,330; wait 1500; move 640,460",
+      "dwellMs": 4000
+    },
+    {
+      "name": "slots-back",
+      "purpose": "Right click = B: the slot picker closes and the MAIN MENU comes back.",
+      "mouse": "rclick",
+      "expect": "\\[SR_FSCMD\\].*claim LoadCreate",
+      "expectMs": 20000,
+      "expectFresh": true,
+      "dwellMs": 4000
+    },
+    {
+      "name": "menu-click-exit",
+      "mouse": "move 600,462; click 640,462",
+      "expect": "\\[SR_FSCMD\\].*menu button=4",
+      "expectMs": 20000,
+      "expectFresh": true,
+      "dwellMs": 4000,
+      "purpose": "EXIT is row 4 since the MODS row (iter-464 modmenu): y 441.8..481.8, its centre 462 is in no other row"
+    },
+    {
+      "name": "confirm-yes",
+      "purpose": "QUIT TO DESKTOP? rows NO (0) / YES (1): click YES.",
+      "mouse": "move 600,425; click 640,421",
+      "expect": "\\[SR_FSCMD\\].*SR_Quit",
+      "expectMs": 20000,
+      "expectFresh": true
+    },
+    {
+      "name": "exits",
+      "expectExitCode": 0,
+      "exitTimeoutMs": 30000
+    }
+  ]
+}

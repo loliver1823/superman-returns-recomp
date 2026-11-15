@@ -1,0 +1,218 @@
+{
+ "_doc": [
+  "The dev-tool registry (docs/DEVTOOLS_DESIGN.md 2.2; user guide docs/DEVTOOLS.md).",
+  "One row per tool of the CLOSED set in kernel/devtools.cpp kTools[] - scripts/audit_forcing.py",
+  "fails when the two differ (name and class). class: observe = display / read-only (never writes",
+  "guest memory, never calls guest code); devtool = acts on the game (the run is tagged",
+  "dev-tool-assisted). gate: how it is switched on (always default OFF). protocol: the per-step",
+  "status of memory/feedback_tool_verification_protocol.md (1 port, 2 calibrate, 3 layout,",
+  "4 triangulate, 5 oracle, 6 observe-only and cheap) - HONEST: a step is 'done' only with the",
+  "evidence named in it. A tool's number is quoted as evidence only when every applicable step is done."
+ ],
+ "tools": [
+  {
+   "name": "hud",
+   "class": "observe",
+   "gate": "devToolAllowed(\"hud\") via dev.txt / SR_DEVTOOLS (default OFF)",
+   "built": false,
+   "guest_reads": [],
+   "guest_writes": [],
+   "guest_calls": [],
+   "truth_source": "host frame timing",
+   "protocol": {
+    "1": "n/a",
+    "2": "n/a",
+    "3": "n/a",
+    "4": "n/a",
+    "5": "n/a",
+    "6": "todo (not built: design 10 step 13)"
+   },
+   "calibration_test": "",
+   "known_differences": []
+  },
+  {
+   "name": "objstate",
+   "class": "observe",
+   "gate": "devToolAllowed(\"objstate\") via dev.txt / SR_DEVTOOLS (default OFF); hook devToolHookNeeded_sub_8223EB08/ECC0/F230",
+   "built": true,
+   "guest_reads": [
+    "base flow + DAS (objectiveStatus0..8, objectiveFound0..8, objective*, triggersAvailable, waitingForLoad, ...)",
+    "OBJ|TRIGGERS members and their trigger FSM states",
+    "BaseWorldFlow FSM state id (proved against the baseworl.AST graph)",
+    "CurrentXP stat value and cap",
+    "the game run state"
+   ],
+   "guest_writes": [],
+   "guest_calls": [],
+   "truth_source": "kernel/devtools_skip_core.cpp = the C++ port of tools/devtools/skipexec.py (objstate.py's ports); [OBJSTATE] lines every SR_DEVTOOLS_OBJSTATE_EVERY active ticks when the story key changes, plus <SR_DEVTOOLS_OUT>/objstate_<n>.{snap,report.json}",
+   "protocol": {
+    "1": "done offline: report == skipexec.report on 3 goldens + 5 live-run-1 snaps (tools/devtools/test_skipcore_cpp.py)",
+    "2": "open",
+    "3": "inherits objstate.py's (TOOLKIT 1.11)",
+    "4": "inherits objstate.py's availability / metro / FSM-distance triangulation",
+    "5": "open: no in-exe dump compared with the Xenia oracle yet",
+    "6": "reads only on the tick thread, fault-free (hostRangeReadableCached); cost unmeasured"
+   },
+   "calibration_test": "tools/devtools/test_skipcore_cpp.py LookupDifferential / LiveRun1",
+   "known_differences": [
+    "a dump is the C++ report (skipexec.report keys), not the full objstate snapshot; the .snap it writes holds only the pages that report read, so objstate.py over it fails the checks that need more pages"
+   ]
+  },
+  {
+   "name": "streaming",
+   "class": "observe",
+   "gate": "devToolAllowed(\"streaming\") via dev.txt / SR_DEVTOOLS (default OFF)",
+   "built": false,
+   "guest_reads": [],
+   "guest_writes": [],
+   "guest_calls": [],
+   "truth_source": "the retail Streamer queue (to be re-derived)",
+   "protocol": {
+    "1": "todo",
+    "2": "n/a",
+    "3": "open (design 10 step 14)",
+    "4": "todo",
+    "5": "todo",
+    "6": "todo (not built)"
+   },
+   "calibration_test": "",
+   "known_differences": []
+  },
+  {
+   "name": "levelskip",
+   "class": "devtool",
+   "gate": "devToolAllowed(\"levelskip\") via dev.txt / SR_DEVTOOLS (default OFF); plan = SR_DEVTOOLS_CMDS; hook devToolHookNeeded_sub_8223EB08/ECC0/F230",
+   "built": true,
+   "guest_reads": [
+    "as objstate"
+   ],
+   "guest_writes": [
+    "pass: base-flow DAS objectiveComplete := 1 then objectiveWon := 1 (u32 BE; the store of DAS_SetIntInScope_sub_82218F38)",
+    "reach (UNPROVEN live): trigger FSM state +0x14 := 1e9 (f32 BE), restored once engaged",
+    "xp_to_cap: CurrentXP stat +8 := its cap (f64 BE; the stfd of the stat setter 0x8223FD58)"
+   ],
+   "guest_calls": [],
+   "truth_source": "kernel/devtools_skip_core.cpp == tools/devtools/skipexec.py (the reference) == tools/devtools/frida_skip.js (the Xenia oracle executor)",
+   "protocol": {
+    "1": "done offline: parser (corpus 64 + fuzz 1500), report and write lists (3 goldens + wrong graph + 5 live-run-1 snaps), 27 step-machine simulations equal the reference; 26 C++ mutants killed (tools/devtools/test_skipcore_cpp.py)",
+    "2": "n/a (the primitives are the game's own stores)",
+    "3": "n/a",
+    "4": "static part only",
+    "5": "OPEN: the kernel executor has not run a plan in the game; the pass primitive is proven 3/3 in Xenia by the Frida executor only (DEVTOOLS_DESIGN 6.7)",
+    "6": "writes only on the active tick at the drain point, fresh VirtualQuery per write; audited as DEVTOOL"
+   },
+   "calibration_test": "tools/devtools/test_skipcore_cpp.py; live: steps.jsonl + k<k>_<prim>_executed.snap per write (skipexec.resolve on the same bytes, tools/devtools/kernel_skip_check.py)",
+   "known_differences": [
+    "no pad injection in the exe yet: a pad step refuses pad_unsupported when the MSTobj03 save prompt shows (our build is always signed in; open item 13)",
+    "play_objective refuses 'unsupported' (a guest call; design 10 step 9 not built)",
+    "deadline polls ride the 10 s [GAUGE] census thread, so a deadline can fire up to 10 s late while no tick runs (the Frida host polls every --poll-seconds)"
+   ]
+  },
+  {
+   "name": "freecam",
+   "class": "devtool",
+   "gate": "devToolAllowed(\"freecam\") via dev.txt / SR_DEVTOOLS (default OFF); commands `freecam on|off` (devToolsSubmit / F6 / a plan step); hook devToolHookNeeded_sub_8223EB08",
+   "built": true,
+   "guest_reads": [
+    "camera manager *0x8296D86C: owner mode +0x10, selector +0x1310, state +0x1320, pending +0x1328/+0x132C, the debug camera's vtables at +0x1150/+0x1154",
+    "input context manager *0x8296D884: slot array +0x20, slot count +0x1C",
+    "SlotSwitch *0x8296DF4C"
+   ],
+   "guest_writes": [
+    "on: camera manager +0x132C := 0.0, +0x1328 := 10, +0x10 := 1; controller slot 1 input context (*(*0x8296D884+0x20)+0x1C) := 7 (DebugContext)",
+    "off: camera manager +0x10 := 0 (when 0 or 1); slot 1 context restored when still 7"
+   ],
+   "guest_calls": [
+    "on: EulerAnglesToRotationMatrix_sub_82169048(cam), SetInterfaceState_sub_821745D0(mgr, 7, 1)",
+    "off: SetInterfaceState_sub_821745D0(mgr, saved, 1), a pending SetInterfaceState(mgr, p, 0) / RequestInterfaceState_sub_8218CD68, SlotSwitch_SetMode_sub_821E8588(*0x8296DF4C, 1)"
+   ],
+   "truth_source": "the retail debug camera itself (CameraManagerCtor_sub_8218C4C0 +0x1150; fly controls CameraInputKeyHandler_sub_821691A8); the switch is the dev's (0x821A99A0 -> 0x8219B2C8 / 0x821A8078), ported in kernel/devtools_levelskip.cpp; host input routed to guest controller 2 (kernel/stubs.cpp)",
+   "protocol": {
+    "1": "C1 (write list = the switch's enable/disable stores, docs/DEVTOOLS.md 6.4); no machine differential",
+    "2": "open",
+    "3": "the camera manager / input-context functions are exact matcher twins (CameraManagerCtor, CameraInputKeyHandler, IgcContextManagerInitSlots, SetInterfaceState, RequestInterfaceState)",
+    "4": "n/a",
+    "5": "open: the Frida executor cannot make Xenia guest calls (refuses 'unsupported')",
+    "6": "gate off = exact pass-through (zero-impact replays); writes and calls only on the tick thread at the drain point"
+   },
+   "calibration_test": "live roll: freecam on/off from a plan; frames + [DEVTOOL] act=freecam lines; camera manager state read back",
+   "known_differences": [
+    "the camera wants a second pad; ours routes the host pad + keyboard to guest controller 2 and reports controller 1 neutral while it is on",
+    "freecam off also restores controller 2's input context",
+    "a pending state request with a transition time is applied with RequestInterfaceState(f1 = its time, r5 = 0, r6 = 0)"
+   ]
+  },
+  {
+   "name": "menuinput",
+   "class": "devtool",
+   "gate": "devToolAllowed(\"menuinput\") via dev.txt / SR_DEVTOOLS (default OFF)",
+   "built": false,
+   "guest_reads": [],
+   "guest_writes": [
+    "guest input is neutral while the menu is up (stub_XamInputGetState)"
+   ],
+   "guest_calls": [],
+   "truth_source": "host",
+   "protocol": {
+    "1": "n/a",
+    "2": "n/a",
+    "3": "n/a",
+    "4": "n/a",
+    "5": "n/a",
+    "6": "todo (not built: design 10 step 13)"
+   },
+   "calibration_test": "",
+   "known_differences": []
+  },
+  {
+   "name": "devmenu",
+   "class": "devtool",
+   "gate": "devToolAllowed(\"devmenu\"): switched on ONLY from the in-game Dev Tools menu (devToolsSetAtRuntime, after the one-time notice; never persisted) - the custom_frontend content mod draws the menu (docs/CUSTOM_FRONTEND.md 5.7)",
+   "built": true,
+   "guest_reads": [],
+   "guest_writes": [],
+   "guest_calls": [],
+   "truth_source": "kernel/devtools_menu.cpp (the page model) + tools/apt/mods/custom_frontend/devtools_ui.aptasm (the Apt renderer)",
+   "protocol": {"1": "done offline: difftest --mod-overlay-test M15a-s (pages, notice, enable/disable, arm/stop, registered toggle/slider rows)", "2": "n/a (a menu)", "3": "n/a", "4": "n/a", "5": "live rolls (docs/CUSTOM_FRONTEND.md 5.7): front end and pause menu", "6": "the master switch only tags the session; every action on the game goes through another closed-set tool (levelskip, the DT-2 cheats)"},
+   "calibration_test": "build/difftest.exe --mod-overlay-test (M15)",
+   "known_differences": ["switching it on marks the session (and every save made in it, the earlier ones included) dev-tool assisted for good; switching it off stops the tools but keeps the mark"]
+  },
+  {
+   "name": "cheats",
+   "class": "devtool",
+   "gate": "devToolAllowed(\"cheats\") via dev.txt / SR_DEVTOOLS (default OFF); commands through devToolsSubmit (the in-game Dev Tools menu) or a plan (then under levelskip); hook devToolHookNeeded_sub_8223EB08",
+   "built": true,
+   "guest_reads": [
+    "script-timer map *(*0x8296DF2C) (eastl rb-tree walk, Eastl_RBTreeIncrement_sub_8271D578)",
+    "objective manager *0x8296DF5C +4 (mini-event enable)",
+    "Metropolis health *0x8296DF50 +4 / +8 / +0x10 / +0x2C / +0x2D",
+    "warp: the pad-0 actor's class vt (0x82009798) and vt+0xC, its position +0x20; warp camera: the debug camera *0x8296D86C +0x1150 +0x70",
+    "infinite_stamina: the upgrade registry *0x8296DF6C, the Superman actor +0x68, the StaminaInfinite entry +0x23"
+   ],
+   "guest_writes": [
+    "pause_timers on|off: byte +37 (running) of every running flow-owned timer node (the store of sub_82209270 / ScriptCmd_PauseTimer); off restores exactly the nodes on paused",
+    "minievents on|off: objective manager +4 := 1|0 (read by ScriptCmd_AreMiniEventsEnabled_sub_8224B948)",
+    "metro_lock on|off: health := max, fraction := 1.0, damage-enabled +0x2C := 0 (= the stores of retail INFINITE_METROPOLIS minus its lock byte); off restores the damage byte",
+    "infinite_stamina on|off (command channel; F8): StaminaInfinite upgrade +0x23 owned := 1|0 (the retail INFINITE_STAMINA cheat's store, without the cheat's active flag and cheat-used byte)"
+   ],
+   "guest_calls": [
+    "warp X Y Z | warp camera (command channel only; F7 = warp camera): GameInput_GetPadActor_sub_8229E210(*0x8296E8C8, 0), then the Superman actor's vt+0xC sub_821AA218(actor, &(X, Y, Z, 0)); its stores (actor +0x20, the physics proxy body) are the game's own",
+    "infinite_stamina on|off: GameInput_GetPadActor_sub_8229E210, FindEntryByName_sub_821F0CB8(*0x8296DF6C, \"StaminaInfinite\" 0x82009E6C), then ApplyPowerups_sub_8221F808(*0x8296DF6C) = the retail cheat's own call (C1: tools/devtools/c1_cheats.py)"
+   ],
+   "truth_source": "kernel/devtools_skip_core.cpp == tools/devtools/skipexec.py (reference) == tools/devtools/frida_skip.js (the Xenia executor): the same write lists over the same image",
+   "protocol": {
+    "1": "done offline: write lists, readout (timers / minievents / metro) and step machine equal the reference on the 3 goldens (test_frida_skip, test_skipcore_cpp); planted mutants killed (test_cheats_dt2)",
+    "2": "n/a (single stores the game makes)",
+    "3": "the timer map / objective manager / metro layouts are read by retail functions (ScriptTimerMgr_Tick, sub_82209270, ScriptCmd_AreMiniEventsEnabled, ScriptCmd_SetMetropolisHealth)",
+    "4": "the timer walk ends on the anchor after exactly map+20 nodes (structural); keys sorted",
+    "5": "see docs/DEVTOOLS.md 6.6 (the same plan in Xenia and ours)",
+    "6": "gate off = exact pass-through; one write list per command, on the tick thread at the drain point"
+   },
+   "calibration_test": "tools/devtools/test_cheats_dt2.py; live: kernel_skip_check on the run's own .snap",
+   "known_differences": [
+    "pause_timers off resumes only the timers pause_timers on paused",
+    "metro_lock off restores the damage byte it cleared"
+   ]
+  }
+ ]
+}

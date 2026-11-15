@@ -1,0 +1,349 @@
+{
+  "name": "step5-pause-rows",
+  "purpose": "Lane E L-c (RELEASE_PLAN step 5; STEP5_PLAN 10, the owner's q14d): the 9-row pause menu (7 rows + QUIT until PHOTO MODE) and the two-choice QUIT. Port features on, audio null, the harness keyboard. NEW GAME, pause; the rows are reached by UP from RESUME GAME (the wrap: QUIT GAME, then OPTIONS - the hidden PHOTO MODE slot is skipped -, MOVES LIST, STATISTICS, ACHIEVEMENTS), so the walk does not depend on whether RESTART OBJECTIVE / SAVE / LOAD are enabled. ACHIEVEMENTS opens the host page (SR_Achievements) and B returns with it focused; DOWN: STATISTICS and MOVES LIST open the game's own screens and their own B returns (the pause menu installs again with the row focused); DOWN: OPTIONS opens the OPTIONS screen and its close calls SR_OptionsClosed(0); DOWN (past the hidden slot): QUIT GAME shows QUIT TO TITLE / QUIT TO DESKTOP - B cancels (button=-1), A on the default QUIT TO TITLE runs the game's own quit back to the title; then NEW GAME again, pause, UP to QUIT GAME, DOWN to QUIT TO DESKTOP, A: SR_Quit and a clean exit.",
+  "gates": "SR_PORT_FEATURES=1,SR_AUDIO_SINK=null,SR_KB_PAD_OBS=1,SR_MENU_CENSUS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=20,SR_PRESENT_DUMP_SPARSE_CAP=2000",
+  "steps": [
+    {
+      "name": "fe-alive",
+      "await": "\\[NAT_FE\\] #1 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "settle-title",
+      "await": "\\[NAT_FE\\] #256 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "press-start",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 4,
+      "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)",
+      "expectMs": 90000
+    },
+    {
+      "name": "title-ui-tail",
+      "await": "\\[APT_REQ\\] #15 path='\\.\\./common/ButtonHints/XBox360/HintB'",
+      "timeoutMs": 240000
+    },
+    {
+      "name": "title-visible",
+      "requireVisibleMs": 8000,
+      "visibleTimeoutMs": 200000,
+      "dwellMs": 6000
+    },
+    {
+      "name": "start-bootflow",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 10000,
+      "expect": "\\[SR_FSCMD\\].*claim LoadCreate",
+      "expectMs": 30000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "new-game",
+      "key": "A",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*menu button=0",
+      "expectMs": 15000
+    },
+    {
+      "name": "game-starts",
+      "expect": "\\[APT_REQ\\] #\\d+ path='screens/hud/main_hud'",
+      "expectMs": 180000
+    },
+    {
+      "name": "play",
+      "dwellMs": 30000
+    },
+    {
+      "name": "pause",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 18,
+      "gapMs": 10000,
+      "expect": "\\[SR_FSCMD\\].*SR_Log 'pause install'",
+      "expectFresh": true,
+      "expectMs": 10000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "up-to-achievements",
+      "purpose": "RESUME -> (wrap) QUIT GAME -> OPTIONS -> MOVES LIST -> STATISTICS -> ACHIEVEMENTS",
+      "key": "UP",
+      "holdMs": 200,
+      "maxPulses": 5,
+      "gapMs": 900,
+      "dwellMs": 2000
+    },
+    {
+      "name": "open-achievements",
+      "key": "A",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\] #\\d+ SR_Achievements 'IG' -> open \\(IG\\)",
+      "expectMs": 8000
+    },
+    {
+      "name": "page-shown",
+      "expect": "\\[ACH_PAGE\\] shown \\(IG, \\d+x\\d+\\): 18 rows",
+      "expectSince": "open-achievements",
+      "expectMs": 8000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "page-back",
+      "key": "B",
+      "holdMs": 160,
+      "maxPulses": 1,
+      "expect": "\\[ACH_PAGE\\] close \\(BACK\\)",
+      "expectMs": 8000
+    },
+    {
+      "name": "page-hidden",
+      "expect": "\\[ACH_PAGE\\] hidden",
+      "expectSince": "page-back",
+      "expectMs": 8000,
+      "dwellMs": 2500
+    },
+    {
+      "name": "down-to-statistics",
+      "key": "DOWN",
+      "holdMs": 200,
+      "maxPulses": 1,
+      "dwellMs": 1500
+    },
+    {
+      "name": "open-statistics",
+      "key": "A",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[APT_SCREEN\\] path='[^']*ScrStatistics'",
+      "expectMs": 15000,
+      "dwellMs": 5000
+    },
+    {
+      "name": "statistics-back",
+      "key": "B",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*SR_Log 'pause install'",
+      "expectFresh": true,
+      "expectMs": 15000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "down-to-moves",
+      "purpose": "STATISTICS was focused again (PauseSelectedItem = btn5)",
+      "key": "DOWN",
+      "holdMs": 200,
+      "maxPulses": 1,
+      "dwellMs": 1500
+    },
+    {
+      "name": "open-moves",
+      "key": "A",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[APT_SCREEN\\] path='[^']*ScrMovesList'",
+      "expectMs": 15000,
+      "dwellMs": 5000
+    },
+    {
+      "name": "moves-back",
+      "key": "B",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*SR_Log 'pause install'",
+      "expectFresh": true,
+      "expectMs": 15000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "down-to-options",
+      "key": "DOWN",
+      "holdMs": 200,
+      "maxPulses": 1,
+      "dwellMs": 1500
+    },
+    {
+      "name": "open-options",
+      "key": "A",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[PC_SETTINGS\\] shown \\(IG",
+      "expectMs": 10000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "options-live",
+      "expect": "\\[SR_FSCMD\\].*SR_GameOptionsLive 'IG \\d+' -> noted",
+      "expectSince": "open-options",
+      "expectMs": 10000
+    },
+    {
+      "name": "options-close",
+      "key": "B",
+      "holdMs": 160,
+      "maxPulses": 1,
+      "expect": "\\[PC_SETTINGS\\] close",
+      "expectMs": 8000
+    },
+    {
+      "name": "options-closed-call",
+      "expect": "\\[GAME_OPTIONS\\] _global\\.SRPause\\.SR_OptionsClosed\\(0",
+      "expectSince": "options-close",
+      "expectMs": 10000,
+      "dwellMs": 2500
+    },
+    {
+      "name": "down-to-quit",
+      "purpose": "OPTIONS -> QUIT GAME (the hidden PHOTO MODE slot is skipped)",
+      "key": "DOWN",
+      "holdMs": 200,
+      "maxPulses": 1,
+      "dwellMs": 1500
+    },
+    {
+      "name": "open-quit",
+      "key": "A",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[APT_SCREEN\\] path='screens/misc/ScrGenPop'",
+      "expectMs": 10000,
+      "dwellMs": 2500,
+      "expectFresh": true,
+      "purpose": "QUIT GAME -> the two-choice popup's own screen request (fresh; the census gives counts, not labels)"
+    },
+    {
+      "name": "quit-cancel",
+      "key": "B",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*SR_Log 'pause quit button=-1'",
+      "expectMs": 10000,
+      "dwellMs": 2500
+    },
+    {
+      "name": "open-quit-2",
+      "purpose": "QUIT GAME -> the two-choice popup's own screen request (fresh; the census gives counts, not labels)",
+      "key": "A",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[APT_SCREEN\\] path='screens/misc/ScrGenPop'",
+      "expectFresh": true,
+      "expectMs": 10000,
+      "dwellMs": 2500
+    },
+    {
+      "name": "quit-to-menu",
+      "purpose": "A on the default: the game's own quit",
+      "key": "A",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*SR_Log 'pause quit button=0'",
+      "expectMs": 10000
+    },
+    {
+      "name": "title-again",
+      "purpose": "the game's own return to the front end: the title's InitGui ran again (femenu_quit.json fe-reloaded)",
+      "expect": "\\[SR_FSCMD\\].*SR_Log 'install' saveFlow\\+16=[1-9]",
+      "expectSince": "quit-to-menu",
+      "expectMs": 120000,
+      "dwellMs": 15000
+    },
+    {
+      "name": "start-again",
+      "purpose": "START on the reloaded title: the sign-in read again (femenu_quit.json)",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 10000,
+      "expect": "\\[XAM_PROFILE\\] #3 ",
+      "expectMs": 30000,
+      "dwellMs": 8000
+    },
+    {
+      "name": "new-game-2",
+      "key": "A",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*menu button=0",
+      "expectFresh": true,
+      "expectMs": 15000
+    },
+    {
+      "name": "game-starts-2",
+      "purpose": "the second start: the HUD screen is already loaded, so it is shown again ([APT_SCREEN] seen >= 2) without a new [APT_REQ] (the Ally roll 480); either form counts, since new-game-2",
+      "expect": "\\[APT_REQ\\] #\\d+ path='screens/hud/main_hud'|\\[APT_SCREEN\\] path='screens/hud/main_hud' seen=\\d+",
+      "expectSince": "new-game-2",
+      "expectMs": 180000
+    },
+    {
+      "name": "play-2",
+      "dwellMs": 20000
+    },
+    {
+      "name": "pause-2",
+      "key": "ENTER",
+      "holdMs": 2000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 18,
+      "gapMs": 10000,
+      "expect": "\\[SR_FSCMD\\].*SR_Log 'pause install'",
+      "expectFresh": true,
+      "expectMs": 10000,
+      "dwellMs": 3000
+    },
+    {
+      "name": "up-to-quit",
+      "purpose": "RESUME -> (wrap) QUIT GAME",
+      "key": "UP",
+      "holdMs": 200,
+      "maxPulses": 1,
+      "dwellMs": 1500
+    },
+    {
+      "name": "open-quit-3",
+      "key": "A",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[APT_SCREEN\\] path='screens/misc/ScrGenPop'",
+      "expectFresh": true,
+      "expectMs": 10000,
+      "dwellMs": 2500,
+      "purpose": "QUIT GAME -> the two-choice popup's own screen request (fresh; the census gives counts, not labels)"
+    },
+    {
+      "name": "to-desktop-row",
+      "key": "DOWN",
+      "holdMs": 200,
+      "maxPulses": 1,
+      "dwellMs": 1500
+    },
+    {
+      "name": "quit-to-desktop",
+      "key": "A",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "\\[SR_FSCMD\\].*SR_Quit",
+      "expectMs": 10000
+    },
+    {
+      "name": "exit-clean",
+      "purpose": "the front end's EXIT path from in game: exit code 0 within 2 s of SR_Quit",
+      "expectExitCode": 0,
+      "exitTimeoutMs": 2000
+    }
+  ]
+}

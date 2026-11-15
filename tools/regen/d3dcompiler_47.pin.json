@@ -1,0 +1,7 @@
+{
+ "dll": "d3dcompiler_47.dll",
+ "sha256": "cdeb0e6a3036df6ccbb39351f142ce6a7c3da2829dab8c4cb73c1c8fbb5b6a61",
+ "size": 4669440,
+ "where": "the build VM's System32 (sr-build), 2026-10-20",
+ "why": "Astra (step 4 lane D merge review, 2026-10-20): the host HLSL ahead-of-time blobs (cmake/host_hlsl.cmake) are pinned to this compiler; tools/regen/host_hlsl_aot.py --pin fails the build on any other DLL. Change it deliberately, with a replay 9/9 of the new blobs."
+}

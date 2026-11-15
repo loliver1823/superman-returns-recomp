@@ -1,0 +1,23 @@
+; Included expression (.include): pushes the FlowMgr.SR_OnHostSettings(p) FUNCTION, the
+; host's reply channel (kernel/mod_bridge.cpp: AptExecutor vt+0x20, target "FlowMgr", as
+; the game's own natives call FlowMgr.CppShowPopup). p = the store as the host keeps it
+; (bit 14 apply_to_loaded_saves, bit 15 volumes known), -1 = no store. Each movie that
+; sends SR_GetSettings / SR_SetSettings binds its own copy right before (and the options
+; screens delete it right after), so the host never calls into an unloaded movie.
+;   fscommand("SR_Log", "host settings " + p); if (!(p < 0)) _global.SRSettings = p;
+    .func2 ''(r3 'p') flags=0x40129
+        EA_PushConstByte 'FSCommand:SR_Log'
+        EA_PushConstByte 'host settings '
+        Push [reg3]
+        Add2
+        GetURL2
+        Push [reg3]
+        EA_PushZero
+        Less2
+        If hs_end
+        Push [reg2]
+        EA_PushConstByte 'SRSettings'
+        Push [reg3]
+        SetMember
+hs_end:
+    .end

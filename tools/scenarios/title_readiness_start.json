@@ -1,0 +1,111 @@
+{
+  "name": "title-readiness-start",
+  "purpose": "iter-458 run (2') (Astra 038). H-READY: the title accepts input once it is READY and VISIBLE. Reaches the title exactly as hrr_title_ab.json / physfree_gameplay.json do (same first four steps); then requires BOTH the title UI tail (APT_REQ #15 HintB) AND a captured visible title (sustained non-black presented frames, the requireVisibleMs gate), settles 8 s, sends exactly ONE ENTER (START) and allows 30 s with NO further input - that interval is scored before anything else is pressed. Then gp3's post-dialog steps verbatim (their A presses double as the A fallback if START did nothing), and a 240 s observe. Run with SR_HRR_CACHE=1 and NO SR_HRR_CACHE_WINDOW, -TimeoutSeconds 900.",
+  "gates": "SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1",
+  "steps": [
+    {
+      "name": "fe-alive",
+      "await": "\\[NAT_FE\\] #1 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "settle-title",
+      "await": "\\[NAT_FE\\] #256 natural FE master tick",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "press-start",
+      "key": "ENTER",
+      "holdMs": 250,
+      "maxPulses": 4,
+      "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)",
+      "expectMs": 90000
+    },
+    {
+      "name": "first-screen",
+      "expect": "\\[FE_SETSCREEN\\] #1 ",
+      "expectMs": 60000
+    },
+    {
+      "name": "title-ui-tail",
+      "purpose": "The title's last UI request. Necessary, not sufficient: in hrr2 it fired ~64 s before any visible frame.",
+      "await": "\\[APT_REQ\\] #15 path='\\.\\./common/ButtonHints/XBox360/HintB'",
+      "timeoutMs": 300000
+    },
+    {
+      "name": "title-visible",
+      "purpose": "Gate-only step: post-entry presented frames must be non-black for 8 s continuously, then settle 8 s. No input until this passes.",
+      "requireVisibleMs": 8000,
+      "visibleTimeoutMs": 300000,
+      "dwellMs": 8000
+    },
+    {
+      "name": "start-once",
+      "purpose": "H-READY: exactly ONE START, delivery verified by KBPAD_OBS; 30 s with no further input for the guest to open the storage flow (selector or ScrGenPop). Scored before any other key.",
+      "key": "ENTER",
+      "holdMs": 250,
+      "maxPulses": 1,
+      "expect": "XamShowDeviceSelectorUI\\(user=|\\[APT_REQ\\] #\\d+ path='screens/misc/ScrGenPop'",
+      "expectMs": 30000,
+      "optional": true
+    },
+    {
+      "name": "settle-modepage",
+      "purpose": "gp3 verbatim: the next page came up ~54 s after ScrGenPop with no input.",
+      "dwellMs": 60000
+    },
+    {
+      "name": "select-mode",
+      "purpose": "gp3 verbatim. Also the A fallback if START opened nothing (gp3: a held A on the ready title opened the selector).",
+      "key": "A",
+      "holdMs": 3000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 8000,
+      "optional": true
+    },
+    {
+      "name": "nav-down",
+      "purpose": "gp3 verbatim. DOWN is an EXTENDED key.",
+      "key": "DOWN",
+      "holdMs": 3000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 4000,
+      "optional": true
+    },
+    {
+      "name": "select-again",
+      "key": "A",
+      "holdMs": 3000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 8000,
+      "optional": true
+    },
+    {
+      "name": "nav-up-select",
+      "key": "UP",
+      "holdMs": 3000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 2,
+      "gapMs": 4000,
+      "optional": true
+    },
+    {
+      "name": "select-third",
+      "key": "A",
+      "holdMs": 3000,
+      "holdUntilConfirmed": true,
+      "maxPulses": 3,
+      "gapMs": 8000,
+      "optional": true
+    },
+    {
+      "name": "observe-gameplay",
+      "purpose": "Four minutes to see whether the game leaves the front end (gp3: main_hud #17 and the HUD components #18-#24).",
+      "dwellMs": 240000
+    }
+  ]
+}

@@ -1,0 +1,185 @@
+R1 batch 1 - L6 golden_call cases (archive/r1/l6/b1.script): what each case exercises
+=====================================================================================
+47 cases over 21 of the 24 functions. Every case runs on the old splice body and on the hooked
+pristine body; registers and changed-page hashes must match.
+
+Shared fixtures (written by W inside each case that needs them; memory is restored at END)
+- Stub targets in .text (mapped recompiled functions, no kernel override):
+  NOP 0x8213C3A0 (blr), RET0 0x8213C3A8 (li r3,0; blr), RET1 0x8213C3C8 (li r3,1; blr).
+  BAD = 0x00001000 / 0x00002000 / 0x00003000: an indirect-call target outside .text.
+- FREE SINK: DogmaFree (sub_8278D3C0) looks up the owning heap in the table *0x829A9424
+  (count *0x829A93F0). The cases point it at one scratch entry {heap 0x70D00100, 0x70000000,
+  0x70E00000} whose vtable+0x2C is RET0, so freeing any scratch pointer is a no-op. Without it a
+  scratch pointer has no owner and DogmaFree calls through *(*(0)+0x2C).
+- ALLOC SINK: DogmaAlloc (sub_8278D258, r5=0) misses the per-thread registry (count
+  *0x829A93EC forced to 0), takes the fallback pool *0x829A93F4 = 0x70D01000 whose vt+36 is
+  sub_826E5848 (returns *(0x829A242C)), so every allocation returns the block written to
+  0x829A242C. It still runs ThreadGetCurrentHandleCached (KeTlsGetValue / NtDuplicateObject,
+  both provided by the harness). sub_8278D258 carries a band-aid override whose grant
+  substitution needs SR_ALLOW_FORCING; the harness must run with forcing off.
+- FAKE RESOURCE MANAGER: sub_826E5838 returns *(0x829A2434); the cases set it to 0x70C80000
+  with vtable 0x70C80100 (vt+32 and vt+40 chosen per case).
+
+Harness assumptions to check when running
+- Guest memory the golden dump does not map (scratch 0x70000000.., page 0) reads as zero and
+  is writable. Two FIRE cases touch page 0 in BOTH bodies because the forced path itself does:
+  sub_820F0048_fire_bufptr0 (the unguarded tail sub_820F0208 stores 4 words at VA 4..0x13) and
+  sub_82187460_fire_vt32_outside_text (AptHandleAssignLocked reads *(0) through the faked r3=0).
+- sub_8218F890_fire_scan_200000_empty and sub_821DDD18_fire_100000_elements rely on large
+  zero scratch ranges (0x70200000..0x702C3510 and 0x70000000..0x70927D00) not written by W.
+
+Per case
+--------
+sub_820F0048_fire_bufptr0       dev+40 (buf) = 0 and dev+48 = 0: the ble at 0x820F0070 reaches
+                                loc_820F007C with r11 = 0 -> hook fires, store chain skipped,
+                                tail (sub_820F0208 + the five std -1) still runs.
+sub_820F0048_normal             buf 0x70004000 < limit: full 8+4-word PM4 chain, dev+40 advanced,
+                                dev+10788 copy, then the tail. Hook returns false.
+  Retired (phase 4.3 batch 4, the Xenia oracle check, docs/FORCING_RETIREMENT.md):
+      sub_820FDCB8_fire_counter_nonzero (dev+10868 = dev+0x2A74 = 1). The 0x820FDD18 hook that dropped the
+      wait's `bne cr6` back-branch is deleted, so the generated D3DDeviceBlockUntilIdle spins until the count
+      returns to 0 - as on the console, where the pump thread's GpuCommandSegmentEndSync_82110768 clears it
+      after the ISR (GpuIsrKickReplayList_82110B00) kicks the replay list. The harness has no GPU, ISR or pump
+      thread, so nothing drains it and the case never returns (l6/final: STOP timeout at 120 s). On the
+      console-faithful emulator the count drains on every wait: Xenia boot -> gameplay entered
+      BlockUntilIdle 2,633 times and GpuCommandSegmentEndSync 11,975 times (xtrace/forcing_idle).
+sub_820FDCB8_normal             dev+10868 = 0: the bne is not taken (identical before and after the
+                                hook's deletion).
+sub_82111B30_fire_bit28clear_bit29set  flags 0x20000000: both forced paths (bail skipped at
+                                0x82111B54, error test skipped at 0x82111BA4); sub_82111118
+                                returns early on bit29. r3 = 0.
+sub_82111B30_fire_bit28clear    flags 0: only the first forced path; sub_82111118 takes its
+                                import-pointer checks (golden 0x80207A60/64 = 0: no call).
+sub_82111B30_fire_errbit31      flags 0x90000000: bit28 set (no first fire), bit31 survives the
+                                clear -> the second forced path (pristine 0x8007000E, now 0).
+sub_82111B30_normal             flags 0x10000000: no forced decision changes the result (r3 = 0).
+                                All four also show the 64-slot clear of RSO+8.
+sub_8211BBE0_fire_lowptr        r4 = 0x70000000 (< image base): r3 = 0, no stores, r10/r11 untouched.
+sub_8211BBE0_normal             r4 = 0x829AC170 (image .data): stb 6 / sth 3750 / r3 = 0.
+sub_8214AFB8_fire_vt32_outside_text  resource-manager vt+32 = BAD: the bctrl is skipped (r3 = 0),
+                                then sub_826E52D0 (vt+40 = NOP) and sub_826E55F8 (zero handle).
+sub_8214AFB8_normal             vt+32 = NOP: the call is made; same tail. g_FeFlowConfig is set in
+                                golden, so sub_82162BD0 is a no-op in both.
+sub_82174340_fire_vt4_outside_text  pool vt+4 = BAD: r3 = 0, jump to the epilogue.
+sub_82174340_normal             vt+4 = RET0: the call is made, returns 0, beq -> same epilogue.
+sub_82187460_normal             ALLOC SINK (block 0x70002000), resMgr vt+32 = NOP, display-object
+                                vt+8 (0x8200167C, patched) = NOP: both calls made; block gets
+                                {0x82001674, 1, r3}.
+sub_82187460_fire_vt32_outside_text  resMgr vt+32 = BAD: first forced path (r3 = 0 into
+                                AptHandleAssignLocked: page-0 read, see above).
+sub_82187460_fire_vt8_outside_text   0x8200167C = BAD: second forced path.
+sub_8218F890_normal             FREE SINK; 1-bucket map with 2 chained nodes and the 0xFFFFFFFF
+                                end marker: both erase iterations, sub_821937F0, free(impl). Hooks
+                                run (counters 1) without firing.
+sub_8218F890_fire_scan_200000_empty  bucket array in zero scratch with no non-empty bucket: the
+                                scan cap fires after 200000 empty steps -> loc_8218F990.
+sub_8218F890_fire_free_10000_entries  10003 overlapping nodes (n_i = 0x70100000 + 4i, a finite
+                                chain in bucket 0): the free-loop cap fires on the 10001st erase;
+                                sub_821937F0 then frees n_10001..n_10002. (Pristine erases all
+                                10003 - the leak the census table describes.)
+  Retired (phase 4.3 batch 3, docs/FORCING_RETIREMENT.md): sub_82191D58_fire_successor_is_self (a one-node
+      tree whose node.right = node). The generated erase walk `do { free the node's +32 object; Erase(node);
+      free(node); node = RBTreeIncrement(node); } while (node != anchor)` never reaches the anchor: the
+      successor of a node that is its own right child is itself (the console spins). No reachable tree has
+      it: EASTL's insert links every new node as a leaf with null children and the rotations exchange
+      distinct nodes; only memory corruption makes a node its own child. Not a memory-pressure or
+      long-session state (the walk allocates nothing).
+sub_82191D58_normal             one-node tree (right = left = 0): successor = anchor, walk ends;
+                                hook compares and does not fire.
+sub_821959D0_fire_capacity0     capacity 0: {0,0} stored at r28, r3 = r28, epilogue 0x82195A74
+                                (pristine divides by zero / traps).
+sub_821959D0_normal             capacity 1, bucket 0 holds a node keyed "ab": hash, find, result
+                                {node 0x70000500, &bucket 0x70000300}.
+  Retired (phase 4.3 batch 3, docs/FORCING_RETIREMENT.md): sub_821DDD18_fire_100000_elements (src 0x70000000,
+      end 0x70000001: an end pointer one byte past the start). The generated copy `do { copy 96 bytes;
+      src += 96; } while (src != end)` tests exact equality, so an end that is not start + n*96 is never
+      met: the walk runs through the address space to an unmapped page (a fault on the console; the harness
+      reads unmapped scratch as zero and never stops). No reachable vector has it: EASTL's end pointer is
+      begin + count*sizeof(T) by construction (push_back/resize/DoRealloc all write it that way) and the
+      caller passes the vector's own begin/end. A vector of more than 100000 96-byte elements (9.6 MB)
+      would have been a legitimate copy the cap TRUNCATED, not a hang.
+sub_821DDD18_normal             2 elements (192 pattern bytes) copied to 0x70010000; out-ptr
+                                = 0x700100C0.
+sub_82318FB0_fire_vt8_outside_text  vt+8 = BAD: r3 = 0, call skipped (stack block still built).
+sub_82318FB0_normal             vt+8 = RET1: call made, r3 = 1.
+sub_82357E60_fire_span_over_0x40000  same-block iterators, span 0x50000: memmove skipped, r3 = dst
+                                start 0x70050000.
+sub_82357E60_fire_dst_in_image  dst start 0x82000000 (image): memmove skipped, image untouched.
+sub_82357E60_normal             32-byte tail moved by sub_8279F130 (0x70100000 -> 0x70100020).
+sub_823A00C0_fire_anim_stub     Before RELEASE_PLAN phase 4 row 1: SR_ANIM_STUB unset (default ON) skipped
+                                the body after the prologue (r3 = 0). The stub, its hooks and the knob are
+                                deleted (docs/FORCING_RETIREMENT.md row 1): the generated 1D kernel runs on
+                                these inputs (r4 = r5 = 0) and returns E_FAIL (r3 = 0x80004005), r1 back at
+                                the stack top. l6/anim: the only change besides the other two below.
+sub_823A0850_fire_anim_stub     same for the 2D kernel: the generated body returns E_FAIL (0x80004005).
+sub_823ACA30_fire_anim_stub     same for the RGB565 texel writer: the generated body runs on the fixture's
+                                synthetic surface arguments (r3 = 0x70000000, r4 = 0x10, r5 = 0x20, r6 = 0),
+                                writes its texels (pages 0x40000000 / 0x9FFFF000 change) and returns r3 = 8.
+  Retired (phase 4.3 batch 3, docs/FORCING_RETIREMENT.md): sub_823AEAB0_fire_size0_wrap (arena +20 = 0) and
+      sub_823AEAB0_fire_request_over_2g_wrap (+20 = 1, request 0x90000000). The generated grow
+      `while (need > size) size *= 2` starts from the arena's block size (+20) and never ends when that is 0
+      or when the request is >= 2 GB (31 doublings, then 0 forever): the console spins. No reachable arena
+      has either: FxArenaInit_sub_823AEA18 is the only writer of +20 and its three callers
+      (PreprocStateInit_sub_8236BBB8, HlslCompileShader_sub_823C8CC0 x2) pass blockSize 1 MB /
+      granularity 64 KB (ppc_recomp.48.cpp:22746, ppc_recomp.51.cpp:56463 and :58164), so +20 = 1 MB; the
+      D3DX effect compiler's requests are token / string / constant sizes, nowhere near 2 GB on a 512 MB
+      console. Memory pressure takes the OTHER path: XMemAlloc returns 0 and the function returns 0 without
+      looping.
+sub_823AEAB0_normal_fit         request fits: the fit path (no loop; hook not reached), r3 =
+                                0x70001010, committed = 0x30.
+sub_823AEAB0_normal_grow        grow loop runs one doubling (0x100 -> 0x200) without wrapping (hook
+                                runs, no fire), then XMemAlloc sub_82167F90(0x200, 0x24810000) ->
+                                sub_82467F40. If the harness cannot run XMemAlloc (an
+                                IMPORT-UNEXPECTED return 0 gives r3 = 0 in both bodies) the case
+                                still compares; drop it if XMemAlloc faults.
+sub_8246A1D8_fire_node_below_0x80000000  list head 0x82917E9C -> 0x70000000: r31 = r30, recompare,
+                                exit with cr6.eq; no callback.
+  Retired (phase 4.3 batch 3, docs/FORCING_RETIREMENT.md): sub_8246A1D8_fire_over_256_callbacks (the golden
+      node 0x829AAEB4 made its own Flink). The generated walk `for (p = head.Flink; p != &head; p = p->Flink)
+      p->routine(fCreate)` never returns to the head on a cycle (the console spins under the notify CS).
+      No reachable list has it: the only inserter is XRegisterThreadNotifyRoutine_sub_8246A238, whose one
+      code caller is Crt_MtInit_sub_827A5840 at CRT start-up, and the golden dumps (menu and gameplay)
+      hold exactly that one node (head 0x82917E9C <-> 0x829AAEB4, routine 0x827AF280); nothing registers
+      per thread or per frame, so neither a cycle nor a 256-entry list can arise in a long session.
+sub_8246A1D8_normal             golden one-node list with callback NOP: one callback, normal exit.
+                                (CS enter/leave are harness imports.)
+sub_8246B670_fire_segment0      segment slot heap+96 = 0: immediate exit through __restgprlr_29;
+                                heap+48 stays 0x100, block untouched.
+sub_8246B670_normal             slot = segment 0x70002000 (end 0x70003000), empty size-16 free
+                                list: heap+48 = 0x110, bitmap bit 16 set, block header rewritten
+                                and linked, trailing sth at block+0x102.
+sub_8246DF08_fire_handle0       0x829AC16C = 0: r3 = 0x82110000.
+sub_8246DF08_normal             golden handle 0x40000000 returned as-is.
+sub_825667C8_fire_freq0         frequency global 0x829792F8 = 0: r11 = 1 at the divd.
+sub_825667C8_normal             golden frequency 50000 (0xC350).
+                                Only r11 is printed: r3/r8/r9/r10 and the stack page depend on
+                                the mftb read in sub_824680D0 (host __rdtsc), so they and the
+                                stack-page hash differ between any two runs unless the harness pins
+                                the timebase. Compare r11 (and page hashes other than the stack).
+
+Functions without a case (cannot be called standalone)
+-----------------------------------------------------
+sub_82151560 FMGameRender_ModuleInit: the render-module init. Before either guarded bctrl it
+  runs the render/scene subsystem constructors (sub_822EABA0, sub_822F72E0, sub_822E4B58,
+  sub_822E4C10 on *(0x82970140)), and between the two sites it builds the world/render managers
+  (sub_82779BE0, sub_82721AE0, sub_827770B8, sub_82775BC0, sub_822EED40, sub_82187678, a
+  104-byte DogmaAlloc + sub_8215ED90, sub_8219FFE8, sub_822D7B60). That is device/subsystem
+  creation with imports the harness does not provide; it cannot run against a golden snapshot
+  that already holds the initialised objects. The two hooks are the same out-of-.text guard
+  as sub_8214AFB8 / sub_82318FB0, whose cases prove the shape.
+sub_821516E0 FmuiGlobalInit: the 563-instruction FMUI global init (57 direct calls: the Apt
+  flow manager factory sub_826D4D60, allocations and subsystem constructors before the guarded
+  vt[4] call at 0x82151E2C). Same reason; same guard shape as above (plus the dead lr, see the .cpp).
+sub_8229F460 (video-out / net init): a constructor that allocates (sub_8278D258 272 bytes,
+  sub_8278D530), runs subsystem inits (sub_821680B0, sub_82162EA8, sub_825F7AF0, sub_82604250,
+  sub_82722600, sub_82722A80, sub_82721C88, sub_827220E0 x4, sub_82565B70) and then polls the
+  'conn' dispatcher against a wall-clock deadline (sub_82564E80 is a kernel override reading
+  the host clock; sub_82564FC8 waits). Not standalone, and the loop exit is time-dependent.
+  The cap/reset hooks are the same per-call-counter shape as sub_821DDD18 and sub_8218F890.
+
+Normal path not covered
+-----------------------
+sub_823A00C0 / sub_823A0850 / sub_823ACA30: since the SR_ANIM_STUB retirement (phase 4 row 1) the
+  three fixtures above run the generated bodies, on synthetic arguments; a real texture-resample job
+  (a loaded texture's source / destination surfaces) is not in the golden blob. The natural rolls
+  carry the real calls (the writer: 30 calls to gameplay, 3 mip tails of each of 10 textures).

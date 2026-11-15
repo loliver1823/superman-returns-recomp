@@ -1,0 +1,9 @@
+{
+  "name": "mod-directory-natural",
+  "purpose": "No-input natural boot for the NtQueryDirectoryFile A/B. Capture the engine's actual FileStorage table with mod_storage_probe.py during the final dwell. No mods, port features, dev tools or forcing. A scenario pass alone does not establish the storage count.",
+  "gates": "SR_MODS=,SR_PORT_FEATURES=,SR_DEVTOOLS=0,SR_ALLOW_FORCING=0,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=30,SR_PRESENT_DUMP_SPARSE_CAP=120",
+  "steps": [
+    {"name": "natural-fe-alive", "await": "\\[NAT_FE\\] #256 natural FE master tick", "timeoutMs": 180000},
+    {"name": "storage-observation-window", "dwellMs": 90000}
+  ]
+}

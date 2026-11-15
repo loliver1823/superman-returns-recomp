@@ -1,0 +1,70 @@
+# A local development layout may keep private checkouts beside the public files
+# (<repo>/_worktrees/<name>/) plus a local agent note. Never commit them.
+/_worktrees/
+/CLAUDE.local.md
+
+# Build outputs. Directory patterns are anchored at the root (/name/): tools/apt/mods/ and
+# tests/fixtures/mods/ are sources.
+/build/
+build-*/
+/out/
+*.obj
+*.pdb
+*.ilk
+*.exe
+vcpkg_installed/
+
+# Generated guest code (regenerated from your own default.xex; never commit it)
+guest/ppc/*
+!guest/ppc/ppc_missing_recomp_stubs.cpp
+guest/ppc_rexglue/
+
+# Untracked tool clones
+tools/XenosRecomp-clone/
+/reference/
+
+# Your game files and anything extracted or captured from them. Never commit these.
+/Superman Returns (USA)/
+*.iso
+*.xex
+*.xexp
+*.cab
+*.zip
+*.dmp
+*.DMP
+*.xtr
+*.srht
+data/ui_ast_extracted/
+data/scrpressstart_extracted/
+data/shaders_carved/
+data/shaders_menu/
+data/shader_cache/
+data/gpu_traces/
+/mods/
+
+# Run artifacts and logs
+/archive/
+/logs/
+*.log
+*.trace
+frame_dump_*.bmp
+frame_dump_*.png
+/*.bmp
+/*.png
+/*.dds
+/sdlaudio.raw
+/dev.txt
+/levelskip.txt
+/devtools_out/
+xconfig.settings
+tools/last_run_x.json
+
+# Tooling caches and editor state
+.cache/
+rag_index/
+__pycache__/
+*.pyc
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

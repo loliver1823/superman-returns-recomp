@@ -1,0 +1,303 @@
+{
+  "_doc": "Combined correctness roll (tools/check_roll.py, docs/TOOLKIT.md 1.8c). Each lane adds its own entries: the gates that switch its CHECK / census / meter on, a regex that must match at least once (pass), and a regex that must never match (fail). Entries whose gates do not exist on the exe under test are harmless (unknown SR_* variables are ignored) but will fail their pass regex, so keep enabled=false until the code is on dev. Perf A/Bs never go here: the checks slow the game.",
+  "checks": [
+    {
+      "lane": "native-a",
+      "name": "native meter whole-run line (pm4 wired, frames counted)",
+      "enabled": true,
+      "gates": "SR_NATIVE_METER=1",
+      "pass": "\\[NATIVE_METER_RUN\\] \\w+ [\\d.]+s frames=[1-9]\\d* \\| pm4=\\d+",
+      "fail": "\\[NATIVE_METER_RUN\\].*\\| pm4=-"
+    },
+    {
+      "lane": "native-a",
+      "name": "draw builder S0 census (cut draws seen, redundancy line)",
+      "enabled": true,
+      "gates": "SR_NATIVE_BUILDER_CENSUS=1",
+      "pass": "\\[NATIVE_BUILDER_REDUNDANCY\\] window frames=[1-9].*calls same=\\d+",
+      "fail": ""
+    },
+    {
+      "lane": "native-a",
+      "name": "stream-resident constant dedup CHECK (0 BAD)",
+      "enabled": true,
+      "gates": "SR_NATIVE_CONST_DEDUP_CHECK=1,SR_NATIVE_CONST_DEDUP_MODES=1",
+      "pass": "\\[CONST_DEDUP\\].*check marks=[1-9]\\d* .*ok=[1-9]\\d* BAD=0\\b",
+      "fail": "\\[CONST_DEDUP\\] CHECK BAD|\\[CONST_DEDUP\\].*BAD=[1-9]",
+      "_note": "SR_NATIVE_CONST_DEDUP_CHECK=1 turns the (default ON) skips off by itself and flags each predicted group for the CP: in the S1 records (tag bit 30) and in the PM4 leaf (DDCK)"
+    },
+    {
+      "lane": "native-a",
+      "name": "native draw flush CHECK (byte-exact PM4, device, cursor)",
+      "enabled": true,
+      "gates": "SR_NATIVE_FLUSH_CHECK=1,SR_NATIVE_FLUSH_CHECK_EVERY=4",
+      "pass": "\\[NATIVE_FLUSH\\] \\w+ CHECK draws=[1-9]\\d* full=[1-9]\\d* .*BAD bytes=0 len=0 dev=0\\b",
+      "fail": "\\[NATIVE_FLUSH\\] \\w+ CHECK .*BAD bytes=[1-9]|\\[NATIVE_FLUSH\\] \\w+ CHECK .*len=[1-9]|\\[NATIVE_FLUSH\\] \\w+ CHECK .*dev=[1-9]"
+    },
+    {
+      "lane": "guestcode",
+      "name": "constant-upload skip CHECK (feature rejected, PERFORMANCE 2.16 - kept for the record)",
+      "enabled": false,
+      "gates": "SR_NATIVE_CONST_SKIP=1,SR_NATIVE_CONST_SKIP_CHECK=1",
+      "pass": "\\[CONST_SKIP\\] calls=.* check regs=[1-9][0-9]* bad=0 ",
+      "fail": "\\[CONST_SKIP\\] CHECK MISMATCH"
+    },
+    {
+      "lane": "guestcode",
+      "name": "cloth light mask CHECK (native ClothUpdateElementLightMask)",
+      "enabled": true,
+      "gates": "SR_NATIVE_CLOTHMASK_CHECK=1",
+      "pass": "\\[NATIVE_CLOTHMASK\\] calls=.* checked=[1-9][0-9]* checkBad=0 ",
+      "fail": "\\[NATIVE_CLOTHMASK\\] MISMATCH"
+    },
+    {
+      "lane": "guestcode",
+      "name": "cloth sim CHECK (native SatisfyDistanceConstraints + CollideParticle)",
+      "enabled": true,
+      "gates": "SR_NATIVE_CLOTHSIM_CHECK=1",
+      "pass": "\\[NATIVE_CLOTHSIM\\] calls=.* checked=[1-9][0-9]* checkBad=0 ",
+      "fail": "\\[NATIVE_CLOTHSIM\\] MISMATCH"
+    },
+    {
+      "lane": "guestcode",
+      "name": "pose CHECK (native PoseSnapshot_GetWorldMatrix)",
+      "enabled": true,
+      "gates": "SR_NATIVE_POSE_CHECK=1",
+      "pass": "\\[NATIVE_POSE\\] calls=.* checked=[1-9][0-9]* checkBad=0 ",
+      "fail": "\\[NATIVE_POSE\\] MISMATCH"
+    },
+    {
+      "lane": "guestcode",
+      "name": "shader params CHECK (native RenderStateBlock_ApplyShaderParams)",
+      "enabled": true,
+      "gates": "SR_NATIVE_PARAMS_CHECK=1",
+      "pass": "\\[NATIVE_PARAMS\\] calls=.* checked=[1-9][0-9]* checkBad=0 ",
+      "fail": "\\[NATIVE_PARAMS\\] MISMATCH"
+    },
+    {
+      "lane": "guestcode",
+      "name": "vertex append CHECK (native AppendVertexData)",
+      "enabled": true,
+      "gates": "SR_NATIVE_VTXAPPEND_CHECK=1",
+      "pass": "\\[NATIVE_VTXAPPEND\\] calls=.* checked=[1-9][0-9]* checkBad=0 ",
+      "fail": "\\[NATIVE_VTXAPPEND\\] MISMATCH"
+    },
+    {
+      "lane": "guestcode",
+      "name": "cloth bounds CHECK (native ClothUpdateBoundsAndLights)",
+      "enabled": true,
+      "gates": "SR_NATIVE_CLOTHBOUNDS_CHECK=1",
+      "pass": "\\[NATIVE_CLOTHBOUNDS\\] calls=.* checked=[1-9][0-9]* checkBad=0 ",
+      "fail": "\\[NATIVE_CLOTHBOUNDS\\] MISMATCH"
+    },
+    {
+      "lane": "audio",
+      "name": "audio native census (N6: no XMA register access, HAL dead)",
+      "enabled": true,
+      "gates": "",
+      "pass": "\\[AUDIO_NATIVE\\] guest_mmio_fns=0 \\(.*\\) xma_regfile_writes=0 reg600=native:[0-9A-F]{8} xma_hal_voices=0 xma_hal_rest=0",
+      "fail": "\\[AUDIO_NATIVE\\] (guest_mmio_fns=[1-9]|.* xma_regfile_writes=[1-9]|.* reg600=lwbrx|.* xma_hal_voices=[1-9]|.* xma_hal_rest=[1-9])"
+    },
+    {
+      "lane": "audio",
+      "name": "D-AUDIO-CMDBUF witness never fires",
+      "enabled": true,
+      "gates": "",
+      "pass": "\\[AUDIO_OUT_SUM\\]",
+      "fail": "\\[EA_RDR\\] #\\d+ FIRST"
+    },
+    {
+      "lane": "native-b",
+      "name": "B2 native targets: resolves write the sampling texture (witness, no failure)",
+      "enabled": true,
+      "gates": "SR_NB_RESOLVE_TEX=1,SR_NB_DEPTH_SRV=1,SR_NB_ARRAY_LAYERS=1,SR_NB_CLEAR_ELIDE=1",
+      "pass": "\\[NB_TARGET\\] native resolve #1 ",
+      "fail": "\\[NB_TARGETS\\].*MISMATCH|\\[NB_TARGET\\].*(failed|FAILED)|\\[NATIVE_VERIFY\\] MISMATCH"
+    },
+    {
+      "lane": "native-b",
+      "name": "B1a XDK-clear transfer elision (witness, no failure)",
+      "enabled": true,
+      "gates": "SR_NB_RESOLVE_TEX=1,SR_NB_DEPTH_SRV=1,SR_NB_ARRAY_LAYERS=1,SR_NB_CLEAR_ELIDE=1",
+      "pass": "\\[NB_ELIDE\\] batch=.*tiles not moved",
+      "fail": "\\[NB_TARGETS\\].*MISMATCH|\\[NB_TARGET\\].*(failed|FAILED)|\\[NATIVE_VERIFY\\] MISMATCH"
+    },
+    {
+      "lane": "native-b",
+      "name": "B2 census + NativeTargets round trip",
+      "enabled": true,
+      "gates": "SR_NB_RESOLVE_TEX=1,SR_NB_DEPTH_SRV=1,SR_NB_ARRAY_LAYERS=1,SR_NB_CLEAR_ELIDE=1,SR_NB_CENSUS=8,SR_NB_CENSUS_EVERY=600,SR_NB_CENSUS_SKIP=1500",
+      "pass": "\\[NB_CENSUS\\] f=\\d+ summary resolves",
+      "fail": "\\[NB_TARGETS\\].*MISMATCH|\\[NB_TARGET\\].*(failed|FAILED)|\\[NATIVE_VERIFY\\] MISMATCH"
+    },
+    {
+      "lane": "native-b",
+      "name": "native resolves vs the EDRAM path (non-target resolves)",
+      "enabled": true,
+      "gates": "SR_NATIVE_RESOLVE_VERIFY=1",
+      "pass": "\\[NATIVE_VERIFY\\] match",
+      "fail": "\\[NATIVE_VERIFY\\] MISMATCH"
+    },
+    {
+      "lane": "native-b",
+      "name": "EDRAM-model meter lines",
+      "enabled": true,
+      "gates": "",
+      "pass": "\\[NB_METER\\] per frame",
+      "fail": ""
+    },
+    {
+      "lane": "native-b",
+      "name": "B4 front target + row / column overhang + depth target (witness, no failure)",
+      "enabled": true,
+      "gates": "SR_NB_FRONT=1,SR_NB_DEPTH_TARGET=1,SR_NB_OVERHANG=1",
+      "pass": "\\[NB_FRONT\\] scan-out fb=[0-9A-F]{8} \\d+x\\d+ from its front target",
+      "fail": "\\[NB_TARGET\\].*(failed|FAILED)|\\[NB_FRONT\\].*(failed|FAILED)|\\[NB_TARGETS\\].*MISMATCH"
+    },
+    {
+      "lane": "native-b",
+      "name": "B-CPU bind memo + rebase protect + claim fast (witness: slots reused; no stale kept hash)",
+      "enabled": true,
+      "gates": "SR_NB_BIND_MEMO=1,SR_NB_REBASE_PROTECT=1,SR_NB_CLAIM_FAST=1,SR_SHM_WT_CHECK=1,SR_MEM_RESOURCES=0",
+      "pass": "\\[NB_BIND_MEMO\\] slot binds reused [1-9]\\d*",
+      "fail": "\\[SHM_WT\\] STALE rebaseline keep"
+    },
+    {
+      "lane": "native-b",
+      "name": "native meter: strand B's EDRAM ids wired (numbers, never '-')",
+      "enabled": true,
+      "gates": "SR_NATIVE_METER=1",
+      "pass": "\\[NATIVE_METER_RUN\\] .*\\| per_frame .*edram_res=[\\d.]+ edram_xfer=[\\d.]+ edram_load=[\\d.]+",
+      "fail": "\\[NATIVE_METER_RUN\\] .*edram_(res|xfer|load)=-"
+    },
+    {
+      "lane": "native-b",
+      "name": "B1c clear propagation: the XDK's aliased clears become host clears (VERIFY: each propagatable move's transfer result == the clear value)",
+      "enabled": true,
+      "gates": "SR_NB_CLEAR_PROP=1,SR_NB_CLEAR_PROP_VERIFY=1",
+      "pass": "\\[NB_CLEAR_PROP\\] VERIFY ok",
+      "fail": "\\[NB_CLEAR_PROP\\] VERIFY MISMATCH"
+    },
+    {
+      "lane": "native-b",
+      "name": "B1b cover fill + B1c propagation (witnesses, no failure)",
+      "enabled": true,
+      "gates": "SR_NB_CLEAR_PROP=1,SR_NB_COVER_FILL=1",
+      "pass": "\\[NB_FILL\\] .* stencil-masked",
+      "fail": "\\[PM4_PSO\\] CreatePSO FAILED|\\[NB_TARGET\\].*(failed|FAILED)|\\[PM4_XFER_DIRECT\\].*failed"
+    },
+    {
+      "lane": "native-b",
+      "name": "SR_NB_SCALED_REMAP: scaled resolves from mixed / reinterpreting owners take the native path (witness at 2x / 3x, no failure)",
+      "enabled": true,
+      "gates": "SR_NB_SCALED_REMAP=1",
+      "pass": "\\[NB_REMAP\\] scaled remap #1 ",
+      "fail": "\\[NB_TARGET\\].*(failed|FAILED)|\\[NATIVE_VERIFY\\] MISMATCH"
+    },
+    {
+      "lane": "native-b",
+      "name": "rebaseline pre-hash + fresh-first (no stale kept hash, every kept page re-hashed by the check)",
+      "enabled": true,
+      "gates": "SR_NB_NATIVE_PREHASH=1,SR_NB_REBASE_FRESH_FIRST=1,SR_SHM_WT_CHECK=1,SR_MEM_RESOURCES=0",
+      "pass": "\\[SHM_WT\\] #\\d+ totals: .*check: \\d+ skipped pages hashed, 0 stale \\| rebaseline kept [1-9]",
+      "fail": "\\[SHM_WT\\] STALE"
+    },
+    {
+      "lane": "native-b",
+      "name": "CP shared-memory range cache: every hit re-walked under the lock agrees (CHECK), hits witnessed, 0 stale",
+      "enabled": true,
+      "gates": "SR_NB_SHM_RANGE_CACHE=1,SR_NB_SHM_RANGE_CHECK=1,SR_SHM_WT_CHECK=1,SR_MEM_RESOURCES=0",
+      "pass": "\\[SHM_WT\\] #\\d+ totals: .*range cache hits=[1-9]\\d* .*check=\\d+ mismatch=0\\b",
+      "fail": "\\[NB_SHMRC\\] CHECK MISMATCH|\\[SHM_WT\\] STALE"
+    },
+    {
+      "lane": "native-b",
+      "name": "CP prepass flat table: every reused fetch's ranges recomputed agree (CHECK), reuse witnessed",
+      "enabled": true,
+      "gates": "SR_NB_PREPASS_FLAT=1,SR_NB_PREPASS_FLAT_CHECK=1",
+      "pass": "\\[SHM_WT\\] #\\d+ totals: .*prepass flat reused=[1-9]\\d* new=\\d+ check mismatch=0\\b",
+      "fail": "\\[NB_PREPASS\\] CHECK MISMATCH"
+    },
+    {
+      "lane": "native-b",
+      "name": "B2 at 1x: resolves write the sampling texture and the memory (witness, no failure)",
+      "enabled": false,
+      "gates": "SR_NB_TARGETS_1X=1",
+      "pass": "\\[NB_TARGET\\] native resolve at 1x #1 ",
+      "fail": "\\[NB_TARGET\\].*(failed|FAILED)|\\[NATIVE_VERIFY\\] MISMATCH"
+    },
+    {
+      "lane": "native-b",
+      "name": "SR_NB_AOT: strand B's compute kernels load from data/shader_cache/nb - nothing compiles at run time (EDRAM zero step 1)",
+      "enabled": true,
+      "gates": "",
+      "pass": "\\[NATIVE_RESOLVE\\] ready: 7 resolve CS from the shipped blobs",
+      "fail": "\\[NB_AOT\\] compiled"
+    },
+    {
+      "lane": "native-b",
+      "name": "EDRAM zero: no resolve, no tile-map transfer and no load through the EDRAM model for the whole run (SR_NB_AOT + SR_NB_ZERO_INIT + SR_NB_RESOLVE_CLAIM + SR_NB_SURF_TABLE)",
+      "enabled": true,
+      "gates": "",
+      "pass": "\\[NATIVE_METER_RUN\\] periodic .*\\| pm4=\\d+ edram_res=0 edram_xfer=0 edram_load=0 ",
+      "fail": "\\[NB_EDRAM_RESOLVE\\]|\\[NATIVE_METER_RUN\\] periodic .*\\| pm4=\\d+ edram_res=[1-9]|\\[NATIVE_METER_RUN\\] periodic .*\\| pm4=\\d+ edram_res=\\d+ edram_xfer=[1-9]|\\[NATIVE_METER_RUN\\] periodic .*\\| pm4=\\d+ edram_res=\\d+ edram_xfer=\\d+ edram_load=[1-9]"
+    },
+    {
+      "lane": "native-b",
+      "name": "EDRAM zero step 3: the surface table decides, the tile map checks every claim and owner query (SR_NB_SURF_VERIFY)",
+      "enabled": true,
+      "gates": "SR_NB_SURF_VERIFY=1",
+      "pass": "\\[NB_SURF\\] verify claim: claims=\\d+ mismatches=0 ",
+      "fail": "\\[NB_SURF\\].*MISMATCH"
+    },
+    {
+      "lane": "p2",
+      "name": "VdGetSystemCommandBuffer = Xenia's fill: Swap's descriptor +0 BEEF0000, +4 / +8 zero, r7 BEEF0001 (SR_VD_SYSCMDBUF, baked default ON)",
+      "enabled": true,
+      "gates": "SR_VD_SYSBUF_LOG=1",
+      "pass": "\\[VD_SYSBUF\\] swap=\\d+ desc=[0-9A-F]{8} \\+0=BEEF0000 \\+4=00000000 \\+8=00000000 \\+28=00000000 r7=BEEF0001 .*xenia=1",
+      "fail": "\\[VD_SYSBUF\\] .*nz8=[1-9]\\d*/"
+    },
+    {
+      "lane": "p2",
+      "name": "scan-out registers V_COUNTER / VIEWPORT_SIZE as Xenia (SR_VD_SCANOUT_REGS, baked default ON)",
+      "enabled": true,
+      "gates": "",
+      "pass": "\\[VD_SCANOUT\\] SR_VD_SCANOUT_REGS on",
+      "fail": ""
+    },
+    {
+      "lane": "p2",
+      "name": "ring from the VdInitializeRingBuffer argument, no pre-claim heap route (SR_VD_RING_ARG, baked default ON; audit U1)",
+      "enabled": true,
+      "gates": "",
+      "pass": "\\[VD_RING\\] SR_VD_RING_ARG: ring phys=0x[0-9A-F]{8} bytes=0x10000 -> VA 0x[0-9A-F]{8}",
+      "fail": "\\[VD_RING\\] .*carries no ring|\\[GPU_RING_ALLOC\\] sub_82467F40 override #|\\[RING_BASE\\] Deferred"
+    },
+    {
+      "lane": "native-b",
+      "name": "the live backend is attached before the CP's first command (no boot backlog: the black-world race)",
+      "enabled": true,
+      "gates": "",
+      "pass": "\\[DISPLAY\\] PM4 live backend attached: guest VdSwaps before it 0, draw commands queued 0\\b",
+      "fail": "\\[DISPLAY\\] PM4 live backend attached: guest VdSwaps before it [1-9]|\\[DISPLAY\\] CP waited .*(TIMED OUT|INIT FAILED)",
+      "_note": "iter-467 native-b job65: with the CP running before main() attached the D3D12 backend (=SR_PM4_WAIT_BACKEND=0), the boot frames' draw queue saturated (8,191 queued after 55 guest swaps) in 2 of 3 rolls and those two drew the 3D world black (eye-adaptation history NaN, ENGINE_MAP 6g.8d); SR_PM4_WAIT_BACKEND (default ON) waits at cpMain. render/boot-attach: the pass pattern held a JSON backspace (\"\\b\" instead of \"\\\\b\") and could never match - fixed; the CP's wait for the attach has no time limit (a Warn every 10 s, the total wait logged); an explicit D3D12 init failure logs INIT FAILED and exits 3 (FATAL). TIMED OUT stays in the fail pattern for logs of the earlier 60 s limit."
+    },
+    {
+      "lane": "render",
+      "name": "boot attach: the shader cache loads off the attach path and the CP starts with the installed cache loaded (render/boot-attach, SR_SHADER_LOAD_ASYNC, WP1)",
+      "enabled": true,
+      "gates": "",
+      "pass": "\\[SHADER_CACHE\\] CP start: waited [0-9.]+ ms for the installed shader cache \\(loaded;",
+      "fail": "\\[SHADER_CACHE\\] CP start: .*\\(none installed;|\\[SHADER_CACHE\\] boot load: the installed stage failed|\\[FATAL\\] the live D3D12 backend",
+      "_note": "docs/NATIVE_ROADMAP.md 'Boot attach': D3D12Backend::init starts the load on its own thread (probe first), main() attaches at once, the CP waits for the installed stage before its first command (WP1) and every cache lookup waits for the stage its answer needs (WP2). The wait itself is the live measurement (the pack-file decision): '[SHADER_CACHE] CP start: waited N ms'."
+    },
+    {"lane": "emu-stage3", "name": "stage 3: native resolves vs the EDRAM word model, the mixed-owner spans included (SR_NATIVE_RESOLVE_VERIFY, dev log profile)", "enabled": true, "gates": "SR_NATIVE_RESOLVE_VERIFY=1,SR_NB_SURF_VERIFY=1,SR_NB_CENSUS=8,SR_NB_CENSUS_EVERY=600,SR_NB_CENSUS_SKIP=1500,SR_LOG=dev", "pass": "\\[NATIVE_VERIFY\\] match .* via owner match [1-9]\\d* bad 0", "fail": "\\[NATIVE_VERIFY\\] MISMATCH"},
+    {"lane": "emu-stage3", "name": "stage 3: a mixed-owner span resolves natively, owner per tile (witness)", "enabled": true, "gates": "", "pass": "\\[NATIVE_RESOLVE\\] span of key [0-9A-F]{8} owned by [0-9A-F]{8} \\+ [0-9A-F]{8} .*: native, owner per tile", "fail": "\\[NATIVE_RESOLVE_BAD\\]|\\[SURFACE_MOVE_BAD\\]"},
+    {"lane": "emu-stage3", "name": "stage 3: the surface table (shipping) agrees with the tile map (oracle) on every claim and owner query", "enabled": true, "gates": "", "pass": "\\[NB_SURF\\] verify claim: claims=\\d+ mismatches=0 ", "fail": "\\[NB_SURF\\].*MISMATCH"},
+    {"lane": "emu-stage3", "name": "stage 3: census path letters - M present, no E / C (no resolve through the word model)", "enabled": true, "gates": "", "pass": "\\[NB_CENSUS\\] f=\\d+ #\\d+ .* path=M ", "fail": "\\[NB_CENSUS\\] f=\\d+ #\\d+ .* path=[EC] |\\[NB_EDRAM_RESOLVE\\]"},
+    {"lane": "emu-stage3", "name": "stage 3: the native kernel declined nothing it was asked for; no kernel compiled at run time (the shipped blobs served every resolve)", "enabled": true, "gates": "", "pass": "\\[NB_CENSUS\\] f=\\d+ native declined: owned 0 ", "fail": "native declined: owned [1-9]|\\[NB_AOT\\] compiled"},
+    {"lane": "emu-stage3", "name": "stage 3: edram_res / edram_xfer / edram_load 0 for the whole run (edram_xfer = moves executed through the word model)", "enabled": true, "gates": "", "pass": "\\[NATIVE_METER_RUN\\] periodic .*\\| pm4=\\d+ edram_res=0 edram_xfer=0 edram_load=0 ", "fail": "\\[NATIVE_METER_RUN\\] periodic .*\\| pm4=\\d+ edram_res=[1-9]|\\[NATIVE_METER_RUN\\] periodic .*edram_xfer=[1-9]|\\[NATIVE_METER_RUN\\] periodic .*edram_load=[1-9]"},
+    {"lane": "emu-stage3", "name": "stage 3: the roll completes (terminal snapshot), no crash / hang / stall", "enabled": true, "gates": "", "pass": "\\[QUIT\\] terminal snapshot complete", "fail": "\\[CRASH\\]|\\[GPU_HANG\\] ====|\\[CP_WAIT\\] stalled"}
+  ]
+}

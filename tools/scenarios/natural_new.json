@@ -1,0 +1,32 @@
+{
+  "name": "natural-new",
+  "purpose": "iter-463 natural path (NO mod: -Gates SR_MODS=0): title -> START -> the game's own LOAD A GAME? popup (after the device selector) -> A = its button 0 START NEW GAME -> sub_822B32B8 runs ProfileSettings_applyOptions (XamUserReadProfileSettings, SR_XAM_PROFILE) -> LoadComplete(true) -> main_hud. The A/B for a platform fix on the new-game path: [XAM_PROFILE] lines, the same main_hud and the same frames with SR_XAM_PROFILE=0. -TimeoutSeconds 360.",
+  "gates": "SR_KB_PAD_OBS=1,SR_PRESENT_DUMP=1,SR_PRESENT_DUMP_SPARSE_EVERY=30,SR_PRESENT_DUMP_SPARSE_CAP=600",
+  "steps": [
+    { "name": "fe-alive", "await": "\\[NAT_FE\\] #1 natural FE master tick", "timeoutMs": 180000 },
+    { "name": "settle-title", "await": "\\[NAT_FE\\] #256 natural FE master tick", "timeoutMs": 180000 },
+    {
+      "name": "press-start", "key": "ENTER", "holdMs": 250, "maxPulses": 4, "gapMs": 12000,
+      "expect": "\\[APT_SCREEN\\] path='main'|\\[APT_LOADMOVIE\\].*\\(\"main\"\\)", "expectMs": 90000
+    },
+    { "name": "title-ui-tail", "await": "\\[APT_REQ\\] #15 path='\\.\\./common/ButtonHints/XBox360/HintB'", "timeoutMs": 240000 },
+    { "name": "title-visible", "requireVisibleMs": 8000, "visibleTimeoutMs": 200000, "dwellMs": 6000 },
+    {
+      "name": "start-bootflow", "key": "ENTER", "holdMs": 250, "maxPulses": 1,
+      "expect": "\\[APT_REQ\\] #\\d+ path='screens/misc/ScrGenPop'", "expectMs": 30000
+    },
+    { "name": "popup-visible", "purpose": "The natural LOAD A GAME? popup.", "dwellMs": 6000 },
+    {
+      "name": "start-new-game", "key": "A", "holdMs": 250, "maxPulses": 1,
+      "expect": "\\[APT_REQ\\] #\\d+ path='screens/hud/main_hud'", "expectMs": 120000
+    },
+    {
+      "name": "skip-opening-movie", "cutsceneSkip": true,
+      "purpose": "iter-467 cutscene skip (owner 2026-10-11: a natural player action, not forcing; sr_drive -SkipCutscenes / SR_DRIVE_SKIP_CUTSCENES=0 turns it off): A pulses during the new game's opening FMV (the skip-movie action, event 187: A (alt) / START in the gameplay contexts, docs/PC_CONTROLS.md) until the movie is over: the player's first gameplay MODE ([PC_CONTROLS] context gameplay ... mode on-foot camera; the merge-ready gate showed pad A killing the opening FMV with NO [EV187] accept line), an [EV187] ... ACCEPTED-KILL edge, or the movie's own EOM if it ends first. The gate's in-game start takes either (tools/perf/perf_report.py MOVIE_SKIP). Optional: a missed skip only costs the movie's 30 s.",
+      "key": "A", "holdMs": 400, "holdUntilConfirmed": true, "maxPulses": 15, "gapMs": 2000, "optional": true,
+      "expect": "\\[EV187\\] #\\d+ slot=\\d+ rc=01 ACCEPTED-KILL|\\[MOVIE_PACE\\] movie#\\d+ EOM wall=[\\d.]+s frames=(?:[2-9]|[1-9]\\d+)\\b|\\[PC_CONTROLS\\] context gameplay \\(igc type \\d+\\) config \\S+ invX=\\d+ invY=\\d+ mode [a-z]",
+      "expectFresh": true, "expectMs": 60000
+    },
+    { "name": "observe-after", "dwellMs": 45000 }
+  ]
+}

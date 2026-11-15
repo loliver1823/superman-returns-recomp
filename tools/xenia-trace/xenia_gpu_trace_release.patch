@@ -1,0 +1,19 @@
+diff --git a/src/xenia/gpu/trace_writer.h b/src/xenia/gpu/trace_writer.h
+index 0239d7f..49eeb68 100644
+--- a/src/xenia/gpu/trace_writer.h
++++ b/src/xenia/gpu/trace_writer.h
+@@ -21,11 +21,10 @@
+ // function calls (even if they just immediately return) is 0.40-0.60% cpu time
+ // total. with inlining they just bloat the caller and negatively impact
+ // register allocation for the caller
+-#ifdef NDEBUG
+-#define XE_ENABLE_TRACE_WRITER_INSTRUMENTATION 0
+-#else
++// superman-recomp patch (tools/xenia-trace/xenia_gpu_trace_release.patch):
++// force-enable the GPU trace writer in Release so --trace_gpu_stream /
++// RequestFrameTrace produce .xtr goldens for SR_GPU_TRACE_REPLAY.
+ #define XE_ENABLE_TRACE_WRITER_INSTRUMENTATION 1
+-#endif
+ 
+ namespace xe {
+ namespace gpu {

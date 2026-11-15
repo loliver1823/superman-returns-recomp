@@ -1,0 +1,677 @@
+diff --git a/src/xenia/gpu/command_processor.h b/src/xenia/gpu/command_processor.h
+index 9fce691..0666f8f 100644
+--- a/src/xenia/gpu/command_processor.h
++++ b/src/xenia/gpu/command_processor.h
+@@ -172,6 +172,9 @@ class CommandProcessor {
+       const reg::DC_LUT_PWL_DATA* new_gamma_ramp_pwl_rgb,
+       uint32_t new_gamma_ramp_rw_component);
+   virtual void RestoreEdramSnapshot(const void* snapshot) = 0;
++  // superman-recomp per-draw EDRAM oracle: the whole EDRAM (guest layout,
++  // kEdramSizeBytes) as it stands now. Must run on the command processor thread.
++  virtual bool DumpEdram(std::vector<uint8_t>& out) { return false; }
+ 
+   void InitializeRingBuffer(uint32_t ptr, uint32_t size_log2);
+   void EnableReadPointerWriteBack(uint32_t ptr, uint32_t block_size_log2);
+diff --git a/src/xenia/gpu/d3d12/d3d12_command_processor.cc b/src/xenia/gpu/d3d12/d3d12_command_processor.cc
+index 68cbf42..0204d0a 100644
+--- a/src/xenia/gpu/d3d12/d3d12_command_processor.cc
++++ b/src/xenia/gpu/d3d12/d3d12_command_processor.cc
+@@ -41,6 +41,14 @@ DEFINE_bool(d3d12_submit_on_primary_buffer_end, true,
+ 
+ DECLARE_bool(clear_memory_page_state);
+ 
++// superman-recomp P1 resolve oracle: with --readback_resolve=full, write every
++// resolve's destination bytes (guest layout, as read back) to
++// <dir>/r<NNN>_<address>_<length>.bin in resolve order.
++DEFINE_string(trace_dump_resolve_dir, "",
++              "Directory for per-resolve destination dumps (needs "
++              "--readback_resolve=full).",
++              "GPU");
++
+ namespace xe {
+ namespace gpu {
+ namespace d3d12 {
+@@ -3030,6 +3038,17 @@ bool D3D12CommandProcessor::IssueDraw(xenos::PrimitiveType primitive_type,
+   return true;
+ }
+ 
++bool D3D12CommandProcessor::DumpEdram(std::vector<uint8_t>& out) {
++  if (!BeginSubmission(true)) {
++    return false;
++  }
++  if (!render_target_cache_->InitializeTraceSubmitDownloads()) {
++    return false;
++  }
++  AwaitAllQueueOperationsCompletion();
++  return render_target_cache_->CompleteEdramDownload(out);
++}
++
+ void D3D12CommandProcessor::InitializeTrace() {
+   CommandProcessor::InitializeTrace();
+ 
+@@ -3178,6 +3197,17 @@ bool D3D12CommandProcessor::IssueCopy_ReadbackResolvePath() {
+           // chrispy: this memcpy needs to be optimized as much as possible
+           auto physaddr = memory_->TranslatePhysical(written_address);
+           memory::vastcpy(physaddr, (uint8_t*)readback_mapping, written_length);
++          if (!cvars::trace_dump_resolve_dir.empty()) {
++            static uint32_t resolve_ordinal = 0;
++            char name[64];
++            std::snprintf(name, sizeof(name), "/r%03u_%08X_%08X.bin",
++                          resolve_ordinal++, written_address, written_length);
++            const std::string path = cvars::trace_dump_resolve_dir + name;
++            if (FILE* f = std::fopen(path.c_str(), "wb")) {
++              std::fwrite(readback_mapping, 1, written_length, f);
++              std::fclose(f);
++            }
++          }
+           D3D12_RANGE readback_write_range = {};
+           read_source->Unmap(0, &readback_write_range);
+         }
+diff --git a/src/xenia/gpu/d3d12/d3d12_command_processor.h b/src/xenia/gpu/d3d12/d3d12_command_processor.h
+index 95687cd..2914503 100644
+--- a/src/xenia/gpu/d3d12/d3d12_command_processor.h
++++ b/src/xenia/gpu/d3d12/d3d12_command_processor.h
+@@ -78,6 +78,7 @@ class D3D12CommandProcessor final : public CommandProcessor {
+   void TracePlaybackWroteMemory(uint32_t base_ptr, uint32_t length) override;
+ 
+   void RestoreEdramSnapshot(const void* snapshot) override;
++  bool DumpEdram(std::vector<uint8_t>& out) override;
+ 
+   void PollCompletedSubmission() override;
+ 
+@@ -120,6 +121,16 @@ class D3D12CommandProcessor final : public CommandProcessor {
+   void PushUAVBarrier(ID3D12Resource* resource);
+   void SubmitBarriers();
+ 
++  // Texture dump (cvars::texture_dump) host-texture readback helpers. Public
++  // forwarders so D3D12TextureCache can flush+await and grab a readback buffer
++  // to copy the UNTILED host texture out for dumping.
++  bool DumpAwaitAllQueueOperationsCompletion() {
++    return AwaitAllQueueOperationsCompletion();
++  }
++  ID3D12Resource* DumpRequestReadbackBuffer(uint32_t size) {
++    return RequestReadbackBuffer(size);
++  }
++
+   // Finds or creates root signature for a pipeline.
+   ID3D12RootSignature* GetRootSignature(const DxbcShader* vertex_shader,
+                                         const DxbcShader* pixel_shader,
+diff --git a/src/xenia/gpu/d3d12/d3d12_render_target_cache.cc b/src/xenia/gpu/d3d12/d3d12_render_target_cache.cc
+index 3cc4c4b..a15ac0b 100644
+--- a/src/xenia/gpu/d3d12/d3d12_render_target_cache.cc
++++ b/src/xenia/gpu/d3d12/d3d12_render_target_cache.cc
+@@ -1568,6 +1568,23 @@ void D3D12RenderTargetCache::InitializeTraceCompleteDownloads() {
+   edram_snapshot_download_buffer_ = nullptr;
+ }
+ 
++bool D3D12RenderTargetCache::CompleteEdramDownload(std::vector<uint8_t>& out) {
++  if (!edram_snapshot_download_buffer_) {
++    return false;
++  }
++  void* download_mapping;
++  bool ok = false;
++  if (SUCCEEDED(edram_snapshot_download_buffer_->Map(0, nullptr,
++                                                     &download_mapping))) {
++    const uint8_t* bytes = reinterpret_cast<const uint8_t*>(download_mapping);
++    out.assign(bytes, bytes + xenos::kEdramSizeBytes);
++    D3D12_RANGE download_write_range = {};
++    edram_snapshot_download_buffer_->Unmap(0, &download_write_range);
++    ok = true;
++  }
++  return ok;
++}
++
+ void D3D12RenderTargetCache::RestoreEdramSnapshot(const void* snapshot) {
+   if (IsDrawResolutionScaled()) {
+     // No 1:1 mapping.
+diff --git a/src/xenia/gpu/d3d12/d3d12_render_target_cache.h b/src/xenia/gpu/d3d12/d3d12_render_target_cache.h
+index c0bb742..5a7eb7d 100644
+--- a/src/xenia/gpu/d3d12/d3d12_render_target_cache.h
++++ b/src/xenia/gpu/d3d12/d3d12_render_target_cache.h
+@@ -91,6 +91,8 @@ class D3D12RenderTargetCache final : public RenderTargetCache {
+   // Returns true if any downloads were submitted to the command processor.
+   bool InitializeTraceSubmitDownloads();
+   void InitializeTraceCompleteDownloads();
++  // superman-recomp: like InitializeTraceCompleteDownloads, into a vector.
++  bool CompleteEdramDownload(std::vector<uint8_t>& out);
+   void RestoreEdramSnapshot(const void* snapshot);
+ 
+   // For host render targets.
+diff --git a/src/xenia/gpu/d3d12/d3d12_texture_cache.cc b/src/xenia/gpu/d3d12/d3d12_texture_cache.cc
+index a4de12e..c7761af 100644
+--- a/src/xenia/gpu/d3d12/d3d12_texture_cache.cc
++++ b/src/xenia/gpu/d3d12/d3d12_texture_cache.cc
+@@ -27,6 +27,13 @@
+ #include "xenia/ui/d3d12/d3d12_upload_buffer_pool.h"
+ #include "xenia/ui/d3d12/d3d12_util.h"
+ 
++// Texture dump (--texture_dump): write the UNTILED host texture as a .DDS.
++#include <cstdio>
++#include <filesystem>
++#include "xenia/base/cvar.h"
++#include "xenia/base/filesystem.h"
++DECLARE_bool(texture_dump);  // defined in texture_dump.cc
++
+ namespace xe {
+ namespace gpu {
+ namespace d3d12 {
+@@ -1374,6 +1381,135 @@ std::unique_ptr<TextureCache::Texture> D3D12TextureCache::CreateTexture(
+       new D3D12Texture(*this, key, resource.Get(), resource_state));
+ }
+ 
++// Writes the UNTILED host (subresource 0) pixels mapped from a readback buffer
++// out as a .DDS. The readback buffer's rows are padded to RowPitch
++// (D3D12_TEXTURE_DATA_PITCH_ALIGNMENT); this strips that padding so the DDS
++// body is tightly packed (the form the recomp consumes).
++static void DumpHostTextureDDS(DXGI_FORMAT fmt, uint32_t width, uint32_t height,
++                               const D3D12_PLACED_SUBRESOURCE_FOOTPRINT& fp,
++                               uint32_t rows, uint32_t tight_row_bytes,
++                               const void* mapped, uint32_t base_page,
++                               xenos::TextureFormat guest_format) {
++  struct {
++    uint32_t size;
++    uint32_t flags;
++    uint32_t height;
++    uint32_t width;
++    uint32_t pitch_or_linear_size;
++    uint32_t depth;
++    uint32_t mip_levels;
++    uint32_t reserved1[11];
++    struct {
++      uint32_t size;
++      uint32_t flags;
++      uint32_t fourcc;  // little-endian fourcc as stored in a DDS file
++      uint32_t rgb_bit_count;
++      uint32_t r_bit_mask;
++      uint32_t g_bit_mask;
++      uint32_t b_bit_mask;
++      uint32_t a_bit_mask;
++    } pixel_format;
++    uint32_t caps[4];
++    uint32_t reserved2;
++  } dds_header;
++
++  std::memset(&dds_header, 0, sizeof(dds_header));
++  dds_header.size = sizeof(dds_header);
++  // DDSD_CAPS|HEIGHT|WIDTH|PIXELFORMAT|MIPMAPCOUNT
++  dds_header.flags = 0x1u | 0x2u | 0x4u | 0x1000u | 0x20000u;
++  dds_header.height = height;
++  dds_header.width = width;
++  dds_header.depth = 1;
++  dds_header.mip_levels = 1;
++  dds_header.pixel_format.size = sizeof(dds_header.pixel_format);
++
++  auto fourcc = [](char a, char b, char c, char d) -> uint32_t {
++    return uint32_t(uint8_t(a)) | (uint32_t(uint8_t(b)) << 8) |
++           (uint32_t(uint8_t(c)) << 16) | (uint32_t(uint8_t(d)) << 24);
++  };
++  bool is_bc = false;
++  const char* fmt_name = "RAW";
++  switch (fmt) {
++    case DXGI_FORMAT_BC1_UNORM:
++    case DXGI_FORMAT_BC1_UNORM_SRGB:
++      dds_header.pixel_format.flags = 0x4u;  // DDPF_FOURCC
++      dds_header.pixel_format.fourcc = fourcc('D', 'X', 'T', '1');
++      is_bc = true;
++      fmt_name = "BC1";
++      break;
++    case DXGI_FORMAT_BC2_UNORM:
++    case DXGI_FORMAT_BC2_UNORM_SRGB:
++      dds_header.pixel_format.flags = 0x4u;
++      dds_header.pixel_format.fourcc = fourcc('D', 'X', 'T', '3');
++      is_bc = true;
++      fmt_name = "BC2";
++      break;
++    case DXGI_FORMAT_BC3_UNORM:
++    case DXGI_FORMAT_BC3_UNORM_SRGB:
++      dds_header.pixel_format.flags = 0x4u;
++      dds_header.pixel_format.fourcc = fourcc('D', 'X', 'T', '5');
++      is_bc = true;
++      fmt_name = "BC3";
++      break;
++    case DXGI_FORMAT_R8G8B8A8_UNORM:
++    case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
++      // DDPF_RGB|DDPF_ALPHAPIXELS, RGBA8 (R in low byte for this fourcc-less).
++      dds_header.pixel_format.flags = 0x1u | 0x40u;
++      dds_header.pixel_format.rgb_bit_count = 32;
++      dds_header.pixel_format.r_bit_mask = 0x000000FFu;
++      dds_header.pixel_format.g_bit_mask = 0x0000FF00u;
++      dds_header.pixel_format.b_bit_mask = 0x00FF0000u;
++      dds_header.pixel_format.a_bit_mask = 0xFF000000u;
++      fmt_name = "RGBA8";
++      break;
++    case DXGI_FORMAT_B8G8R8A8_UNORM:
++    case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
++      dds_header.pixel_format.flags = 0x1u | 0x40u;
++      dds_header.pixel_format.rgb_bit_count = 32;
++      dds_header.pixel_format.r_bit_mask = 0x00FF0000u;
++      dds_header.pixel_format.g_bit_mask = 0x0000FF00u;
++      dds_header.pixel_format.b_bit_mask = 0x000000FFu;
++      dds_header.pixel_format.a_bit_mask = 0xFF000000u;
++      fmt_name = "BGRA8";
++      break;
++    default:
++      XELOGW("texture_dump: unhandled host DXGI format {}, dumping raw bytes",
++             uint32_t(fmt));
++      break;
++  }
++  if (is_bc) {
++    dds_header.flags |= 0x80000u;  // DDSD_LINEARSIZE
++    dds_header.pitch_or_linear_size = tight_row_bytes * rows;
++  } else {
++    dds_header.flags |= 0x8u;  // DDSD_PITCH
++    dds_header.pitch_or_linear_size = tight_row_bytes;
++  }
++  dds_header.caps[0] = 0x1000u;  // DDSCAPS_TEXTURE
++
++  std::filesystem::path path = "texture_dumps";
++  std::error_code ec;
++  std::filesystem::create_directories(path, ec);
++  static int dump_counter = 0;
++  char name[128];
++  std::snprintf(name, sizeof(name), "host_%05d_%08X_%ux%u_%s.dds",
++                dump_counter++, base_page << 12, width, height, fmt_name);
++  path /= name;
++
++  FILE* handle = xe::filesystem::OpenFile(path, "wb");
++  if (handle) {
++    const char signature[4] = {'D', 'D', 'S', ' '};
++    fwrite(signature, sizeof(signature), 1, handle);
++    fwrite(&dds_header, sizeof(dds_header), 1, handle);
++    const uint8_t* src = reinterpret_cast<const uint8_t*>(mapped);
++    for (uint32_t r = 0; r < rows; ++r) {
++      fwrite(src + uint64_t(r) * fp.Footprint.RowPitch, tight_row_bytes, 1,
++             handle);
++    }
++    fclose(handle);
++    XELOGI("texture_dump: wrote {}", xe::path_to_utf8(path));
++  }
++}
++
+ bool D3D12TextureCache::LoadTextureDataFromResidentMemoryImpl(Texture& texture,
+                                                               bool load_base,
+                                                               bool load_mips) {
+@@ -1738,8 +1874,81 @@ bool D3D12TextureCache::LoadTextureDataFromResidentMemoryImpl(Texture& texture,
+     }
+   }
+ 
++  // FEATURE: dump the UNTILED host texture (subresource 0) as a .DDS so the
++  // recomp can use the authentic untiled pixels. texture_resource here holds the
++  // fully untiled, host-format pixels (the load compute shader untiled guest
++  // memory into copy_buffer, then the loop above copied it into texture_resource).
++  // Gated by --texture_dump. Only the base mip is dumped.
++  //
++  // IMPORTANT ordering: all command-list / state-machine work that requires the
++  // submission to be OPEN (barriers, the readback CopyTextureRegion, releasing
++  // the scratch copy_buffer) is recorded FIRST, while the submission is still
++  // open. Only AFTER that do we flush+await (which ENDS the submission) and map
++  // the readback buffer. No submission-dependent calls happen post-await.
++  bool dump_pending = false;
++  ID3D12Resource* dump_rb = nullptr;
++  D3D12_RESOURCE_DESC dump_tex_desc = {};
++  D3D12_PLACED_SUBRESOURCE_FOOTPRINT dump_fp = {};
++  UINT dump_rows = 0;
++  UINT64 dump_row_bytes = 0, dump_total = 0;
++  if (cvars::texture_dump && load_base) {
++    dump_tex_desc = texture_resource->GetDesc();
++    // Guard: only dump COMPRESSED (BC1-BC7) content textures of reasonable size.
++    // This skips the flood of RAW render-targets/FMV buffers (which would stall
++    // the GPU thousands of times and never reach the menu), capturing only real
++    // assets like the press-start wordmark/S-shield/background.
++    DXGI_FORMAT _df = dump_tex_desc.Format;
++    bool _is_bc = (_df >= DXGI_FORMAT_BC1_TYPELESS && _df <= DXGI_FORMAT_BC5_SNORM) ||
++                  (_df >= DXGI_FORMAT_BC6H_TYPELESS && _df <= DXGI_FORMAT_BC7_UNORM_SRGB);
++    if (_is_bc && dump_tex_desc.Width <= 2048 && dump_tex_desc.Height <= 2048) {
++    device->GetCopyableFootprints(&dump_tex_desc, 0, 1, 0, &dump_fp, &dump_rows,
++                                  &dump_row_bytes, &dump_total);
++    dump_rb = command_processor_.DumpRequestReadbackBuffer(uint32_t(dump_total));
++    if (dump_rb != nullptr) {
++      // texture_resource was left in COPY_DEST by the copy loop; move it to
++      // COPY_SOURCE so we can read it back. We leave it recorded as COPY_SOURCE
++      // (the real state) so the next RequestTextures transitions correctly.
++      command_processor_.PushTransitionBarrier(
++          texture_resource,
++          d3d12_texture.SetResourceState(D3D12_RESOURCE_STATE_COPY_SOURCE),
++          D3D12_RESOURCE_STATE_COPY_SOURCE);
++      command_processor_.SubmitBarriers();
++      D3D12_TEXTURE_COPY_LOCATION rb_dst = {};
++      rb_dst.pResource = dump_rb;
++      rb_dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
++      rb_dst.PlacedFootprint = dump_fp;
++      D3D12_TEXTURE_COPY_LOCATION rb_src = {};
++      rb_src.pResource = texture_resource;
++      rb_src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
++      rb_src.SubresourceIndex = 0;
++      command_list.D3DCopyTextureRegion(&rb_dst, 0, 0, 0, &rb_src, nullptr);
++      dump_pending = true;
++    }
++    }  // end _is_bc guard
++  }
++
++  // Release the scratch copy_buffer (records its new state) while the submission
++  // is still open, as the normal path requires.
+   command_processor_.ReleaseScratchGPUBuffer(copy_buffer, copy_buffer_state);
+ 
++  // Now flush + await (this ENDS the submission) and read back the dump.
++  if (dump_pending) {
++    if (command_processor_.DumpAwaitAllQueueOperationsCompletion()) {
++      D3D12_RANGE rd_range;
++      rd_range.Begin = 0;
++      rd_range.End = size_t(dump_total);
++      void* rb_map = nullptr;
++      if (SUCCEEDED(dump_rb->Map(0, &rd_range, &rb_map))) {
++        DumpHostTextureDDS(dump_tex_desc.Format, texture_key.GetWidth(),
++                           texture_key.GetHeight(), dump_fp, dump_rows,
++                           uint32_t(dump_row_bytes), rb_map,
++                           texture_key.base_page, guest_format);
++        D3D12_RANGE wr = {};
++        dump_rb->Unmap(0, &wr);
++      }
++    }
++  }
++
+   return true;
+ }
+ 
+diff --git a/src/xenia/gpu/pm4_command_processor_declare.h b/src/xenia/gpu/pm4_command_processor_declare.h
+index 93a9aaf..3b792c8 100644
+--- a/src/xenia/gpu/pm4_command_processor_declare.h
++++ b/src/xenia/gpu/pm4_command_processor_declare.h
+@@ -9,7 +9,12 @@ virtual uint32_t ExecutePrimaryBuffer(uint32_t start_index, uint32_t end_index)
+ virtual bool ExecutePacket() PM4_OVERRIDE;
+ 
+ public:
+-void ExecutePacket(uint32_t ptr, uint32_t count);
++// superman-recomp fix: virtual so TracePlayer (which holds a base
++// CommandProcessor*) dispatches into the derived backend's PM4 walker.
++// Non-virtual, the base walker runs and its qualified
++// COMMAND_PROCESSOR::IssueDraw statically binds to the base stub that
++// returns false -> every trace-playback draw "Failed in backend".
++virtual void ExecutePacket(uint32_t ptr, uint32_t count) PM4_OVERRIDE;
+ 
+ protected:
+ XE_NOINLINE
+diff --git a/src/xenia/gpu/trace_dump.cc b/src/xenia/gpu/trace_dump.cc
+index 6a27325..37581b5 100644
+--- a/src/xenia/gpu/trace_dump.cc
++++ b/src/xenia/gpu/trace_dump.cc
+@@ -37,6 +37,15 @@
+ 
+ DEFINE_path(target_trace_file, "", "Specifies the trace file to load.", "GPU");
+ DEFINE_path(trace_dump_path, "", "Output path for dumped files.", "GPU");
++// iter-456p (superman-recomp): stop playback at a chosen command so a sweep can
++// attribute pixels to a draw range. -1 keeps the stock behaviour (play to the
++// last command of frame 0).
++// Defined in trace_player.cc, where the omission actually happens.
++DECLARE_int32(trace_skip_draw_first);
++DECLARE_int32(trace_skip_draw_last);
++
++DEFINE_int32(trace_dump_last_command, -1,
++             "Stop playback after this command index (-1 = last).", "GPU");
+ 
+ namespace xe {
+ namespace gpu {
+@@ -128,11 +137,50 @@ bool TraceDump::Load(const std::filesystem::path& trace_file_path) {
+ int TraceDump::Run() {
+   BeginHostCapture();
+   player_->SeekFrame(0);
+-  player_->SeekCommand(
+-      static_cast<int>(player_->current_frame()->commands.size() - 1));
++  int last_command =
++      static_cast<int>(player_->current_frame()->commands.size() - 1);
++  if (cvars::trace_dump_last_command >= 0 &&
++      cvars::trace_dump_last_command < last_command) {
++    last_command = cvars::trace_dump_last_command;
++  }
++  XELOGI("TraceDump: seeking to command {} of {}", last_command,
++         player_->current_frame()->commands.size() - 1);
++  player_->SeekCommand(last_command);
+   player_->WaitOnPlayback();
+   EndHostCapture();
+ 
++  // ?? iter-456p (superman-recomp): FAIL-CLOSED ABLATION ACCOUNTING ??????????
++  // A request that was not honoured EXACTLY must not quietly yield a baseline
++  // image - that would read as "omitting these draws changed nothing", which is
++  // the one conclusion a silent no-op could fake.
++  {
++    const int32_t first = cvars::trace_skip_draw_first;
++    const int32_t last = cvars::trace_skip_draw_last;
++    const uint32_t total = player_->draw_packets_total();
++    const uint32_t skipped = player_->draw_packets_skipped();
++    XELOGI("TraceDump: draw packets={} skip_request=[{}..{}] skipped={}", total,
++           first, last, skipped);
++    if (first != 0 || last != 0) {
++      const char* refusal = nullptr;
++      if (first <= 0 || last <= 0) {
++        refusal = "both bounds must be >= 1 (a single bound or zero is refused)";
++      } else if (first > last) {
++        refusal = "the range is inverted";
++      } else if (static_cast<uint32_t>(last) > total) {
++        refusal = "the range runs past the frame's draw count";
++      } else if (skipped != static_cast<uint32_t>(last - first + 1)) {
++        refusal = "the skipped count does not equal the requested span";
++      }
++      if (refusal) {
++        XELOGE(
++            "TraceDump: REFUSING to write an image - {}. request=[{}..{}] "
++            "draws={} skipped={}",
++            refusal, first, last, total, skipped);
++        return 1;
++      }
++    }
++  }
++
+   // Capture.
+   int result = 0;
+   ui::Presenter* presenter = graphics_system_->presenter();
+diff --git a/src/xenia/gpu/trace_player.cc b/src/xenia/gpu/trace_player.cc
+index 303e4d5..6546078 100644
+--- a/src/xenia/gpu/trace_player.cc
++++ b/src/xenia/gpu/trace_player.cc
+@@ -9,6 +9,53 @@
+ 
+ #include "xenia/gpu/trace_player.h"
+ 
++#include "xenia/base/cvar.h"
++#include "xenia/base/logging.h"
++#include "xenia/gpu/packet_disassembler.h"
++#include "xenia/gpu/register_file.h"
++#include "xenia/gpu/shader.h"
++
++// ?? iter-456p (superman-recomp): FULL-FRAME DRAW ABLATION ????????????????????
++// Omit selected DRAW packets while the rest of the frame - every generic packet,
++// memory and register record, event, and the SWAP - still executes. Truncating
++// playback instead produces no image at all, because TraceDump captures the
++// presenter's guest output and that only exists after the swap.
++//
++// The range is 1-BASED INCLUSIVE and aligns with [PM4_TEXINV] draw=N on the
++// recomp side. 0/0 disables. Both bounds must be supplied; the caller validates
++// against the real draw total after playback and refuses to emit an image if the
++// request was not honoured exactly.
++DEFINE_int32(trace_skip_draw_first, 0,
++             "First 1-based draw packet to OMIT (0 = ablation disabled).",
++             "GPU");
++DEFINE_int32(trace_skip_draw_last, 0,
++             "Last 1-based draw packet to OMIT, inclusive (0 = disabled).",
++             "GPU");
++
++// ?? iter-456p Slice C (superman-recomp): THE SAMPLED-SLOT OBSERVER ???????????
++// A fetch-REGISTER inventory is not a sampled-texture inventory: all 32 slots
++// can hold valid-looking descriptors while the active shader samples only a few,
++// so stale constants masquerade as used textures. Xenia's own parsed
++// Shader::TextureBinding::fetch_constant is the authoritative used-slot list.
++//
++// OBSERVER ONLY: it runs AFTER ExecutePacket, reads the shaders and the register
++// file, and logs. It binds nothing, changes no state, and skips no draw.
++DEFINE_bool(trace_log_sampled_textures, false,
++            "Log the active VS/PS parsed texture bindings after each draw.",
++            "GPU");
++
++// superman-recomp P1: PER-DRAW EDRAM ORACLE. After each listed 1-based draw
++// packet, write the whole EDRAM (guest layout) to <dir>/e<NNNNN>.bin. The recomp
++// side (SR_PM4_EDRAM_DUMP) writes its mirror after the same draw ordinal.
++DEFINE_string(trace_dump_edram_draws, "",
++              "Comma-separated 1-based draw ordinals to dump the EDRAM after.",
++              "GPU");
++DEFINE_string(trace_dump_edram_dir, "", "Directory for per-draw EDRAM dumps.",
++              "GPU");
++
++#include <cstdio>
++#include <set>
++#include <sstream>
+ #include "xenia/gpu/command_processor.h"
+ #include "xenia/gpu/graphics_system.h"
+ #include "xenia/gpu/registers.h"
+@@ -92,6 +139,34 @@ void TracePlayer::PlayTrace(const uint8_t* trace_data, size_t trace_size,
+   });
+ }
+ 
++// iter-456p Slice C: log ONLY the slots the active shaders actually sample.
++void TracePlayer::LogSampledTextures(uint32_t draw_ordinal) {
++  auto command_processor = graphics_system_->command_processor();
++  auto* regs = graphics_system_->register_file();
++  if (!regs) return;
++
++  auto dump_stage = [&](const char* stage, Shader* shader) {
++    if (!shader) return;
++    for (const auto& b : shader->texture_bindings()) {
++      const uint32_t slot = b.fetch_constant;
++      if (slot >= 32) continue;
++      // Fetch constants live at XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0, six
++      // dwords per texture slot.
++      const uint32_t base =
++          XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + slot * 6;
++      uint32_t f[6];
++      for (uint32_t i = 0; i < 6; i++) f[i] = regs->values[base + i];
++      XELOGI(
++          "[XE_SAMPLED] draw={} stage={} shaderHash={:016X} slot={} "
++          "raw={:08X},{:08X},{:08X},{:08X},{:08X},{:08X}",
++          draw_ordinal, stage, shader->ucode_data_hash(), slot, f[0], f[1],
++          f[2], f[3], f[4], f[5]);
++    }
++  };
++  dump_stage("VS", command_processor->active_vertex_shader());
++  dump_stage("PS", command_processor->active_pixel_shader());
++}
++
+ void TracePlayer::PlayTraceOnThread(const uint8_t* trace_data,
+                                     size_t trace_size,
+                                     TracePlaybackMode playback_mode,
+@@ -99,6 +174,11 @@ void TracePlayer::PlayTraceOnThread(const uint8_t* trace_data,
+   auto memory = graphics_system_->memory();
+   auto command_processor = graphics_system_->command_processor();
+ 
++  // iter-456p: per-playback accounting. A stale count from a previous seek
++  // would make the ablation report a range it did not actually apply.
++  draw_packets_total_ = 0;
++  draw_packets_skipped_ = 0;
++
+   if (clear_caches) {
+     command_processor->ClearCaches();
+   }
+@@ -156,8 +236,56 @@ void TracePlayer::PlayTraceOnThread(const uint8_t* trace_data,
+         auto cmd = reinterpret_cast<const PacketEndCommand*>(trace_ptr);
+         trace_ptr += sizeof(*cmd);
+         if (pending_packet) {
+-          command_processor->ExecutePacket(pending_packet->base_ptr,
+-                                           pending_packet->count);
++          // Classify BEFORE executing. Only kDraw packets carry an ordinal and
++          // only they may be omitted; a generic packet, a register write or the
++          // swap must always run, or the frame stops being the same frame.
++          const auto category = PacketDisassembler::GetPacketCategory(
++              memory->TranslatePhysical(pending_packet->base_ptr));
++          bool omit = false;
++          if (category == PacketCategory::kDraw) {
++            ++draw_packets_total_;
++            const int32_t ord = static_cast<int32_t>(draw_packets_total_);
++            if (cvars::trace_skip_draw_first > 0 &&
++                cvars::trace_skip_draw_last > 0 &&
++                ord >= cvars::trace_skip_draw_first &&
++                ord <= cvars::trace_skip_draw_last) {
++              omit = true;
++              ++draw_packets_skipped_;
++            }
++          }
++          if (!omit) {
++            command_processor->ExecutePacket(pending_packet->base_ptr,
++                                             pending_packet->count);
++            if (category == PacketCategory::kDraw &&
++                cvars::trace_log_sampled_textures) {
++              LogSampledTextures(draw_packets_total_);
++            }
++            if (category == PacketCategory::kDraw &&
++                !cvars::trace_dump_edram_dir.empty()) {
++              static const std::set<uint32_t> dump_draws = [] {
++                std::set<uint32_t> s;
++                std::stringstream ss(cvars::trace_dump_edram_draws);
++                std::string item;
++                while (std::getline(ss, item, ',')) {
++                  if (!item.empty()) s.insert(uint32_t(std::stoul(item)));
++                }
++                return s;
++              }();
++              if (dump_draws.count(draw_packets_total_)) {
++                std::vector<uint8_t> edram;
++                if (command_processor->DumpEdram(edram)) {
++                  char name[32];
++                  std::snprintf(name, sizeof(name), "/e%05u.bin",
++                                draw_packets_total_);
++                  const std::string path = cvars::trace_dump_edram_dir + name;
++                  if (FILE* f = std::fopen(path.c_str(), "wb")) {
++                    std::fwrite(edram.data(), 1, edram.size(), f);
++                    std::fclose(f);
++                  }
++                }
++              }
++            }
++          }
+           pending_packet = nullptr;
+         }
+         if (pending_break) {
+diff --git a/src/xenia/gpu/trace_player.h b/src/xenia/gpu/trace_player.h
+index 9117e88..5e296b4 100644
+--- a/src/xenia/gpu/trace_player.h
++++ b/src/xenia/gpu/trace_player.h
+@@ -41,6 +41,12 @@ class TracePlayer : public TraceReader {
+   // Scalar from 0-10000
+   uint32_t playback_percent() const { return playback_percent_; }
+ 
++  // iter-456p (superman-recomp): how many kDraw packets the last playback saw,
++  // and how many of them were omitted. Reported so a caller can verify the
++  // ablation did exactly what it was asked to.
++  uint32_t draw_packets_total() const { return draw_packets_total_; }
++  uint32_t draw_packets_skipped() const { return draw_packets_skipped_; }
++
+   void SeekFrame(int target_frame);
+   void SeekCommand(int target_command);
+ 
+@@ -56,6 +62,10 @@ class TracePlayer : public TraceReader {
+   int current_frame_index_;
+   int current_command_index_;
+   bool playing_trace_ = false;
++  // iter-456p (superman-recomp): draw-packet ablation accounting.
++  void LogSampledTextures(uint32_t draw_ordinal);   // iter-456p Slice C
++  uint32_t draw_packets_total_ = 0;
++  uint32_t draw_packets_skipped_ = 0;
+   std::atomic<uint32_t> playback_percent_ = {0};
+   std::unique_ptr<xe::threading::Event> playback_event_;
+ };
+diff --git a/src/xenia/gpu/trace_writer.h b/src/xenia/gpu/trace_writer.h
+index 0239d7f..49eeb68 100644
+--- a/src/xenia/gpu/trace_writer.h
++++ b/src/xenia/gpu/trace_writer.h
+@@ -21,11 +21,10 @@
+ // function calls (even if they just immediately return) is 0.40-0.60% cpu time
+ // total. with inlining they just bloat the caller and negatively impact
+ // register allocation for the caller
+-#ifdef NDEBUG
+-#define XE_ENABLE_TRACE_WRITER_INSTRUMENTATION 0
+-#else
++// superman-recomp patch (tools/xenia-trace/xenia_gpu_trace_release.patch):
++// force-enable the GPU trace writer in Release so --trace_gpu_stream /
++// RequestFrameTrace produce .xtr goldens for SR_GPU_TRACE_REPLAY.
+ #define XE_ENABLE_TRACE_WRITER_INSTRUMENTATION 1
+-#endif
+ 
+ namespace xe {
+ namespace gpu {

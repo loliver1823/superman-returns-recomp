@@ -1,0 +1,259 @@
+; Included expression (.include): pushes the ApplyStore FUNCTION (DefineFunction2 with
+; its own registers), so a patch can bind it to a member and call it. Used by
+; srfrontend.aptasm (SRFrontEnd.ApplyStore) and by the ScrSaveLoad patch (an in-game
+; load), so each movie runs its own copy (no call into a movie that is not loaded).
+;
+; ApplyStore(why): why 0 = the menu claim (after the sign-in ProfileSettings_applyOptions),
+; 1 = NEW GAME (after applyOptions), 2 = a loaded save (after the save's own options were
+; restored, ScriptCmd_FillRecordArray_sub_821652E0). Applies the universal store
+; _global.SRSettings (packed, kernel/mod_bridge.hpp) through the game's OWN SettingsAdapter
+; setters - the same natives the options screens call - and only where the live value
+; differs. why 2 honours the host-owned bit 14 apply_to_loaded_saves (0 = console
+; behaviour: the save's options stay). SetRumble(1) starts a test rumble in the options
+; screen, so a changed vibration is followed by StopRumble (ScrGameplayOpt.ExitScreen).
+;   var p = _global.SRSettings; if (p == undefined) return;
+;   if (why == 2 && (p & 16384) == 0) { fscommand("SR_Log", ...skipped...); return; }
+;   var SA = _global.SettingsAdapter, v;
+;   if (p & 32768) {    // volumes known (the host saw the audio mixer when it stored them)
+;     v = p & 15;       if (SA.GetMusicVol() != v) SA.SetMusicVol(v);   ... SFX (>>4 &15)
+;   }
+;   likewise scheme (>>8 &3), X (>>10 &1), Y (>>11 &1), auto-center (>>12 &1),
+;   vibration (>>13 &1, then SA.StopRumble());
+;   fscommand("SR_Log", "apply why=" + why + " store=" + p + " now=" + <snapshot>
+;             + " match=" + ((p & m) == (<snapshot> & m)));
+;   // m = the options the store knows: bits 8-13 (scheme, X/Y, auto-center, vibration),
+;   // plus bits 0-7 (volumes) when bit 15 says they are known: 16128 + ((p >> 15) & 1) * 255.
+;   // match=true = the game's live options now equal the store (the scenarios' pass check:
+;   // a no-op ApplyStore after NEW GAME's applyOptions reset reads match=false).
+    .func2 ''(r3 'why') flags=0x70129
+        Push [reg2]
+        EA_GetNamedMember 'SRSettings'
+        StoreRegister 4
+        Pop
+        Push [reg4]
+        op_76
+        Equals2
+        Not
+        If as_have
+        EA_PushConstByte 'FSCommand:SR_Log'
+        EA_PushConstByte 'apply why='
+        Push [reg3]
+        Add2
+        EA_PushConstByte ' skipped: no store'
+        Add2
+        GetURL2
+        op_76
+        Return
+as_have:
+        Push [reg3]
+        EA_PushByte 2
+        Equals2
+        Not
+        If as_go
+        Push [reg4]
+        EA_PushShort 16384
+        BitAnd
+        EA_PushZero
+        Equals2
+        Not
+        If as_go
+        EA_PushConstByte 'FSCommand:SR_Log'
+        EA_PushConstByte 'apply why=2 skipped: apply_to_loaded_saves=0 store='
+        Push [reg4]
+        Add2
+        GetURL2
+        op_76
+        Return
+as_go:
+        Push [reg2]
+        EA_GetNamedMember 'SettingsAdapter'
+        StoreRegister 5
+        Pop
+        ; volumes only when the host knew them (bit 15: the audio mixer existed)
+        Push [reg4]
+        EA_PushLong 32768
+        BitAnd
+        EA_PushZero
+        Equals2
+        If as_s1
+        ; SetMusicVol
+        Push [reg4]
+        EA_PushByte 15
+        BitAnd
+        StoreRegister 6
+        Pop
+        EA_PushZero
+        Push [reg5]
+        EA_PushConstByte 'GetMusicVol'
+        CallMethod
+        Push [reg6]
+        Equals2
+        If as_s0
+        Push [reg6]
+        EA_PushOne
+        Push [reg5]
+        EA_CallNamedMethodPop 'SetMusicVol'
+as_s0:
+        ; SetSFXVol
+        Push [reg4]
+        EA_PushByte 4
+        BitRShift
+        EA_PushByte 15
+        BitAnd
+        StoreRegister 6
+        Pop
+        EA_PushZero
+        Push [reg5]
+        EA_PushConstByte 'GetSFXVol'
+        CallMethod
+        Push [reg6]
+        Equals2
+        If as_s1
+        Push [reg6]
+        EA_PushOne
+        Push [reg5]
+        EA_CallNamedMethodPop 'SetSFXVol'
+as_s1:
+        ; SetControlScheme
+        Push [reg4]
+        EA_PushByte 8
+        BitRShift
+        EA_PushByte 3
+        BitAnd
+        StoreRegister 6
+        Pop
+        EA_PushZero
+        Push [reg5]
+        EA_PushConstByte 'GetControlScheme'
+        CallMethod
+        Push [reg6]
+        Equals2
+        If as_s2
+        Push [reg6]
+        EA_PushOne
+        Push [reg5]
+        EA_CallNamedMethodPop 'SetControlScheme'
+as_s2:
+        ; SetXInversion
+        Push [reg4]
+        EA_PushByte 10
+        BitRShift
+        EA_PushByte 1
+        BitAnd
+        StoreRegister 6
+        Pop
+        EA_PushZero
+        Push [reg5]
+        EA_PushConstByte 'GetXInversion'
+        CallMethod
+        Push [reg6]
+        Equals2
+        If as_s3
+        Push [reg6]
+        EA_PushOne
+        Push [reg5]
+        EA_CallNamedMethodPop 'SetXInversion'
+as_s3:
+        ; SetYInversion
+        Push [reg4]
+        EA_PushByte 11
+        BitRShift
+        EA_PushByte 1
+        BitAnd
+        StoreRegister 6
+        Pop
+        EA_PushZero
+        Push [reg5]
+        EA_PushConstByte 'GetYInversion'
+        CallMethod
+        Push [reg6]
+        Equals2
+        If as_s4
+        Push [reg6]
+        EA_PushOne
+        Push [reg5]
+        EA_CallNamedMethodPop 'SetYInversion'
+as_s4:
+        ; SetAutoCenter
+        Push [reg4]
+        EA_PushByte 12
+        BitRShift
+        EA_PushByte 1
+        BitAnd
+        StoreRegister 6
+        Pop
+        EA_PushZero
+        Push [reg5]
+        EA_PushConstByte 'GetAutoCenter'
+        CallMethod
+        Push [reg6]
+        Equals2
+        If as_s5
+        Push [reg6]
+        EA_PushOne
+        Push [reg5]
+        EA_CallNamedMethodPop 'SetAutoCenter'
+as_s5:
+        ; SetRumble
+        Push [reg4]
+        EA_PushByte 13
+        BitRShift
+        EA_PushByte 1
+        BitAnd
+        StoreRegister 6
+        Pop
+        EA_PushZero
+        Push [reg5]
+        EA_PushConstByte 'GetRumble'
+        CallMethod
+        Push [reg6]
+        Equals2
+        If as_s6
+        Push [reg6]
+        EA_PushOne
+        Push [reg5]
+        EA_CallNamedMethodPop 'SetRumble'
+        EA_PushZero
+        Push [reg5]
+        EA_CallNamedMethodPop 'StopRumble'
+as_s6:
+        EA_PushConstByte 'FSCommand:SR_Log'
+        EA_PushConstByte 'apply why='
+        Push [reg3]
+        Add2
+        EA_PushConstByte ' store='
+        Add2
+        Push [reg4]
+        Add2
+        EA_PushConstByte ' now='
+        Add2
+.include 'snapshot_expr.aptasm'
+        Add2
+        EA_PushConstByte ' match='
+        Add2
+        Push [reg4]
+        Push [reg4]
+        EA_PushByte 15
+        BitRShift
+        EA_PushOne
+        BitAnd
+        EA_PushShort 255
+        Multiply
+        EA_PushShort 16128
+        Add2
+        BitAnd
+.include 'snapshot_expr.aptasm'
+        Push [reg4]
+        EA_PushByte 15
+        BitRShift
+        EA_PushOne
+        BitAnd
+        EA_PushShort 255
+        Multiply
+        EA_PushShort 16128
+        Add2
+        BitAnd
+        Equals2
+        Add2
+        GetURL2
+    .end

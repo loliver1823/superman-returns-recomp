@@ -1,0 +1,7 @@
+; The returned retail Array is already on the stack. Append returns the same
+; array when the native extension is gated off or its reply is incomplete.
+    EA_PushOne
+    Push [reg2]
+    EA_GetNamedMember 'SRCostumes'
+    EA_PushConstByte 'Append'
+    CallMethod

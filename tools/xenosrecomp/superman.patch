@@ -1,0 +1,921 @@
+diff --git a/XenosRecomp/main.cpp b/XenosRecomp/main.cpp
+index d015145..fcb4103 100644
+--- a/XenosRecomp/main.cpp
++++ b/XenosRecomp/main.cpp
+@@ -27,8 +27,27 @@ struct RecompiledShader
+     IDxcBlob* dxil = nullptr;
+     std::vector<uint8_t> spirv;
+     uint32_t specConstantsMask = 0;
++    std::string srcPath;  // which input file this container came from (skip report)
+ };
+ 
++
++// superman (iter-440g): garbage containers from live-memory corpora can AV the
++// recompiler (wild definition-table offsets). SEH-wrap the recompile so any
++// crash becomes a reportable SKIP instead of killing the batch. This function
++// must stay free of C++ objects requiring unwinding (__try constraint).
++static bool sehRecompile(ShaderRecompiler& r, const uint8_t* data, const std::string_view& include)
++{
++    __try
++    {
++        r.recompile(data, include);
++        return true;
++    }
++    __except (EXCEPTION_EXECUTE_HANDLER)
++    {
++        return false;
++    }
++}
++
+ int main(int argc, char** argv)
+ {
+ #ifndef XENOS_RECOMP_INPUT
+@@ -67,6 +86,7 @@ int main(int argc, char** argv)
+     auto includeData = readAllBytes(includeInput, includeSize);
+     std::string_view include(reinterpret_cast<const char*>(includeData.get()), includeSize);
+ 
++
+     if (std::filesystem::is_directory(input))
+     {
+         std::vector<std::unique_ptr<uint8_t[]>> files;
+@@ -88,16 +108,27 @@ int main(int argc, char** argv)
+                 auto shaderContainer = reinterpret_cast<const ShaderContainer*>(fileData.get() + i);
+                 size_t dataSize = shaderContainer->virtualSize + shaderContainer->physicalSize;
+ 
++                // superman (iter-440g): accept LIVE-MEMORY containers. field1C/
++                // field20 are runtime-patched pointers (CreateShader fills them)
++                // — the old ==0 filter silently dropped nearly every container
++                // dumped from a running game or carved from a memory dump.
++                // Size sanity replaces them. Dedupe stays per-CONTAINER (not
++                // per-ucode): live dumps include stale/garbage variants of a
++                // program; every variant gets its own compile attempt, any good
++                // one emits the ucode-keyed dxil, garbage ones fail-soft SKIP.
+                 if ((shaderContainer->flags & 0xFFFFFF00) == 0x102A1100 &&
+                     dataSize <= (fileSize - i) &&
+-                    shaderContainer->field1C == 0 &&
+-                    shaderContainer->field20 == 0)
++                    shaderContainer->virtualSize >= sizeof(ShaderContainer) &&
++                    shaderContainer->virtualSize < 0x20000 &&
++                    shaderContainer->physicalSize > 0 &&
++                    shaderContainer->physicalSize < 0x20000)
+                 {
+                     XXH64_hash_t hash = XXH3_64bits(shaderContainer, dataSize);
+                     auto shader = shaders.try_emplace(hash);
+                     if (shader.second)
+                     {
+                         shader.first->second.data = fileData.get() + i;
++                        shader.first->second.srcPath = file.path().filename().string();
+                         foundAny = true;
+                     }
+ 
+@@ -113,39 +144,129 @@ int main(int argc, char** argv)
+                 files.emplace_back(std::move(fileData));
+         }
+ 
++        // Superman Returns host-runtime cache: per-shader signed DXIL + VS vfetch sidecar,
++        // keyed by XXH3-64 of the ucode section (the exact bytes IM_LOAD delivers live).
++        auto dxilDir = std::filesystem::path(output).parent_path() / "dxil";
++        std::filesystem::create_directories(dxilDir);
++
+         std::atomic<uint32_t> progress = 0;
+ 
+-        std::for_each(std::execution::par_unseq, shaders.begin(), shaders.end(), [&](auto& hashShaderPair)
++        // superman (iter-440g): SEQUENTIAL on purpose. par_unseq over a live-memory
++        // corpus OOM-crashed the host: garbage containers drive huge allocations
++        // and N threads of those exhaust physical memory before any SKIP fires.
++        std::for_each(std::execution::seq, shaders.begin(), shaders.end(), [&](auto& hashShaderPair)
+             {
+                 auto& shader = hashShaderPair.second;
+ 
++                try
++                {
+                 thread_local ShaderRecompiler recompiler;
+                 recompiler = {};
+-                recompiler.recompile(shader.data, include);
++                if (!sehRecompile(recompiler, shader.data, include))
++                    throw std::runtime_error("recompiler crashed (garbage container)");
+ 
+                 shader.specConstantsMask = recompiler.specConstantsMask;
+ 
+                 thread_local DxcCompiler dxcCompiler;
+ 
+ #ifdef XENOS_RECOMP_DXIL
+-                shader.dxil = dxcCompiler.compile(recompiler.out, recompiler.isPixelShader, recompiler.specConstantsMask != 0, false);
+-                assert(shader.dxil != nullptr);
+-                assert(*(reinterpret_cast<uint32_t *>(shader.dxil->GetBufferPointer()) + 1) != 0 && "DXIL was not signed properly!");
++                // Superman Returns: always plain vs_6_0/ps_6_0 — no lib_6_3 spec-constant
++                // linking (the host PSO path consumes the DXIL directly).
++                shader.dxil = dxcCompiler.compile(recompiler.out, recompiler.isPixelShader, false, false);
++                if (shader.dxil == nullptr)
++                    throw std::runtime_error("dxc DXIL compile failed");
++                if (*(reinterpret_cast<uint32_t *>(shader.dxil->GetBufferPointer()) + 1) == 0)
++                    throw std::runtime_error("DXIL was not signed properly");
+ #endif
+ 
+                 IDxcBlob* spirv = dxcCompiler.compile(recompiler.out, recompiler.isPixelShader, false, true);
+-                assert(spirv != nullptr);
++                if (spirv == nullptr)
++                    throw std::runtime_error("dxc SPIR-V compile failed");
+ 
+                 bool result = smolv::Encode(spirv->GetBufferPointer(), spirv->GetBufferSize(), shader.spirv, smolv::kEncodeFlagStripDebugInfo);
+                 assert(result);
+ 
+                 spirv->Release();
+ 
++#ifdef XENOS_RECOMP_DXIL
++                {
++                    auto container = reinterpret_cast<const ShaderContainer*>(shader.data);
++                    auto sh = reinterpret_cast<const Shader*>(shader.data + container->shaderOffset);
++                    const uint8_t* ucode = shader.data + container->virtualSize + sh->physicalOffset;
++                    XXH64_hash_t ucodeHash = XXH3_64bits(ucode, sh->size);
++                    auto stem = (dxilDir / fmt::format("{:016x}.{}", ucodeHash, recompiler.isPixelShader ? "ps" : "vs")).string();
++                    // superman: XENOS_DUMP_HLSL=<16-hex ucode hash>[,...] writes that
++                    // program's generated HLSL next to its dxil (<stem>.hlsl).
++                    if (const char* want = std::getenv("XENOS_DUMP_HLSL"))
++                    {
++                        if (std::string(want).find(fmt::format("{:016x}", ucodeHash)) != std::string::npos)
++                            writeAllBytes((stem + ".hlsl").c_str(), recompiler.out.data(), recompiler.out.size());
++                    }
++                    // superman: XENOS_VSF_ONLY=1 writes only the vertex-fetch
++                    // variants (adding them to a cache without touching the rest).
++                    static const bool vsfOnly = [] { const char* e = std::getenv("XENOS_VSF_ONLY"); return e && e[0] == '1'; }();
++                    // XENOS_PS_ONLY=1: pixel shaders only (a PS-side codegen change
++                    // without touching any vertex program).
++                    static const bool psOnly = [] { const char* e = std::getenv("XENOS_PS_ONLY"); return e && e[0] == '1'; }();
++                    if (psOnly && !recompiler.isPixelShader)
++                    {
++                        // skip every VS output
++                    }
++                    else if (!vsfOnly)
++                    {
++                        writeAllBytes((stem + ".dxil").c_str(), shader.dxil->GetBufferPointer(), shader.dxil->GetBufferSize());
++                        if (!recompiler.isPixelShader)
++                            writeAllBytes((stem + ".vfetch").c_str(), recompiler.vfetchSidecar.data(), recompiler.vfetchSidecar.size());
++                    }
++                    // superman (P1): the in-shader vertex-fetch variant of every VS.
++                    if (!recompiler.isPixelShader && !psOnly)
++                    {
++                        thread_local ShaderRecompiler fetchRecompiler;
++                        fetchRecompiler = {};
++                        fetchRecompiler.fetchMode = true;
++                        IDxcBlob* vsf = nullptr;
++                        if (sehRecompile(fetchRecompiler, shader.data, include))
++                            vsf = dxcCompiler.compile(fetchRecompiler.out, false, false, false);
++                        if (vsf != nullptr)
++                        {
++                            writeAllBytes((stem + ".vsf.dxil").c_str(), vsf->GetBufferPointer(), vsf->GetBufferSize());
++                            vsf->Release();
++                        }
++                        else
++                        {
++                            fmt::println("VSF-SKIP {} ({:016X})", shader.srcPath, hashShaderPair.first);
++                            writeAllBytes((stem + ".vsf.fail.hlsl").c_str(), fetchRecompiler.out.data(), fetchRecompiler.out.size());
++                        }
++                    }
++                }
++#endif
++                }
++                catch (const std::exception& e)
++                {
++                    // Skip-with-report: a known translation gap in one shader must not
++                    // kill the batch. The entry stays with null dxil / empty spirv.
++                    if (shader.dxil) { shader.dxil->Release(); shader.dxil = nullptr; }
++                    shader.spirv.clear();
++                    fmt::println("SKIP {} ({:016X}): {}", shader.srcPath, hashShaderPair.first, e.what());
++                    // superman (iter-440i): dump the generated HLSL of every failure
++                    // for residue diagnosis (<dxil>/<hash>.fail.hlsl).
++                    {
++                        thread_local ShaderRecompiler diag;
++                        diag = {};
++                        if (sehRecompile(diag, shader.data, include) && !diag.out.empty())
++                        {
++                            auto failPath = (dxilDir / fmt::format("{:016x}.fail.hlsl", hashShaderPair.first)).string();
++                            writeAllBytes(failPath.c_str(), diag.out.data(), diag.out.size());
++                        }
++                    }
++                }
++
+                 size_t currentProgress = ++progress;
+                 if ((currentProgress % 10) == 0 || (currentProgress == shaders.size() - 1))
+                     fmt::println("Recompiling shaders... {}%", currentProgress / float(shaders.size()) * 100.0f);
+             });
+ 
++        fmt::println("Collection: {} unique containers accepted", shaders.size());
+         fmt::println("Creating shader cache...");
+ 
+         StringBuffer f;
+diff --git a/XenosRecomp/pch.h b/XenosRecomp/pch.h
+index e59682c..26d858d 100644
+--- a/XenosRecomp/pch.h
++++ b/XenosRecomp/pch.h
+@@ -16,6 +16,7 @@
+ #include <fmt/core.h>
+ #include <string>
+ #include <unordered_map>
++#include <unordered_set>
+ #include <xxhash.h>
+ #include <zstd.h>
+ 
+diff --git a/XenosRecomp/shader_common.h b/XenosRecomp/shader_common.h
+index 1c74034..7a78822 100644
+--- a/XenosRecomp/shader_common.h
++++ b/XenosRecomp/shader_common.h
+@@ -30,6 +30,7 @@ struct PushConstants
+ #define g_SwappedTexcoords         vk::RawBufferLoad<uint>(g_PushConstants.SharedConstants + 260)
+ #define g_HalfPixelOffset          vk::RawBufferLoad<float2>(g_PushConstants.SharedConstants + 264)
+ #define g_AlphaThreshold           vk::RawBufferLoad<float>(g_PushConstants.SharedConstants + 272)
++#define g_NdcScaleOffset           vk::RawBufferLoad<float4>(g_PushConstants.SharedConstants + 288)
+ 
+ [[vk::constant_id(0)]] const uint g_SpecConstants = 0;
+ 
+@@ -41,9 +42,12 @@ struct PushConstants
+     uint g_Booleans : packoffset(c16.x); \
+     uint g_SwappedTexcoords : packoffset(c16.y); \
+     float2 g_HalfPixelOffset : packoffset(c16.z); \
+-    float g_AlphaThreshold : packoffset(c17.x);
++    float g_AlphaThreshold : packoffset(c17.x); \
++    float4 g_NdcScaleOffset : packoffset(c18);
+ 
+-uint g_SpecConstants();
++// Superman Returns: spec-constant DXIL linking unused — everything compiles as
++// plain vs_6_0/ps_6_0 with all spec-gated behaviors (alpha test etc.) disabled.
++static uint g_SpecConstants() { return 0; }
+ 
+ #endif
+ 
+@@ -51,6 +55,11 @@ Texture2D<float4> g_Texture2DDescriptorHeap[] : register(t0, space0);
+ Texture3D<float4> g_Texture3DDescriptorHeap[] : register(t0, space1);
+ TextureCube<float4> g_TextureCubeDescriptorHeap[] : register(t0, space2);
+ SamplerState g_SamplerDescriptorHeap[] : register(s0, space3);
++// superman (P1): the 2D slot band viewed as arrays (stacked textures), volumes
++// and cubes - the host keeps every PM4-path resource in that one band.
++Texture2DArray<float4> g_Texture2DArrayDescriptorHeap[] : register(t0, space6);
++Texture3D<float4> g_Texture3DBandDescriptorHeap[] : register(t0, space7);
++TextureCube<float4> g_TextureCubeBandDescriptorHeap[] : register(t0, space8);
+ 
+ uint2 getTexture2DDimensions(Texture2D<float4> texture)
+ {
+@@ -143,9 +152,43 @@ float4 tfetch2DBicubic(uint resourceDescriptorIndex, uint samplerDescriptorIndex
+     return r;
+ }
+ 
+-float4 tfetch3D(uint resourceDescriptorIndex, uint samplerDescriptorIndex, float3 texCoord)
++float4 tfetch3D(uint resourceDescriptorIndex, uint samplerDescriptorIndex, float3 texCoord, float3 offset)
+ {
+-    return g_Texture3DDescriptorHeap[resourceDescriptorIndex].Sample(g_SamplerDescriptorHeap[samplerDescriptorIndex], texCoord);
++    // superman (P1): Xenos "3D or stacked" fetch. A 2D texture (the fetch
++    // constant's dimension, e.g. the shadow map sampled by the Poisson filter)
++    // is bound in the 2D table and flagged with bit 31 by the host.
++    if (resourceDescriptorIndex & 0x80000000u)
++    {
++        const uint index = resourceDescriptorIndex & 0x1FFFFFFFu;
++        if (resourceDescriptorIndex & 0x20000000u)
++        {
++            // A real volume (fetch dimension 3D) in the 2D band (bit 29).
++            Texture3D<float4> volume = g_Texture3DBandDescriptorHeap[index];
++            uint3 vd;
++            volume.GetDimensions(vd.x, vd.y, vd.z);
++            return volume.Sample(g_SamplerDescriptorHeap[samplerDescriptorIndex], texCoord + offset / float3(vd));
++        }
++        if (resourceDescriptorIndex & 0x40000000u)
++        {
++            // Stacked (2D array): Z is denormalized - layer = z * depth + offset.z -
++            // and FLOORED: D3D12 rounds an array index to nearest even, the
++            // Xbox 360 addresses layers like 3D slices (Xenia
++            // dxbc_shader_translator_fetch.cc:1853). Xenia's linear-filter lerp
++            // between two layers is not implemented (point layers only).
++            Texture2DArray<float4> array = g_Texture2DArrayDescriptorHeap[index];
++            uint3 d;
++            array.GetDimensions(d.x, d.y, d.z);
++            return array.Sample(g_SamplerDescriptorHeap[samplerDescriptorIndex],
++                                float3(texCoord.xy + offset.xy / float2(d.xy), floor(texCoord.z * d.z + offset.z)));
++        }
++        Texture2D<float4> texture2D = g_Texture2DDescriptorHeap[index];
++        return texture2D.Sample(g_SamplerDescriptorHeap[samplerDescriptorIndex],
++                                texCoord.xy + offset.xy / getTexture2DDimensions(texture2D));
++    }
++    Texture3D<float4> texture = g_Texture3DDescriptorHeap[resourceDescriptorIndex];
++    uint3 dimensions;
++    texture.GetDimensions(dimensions.x, dimensions.y, dimensions.z);
++    return texture.Sample(g_SamplerDescriptorHeap[samplerDescriptorIndex], texCoord + offset / float3(dimensions));
+ }
+ 
+ struct CubeMapData
+@@ -156,6 +199,10 @@ struct CubeMapData
+ 
+ float4 tfetchCube(uint resourceDescriptorIndex, uint samplerDescriptorIndex, float3 texCoord, inout CubeMapData cubeMapData)
+ {
++    // superman (P1): bit 31 = a cube in the 2D band (the PM4 path).
++    if (resourceDescriptorIndex & 0x80000000u)
++        return g_TextureCubeBandDescriptorHeap[resourceDescriptorIndex & 0x1FFFFFFFu].Sample(
++            g_SamplerDescriptorHeap[samplerDescriptorIndex], cubeMapData.cubeMapDirections[texCoord.z]);
+     return g_TextureCubeDescriptorHeap[resourceDescriptorIndex].Sample(g_SamplerDescriptorHeap[samplerDescriptorIndex], cubeMapData.cubeMapDirections[texCoord.z]);
+ }
+ 
+diff --git a/XenosRecomp/shader_recompiler.cpp b/XenosRecomp/shader_recompiler.cpp
+index 698a418..8701ed8 100644
+--- a/XenosRecomp/shader_recompiler.cpp
++++ b/XenosRecomp/shader_recompiler.cpp
+@@ -13,16 +13,19 @@ static constexpr char SWIZZLES[] =
+     '_'
+ };
+ 
++// Superman Returns: the host runtime CPU-decodes every vertex attribute to a
++// canonical float4 (this game's packed normals are k_2_10_10_10, not the
++// R11G11B10 Unleashed convention the uint4 entries served).
+ static constexpr const char* USAGE_TYPES[] =
+ {
+     "float4", // POSITION
+     "float4", // BLENDWEIGHT
+-    "uint4", // BLENDINDICES
+-    "uint4", // NORMAL
++    "float4", // BLENDINDICES
++    "float4", // NORMAL
+     "float4", // PSIZE
+     "float4", // TEXCOORD
+-    "uint4", // TANGENT
+-    "uint4", // BINORMAL
++    "float4", // TANGENT
++    "float4", // BINORMAL
+     "float4", // TESSFACTOR
+     "float4", // POSITIONT
+     "float4", // COLOR
+@@ -94,6 +97,7 @@ static constexpr DeclUsageLocation USAGE_LOCATIONS[] =
+     { DeclUsage::TexCoord, 6, 14 },
+     { DeclUsage::TexCoord, 7, 15 },
+     { DeclUsage::Position, 1, 15 },
++    { DeclUsage::Normal, 1, 16 },   // Superman Returns: second normal stream (blend-shape class)
+ };
+ 
+ static constexpr std::pair<DeclUsage, size_t> INTERPOLATORS[] =
+@@ -115,7 +119,8 @@ static constexpr std::pair<DeclUsage, size_t> INTERPOLATORS[] =
+     { DeclUsage::TexCoord, 14 },
+     { DeclUsage::TexCoord, 15 },
+     { DeclUsage::Color, 0 },
+-    { DeclUsage::Color, 1 }
++    { DeclUsage::Color, 1 },
++    { DeclUsage::Normal, 0 },   // Superman Returns passes world-space normals to the PS
+ };
+ 
+ static constexpr std::string_view TEXTURE_DIMENSIONS[] = 
+@@ -170,48 +175,95 @@ void ShaderRecompiler::recompile(const VertexFetchInstruction& instr, uint32_t a
+         ++indentation;
+     }
+ 
+-    indent();
+-    print("r{}.", instr.dstRegister);
+-    printDstSwizzle(instr.dstSwizzle, false);
++    // A destination swizzle can select no source components at all (every lane
++    // Zero/One/Keep) — emitting the assignment then produces "rN. = iX.;".
++    bool anySourceComponent = false;
++    for (size_t i = 0; i < 4; i++)
++    {
++        const auto swizzle = getDestSwizzle(instr.dstSwizzle, i);
++        if (swizzle >= FetchDestinationSwizzle::X && swizzle <= FetchDestinationSwizzle::W)
++            anySourceComponent = true;
++    }
+ 
+-    out += " = ";
++    if (fetchMode)
++    {
++        // superman: in-shader fetch. vfetch_full computes the element address
++        // from ITS index operand (any register - Superman's world shaders fetch
++        // their own index from slot 94 and derive the instance from r0.x);
++        // vfetch_mini reuses it (the index GPR may have been overwritten since).
++        const uint32_t slot = instr.isMiniFetch ? lastFullFetchSlot
++                                                : uint32_t(instr.constIndex * 3 + instr.constIndexSelect);
++        if (!instr.isMiniFetch)
++        {
++            lastFullFetchSlot = slot;
++            lastFullFetchStride = uint32_t(instr.stride);
++            indent();
++            println("vfAddr = XeVfAddr({}u, r{}.{}, {}u, {});", slot, uint32_t(instr.srcRegister),
++                SWIZZLES[instr.srcSwizzle & 3], uint32_t(instr.stride), instr.isIndexRounded ? "true" : "false");
++        }
++        if (anySourceComponent)
++        {
++            indent();
++            print("r{}.", instr.dstRegister);
++            printDstSwizzle(instr.dstSwizzle, false);
++            print(" = XeVfLoad({}u, vfAddr, {}, {}u, {}, {}, {}, {}).", slot, int32_t(instr.offset),
++                uint32_t(instr.format), instr.formatCompAll ? "true" : "false",
++                instr.numFormatAll ? "true" : "false", instr.signedRfModeAll ? "true" : "false",
++                int32_t(instr.expAdjust));
++            printDstSwizzle(instr.dstSwizzle, true);
++            out += ";\n";
++        }
++        printDstSwizzle01(instr.dstRegister, instr.dstSwizzle);
++        if (instr.isPredicated)
++        {
++            --indentation;
++            indent();
++            out += "}\n";
++        }
++        return;
++    }
+ 
+     auto findResult = vertexElements.find(address);
+     assert(findResult != vertexElements.end());
+ 
+-    switch (findResult->second.usage)
++    // Host-runtime sidecar: resolve mini-fetch slot/stride from the preceding full fetch.
+     {
+-    case DeclUsage::Normal:
+-    case DeclUsage::Tangent:
+-    case DeclUsage::Binormal:
+-        specConstantsMask |= SPEC_CONSTANT_R11G11B10_NORMAL;
+-        print("tfetchR11G11B10(");
+-        break;
+-
+-    case DeclUsage::TexCoord:
+-        print("tfetchTexcoord(g_SwappedTexcoords, ");
+-        break;
++        uint32_t slot = instr.isMiniFetch ? lastFullFetchSlot
++                                          : uint32_t(instr.constIndex * 3 + instr.constIndexSelect);
++        uint32_t stride = instr.isMiniFetch ? lastFullFetchStride : uint32_t(instr.stride);
++        if (!instr.isMiniFetch)
++        {
++            lastFullFetchSlot = slot;
++            lastFullFetchStride = stride;
++        }
++        if (anySourceComponent)
++        {
++            vfetchSidecar += fmt::format("{} {} {} {} {} {} {} {}\n",
++                slot, int32_t(instr.offset), stride, uint32_t(instr.format),
++                uint32_t(findResult->second.usage), uint32_t(findResult->second.usageIndex),
++                uint32_t(instr.formatCompAll), uint32_t(instr.numFormatAll));
++        }
+     }
+ 
+-    print("i{}{}", USAGE_VARIABLES[uint32_t(findResult->second.usage)], uint32_t(findResult->second.usageIndex));
+-
+-    switch (findResult->second.usage)
++    if (anySourceComponent)
+     {
+-    case DeclUsage::Normal:
+-    case DeclUsage::Tangent:
+-    case DeclUsage::Binormal:
+-        out += ')';
+-        break;
++    indent();
++    print("r{}.", instr.dstRegister);
++    printDstSwizzle(instr.dstSwizzle, false);
+ 
+-    case DeclUsage::TexCoord:
+-        print(", {})", uint32_t(findResult->second.usageIndex));
+-        break;
+-    }
++    out += " = ";
++
++    // Superman Returns: no tfetchR11G11B10 / tfetchTexcoord wrapping — the host
++    // runtime feeds every attribute pre-decoded as float4 (this game's packed
++    // formats differ from Unleashed's; decode lives host-side, driven by the
++    // format/signed/numFormat fields in the vfetch sidecar).
++    print("i{}{}", USAGE_VARIABLES[uint32_t(findResult->second.usage)], uint32_t(findResult->second.usageIndex));
+ 
+     out += '.';
+     printDstSwizzle(instr.dstSwizzle, true);
+ 
+     out += ";\n";
++    }
+ 
+     printDstSwizzle01(instr.dstRegister, instr.dstSwizzle);
+ 
+@@ -339,6 +391,12 @@ void ShaderRecompiler::recompile(const TextureFetchInstruction& instr, bool bicu
+     case TextureDimension::Texture2D:
+         print(", float2({}, {})", instr.offsetX * 0.5f, instr.offsetY * 0.5f);
+         break;
++    case TextureDimension::Texture3D:
++        // superman (P1): the texel offsets apply to 3D-or-stacked fetches too
++        // (Xenia); dropping them collapsed a 9-tap shadow filter to one tap.
++        if (instr.opcode == FetchOpcode::TextureFetch)
++            print(", float3({}, {}, {})", instr.offsetX * 0.5f, instr.offsetY * 0.5f, instr.offsetZ * 0.5f);
++        break;
+     case TextureDimension::TextureCube:
+         out += ", cubeMapData";
+         break;
+@@ -476,14 +534,24 @@ void ShaderRecompiler::recompile(const AluInstruction& instr)
+                     }
+                     else
+                     {
+-                        assert(!instr.const0Relative && !instr.const1Relative);
+-                        regFormatted = constantName;
++                        if (instr.const0Relative || instr.const1Relative)
++                            regFormatted = fmt::format("g_UnnamedConstants({}{})", reg,
++                                instr.constAddressRegisterRelative ? " + a0" : " + aL");
++                        else
++                            regFormatted = constantName;
+                     }
+                 }
+                 else
+                 {
+-                    assert(!instr.const0Relative && !instr.const1Relative);
+-                    regFormatted = fmt::format("c{}", reg);
++                    if (instr.const0Relative || instr.const1Relative)
++                        regFormatted = fmt::format("g_UnnamedConstants({}{})", reg,
++                            instr.constAddressRegisterRelative ? " + a0" : " + aL");
++                    else if (literalConstants.count(reg))
++                        regFormatted = fmt::format("c{}", reg);
++                    else
++                        // No ctab name, no definition-table literal: a constant the game
++                        // sets by register at runtime — read the live constant buffer.
++                        regFormatted = fmt::format("g_UnnamedConstants({})", reg);
+                 }
+             }
+ 
+@@ -625,9 +693,24 @@ void ShaderRecompiler::recompile(const AluInstruction& instr)
+ 
+             default:
+             {
+-                auto findResult = interpolators.find(instr.vectorDest);
+-                assert(findResult != interpolators.end());
+-                exportRegister = findResult->second;
++                // superman (linkfix): Xenos links interpolators BY INDEX - VS export
++                // register N (kVSInterpolator0..15) is PS GPR rN (Xenia
++                // shader_translator.cc ParseAluInstruction kInterpolator,
++                // dxbc_shader_translator.cc StoreResult / StartPixelShader). The
++                // container's D3D usage table is pre-link metadata (the XDK patches
++                // the ucode exports at bind time) and a synthesized container's
++                // table belongs to a different program, so export N always goes
++                // to TEXCOORDN and the PS reads rN from TEXCOORDN.
++                static constexpr std::string_view VS_INTERPOLATOR_EXPORTS[16] =
++                {
++                    "oTexCoord0", "oTexCoord1", "oTexCoord2", "oTexCoord3",
++                    "oTexCoord4", "oTexCoord5", "oTexCoord6", "oTexCoord7",
++                    "oTexCoord8", "oTexCoord9", "oTexCoord10", "oTexCoord11",
++                    "oTexCoord12", "oTexCoord13", "oTexCoord14", "oTexCoord15",
++                };
++                if (instr.vectorDest >= 16)
++                    throw std::runtime_error(fmt::format("unsupported VS export register {}", uint32_t(instr.vectorDest)));
++                exportRegister = VS_INTERPOLATOR_EXPORTS[instr.vectorDest];
+                 break;
+             }
+             }
+@@ -764,7 +847,22 @@ void ShaderRecompiler::recompile(const AluInstruction& instr)
+             break;
+ 
+         case AluVectorOpcode::Cube:
+-            print("cube(r{}, cubeMapData)", instr.src1Register);
++            // src1 carries the same select/modifier encoding as every other operand:
++            // select=1 -> temp register, index &0x3F, bit 0x80 = abs; select=0 -> constant file.
++            if (instr.src1Select)
++            {
++                print("cube({}{}r{}{}{}, cubeMapData)",
++                    instr.src1Negate ? "-" : "",
++                    (instr.src1Register & 0x80) ? "abs(" : "",
++                    uint32_t(instr.src1Register & 0x3F),
++                    (instr.src1Register & 0x80) ? ")" : "",
++                    "");
++            }
++            else
++            {
++                print("cube({}g_UnnamedConstants({}), cubeMapData)",
++                    instr.src1Negate ? "-" : "", uint32_t(instr.src1Register));
++            }
+             break;
+ 
+         case AluVectorOpcode::Max4:
+@@ -1152,7 +1250,7 @@ void ShaderRecompiler::recompile(const uint8_t* shaderData, const std::string_vi
+ 
+             if (constantInfo->registerCount > 1)
+             {
+-                uint32_t tailCount = (isPixelShader ? 224 : 256) - constantInfo->registerIndex;
++                uint32_t tailCount = 256 - constantInfo->registerIndex;
+ 
+                 println("#define {}(INDEX) select((INDEX) < {}, vk::RawBufferLoad<float4>(g_PushConstants.{}ShaderConstants + ({} + min(INDEX, {})) * 16, 0x10), 0.0)",
+                     constantName, tailCount, shaderName, constantInfo->registerIndex.get(), tailCount - 1);
+@@ -1187,6 +1285,11 @@ void ShaderRecompiler::recompile(const uint8_t* shaderData, const std::string_vi
+         }
+     }
+ 
++    // Whole-constant-file dynamic access for relative addressing that falls outside
++    // any constant-table-declared array (bools/floats set by register, not by name).
++    println("#define g_UnnamedConstants(INDEX) select(uint(INDEX) < {0}u, vk::RawBufferLoad<float4>(g_PushConstants.{1}ShaderConstants + min(uint(INDEX), {2}u) * 16, 0x10), 0.0)",
++        256, isPixelShader ? "Pixel" : "Vertex", 255);
++
+     out += "\n#else\n\n";
+ 
+     println("cbuffer {}ShaderConstants : register(b{}, space4)", isPixelShader ? "Pixel" : "Vertex", isPixelShader ? 1 : 0);
+@@ -1210,7 +1313,7 @@ void ShaderRecompiler::recompile(const uint8_t* shaderData, const std::string_vi
+ 
+             if (constantInfo->registerCount > 1)
+             {
+-                uint32_t tailCount = (isPixelShader ? 224 : 256) - constantInfo->registerIndex;
++                uint32_t tailCount = 256 - constantInfo->registerIndex;
+                 println("#define {0}(INDEX) select((INDEX) < {1}, {0}[min(INDEX, {2})], 0.0)", constantName, tailCount, tailCount - 1);
+             }
+         }
+@@ -1218,6 +1321,19 @@ void ShaderRecompiler::recompile(const uint8_t* shaderData, const std::string_vi
+ 
+     out += "};\n\n";
+ 
++    // Same 256-float4 buffer as b0/b1, bound again at b3/b4 as a plain array so
++    // relative addressing outside declared arrays can index it dynamically (packoffset
++    // overlap with the named members above is rejected by dxc, hence the extra binding).
++    // superman (P1): the PS file is 256 float4 too (Xenos c256-511); Unleashed's 224
++    // cut off this game's named PS constants above c223 (KaS at c229).
++    println("cbuffer {}ShaderConstantsArray : register(b{}, space4)", isPixelShader ? "Pixel" : "Vertex", isPixelShader ? 4 : 3);
++    out += "{\n";
++    println("\tfloat4 g_UnnamedConstantsData[{}];", 256);
++    out += "};\n";
++    println("#define g_UnnamedConstants(INDEX) select(uint(INDEX) < {0}u, g_UnnamedConstantsData[min(uint(INDEX), {1}u)], 0.0)",
++        256, 255);
++    out += "\n";
++
+     out += "cbuffer SharedConstants : register(b2, space4)\n";
+     out += "{\n";
+ 
+@@ -1263,6 +1379,118 @@ void ShaderRecompiler::recompile(const uint8_t* shaderData, const std::string_vi
+ 
+     const auto shader = reinterpret_cast<const Shader*>(shaderData + shaderContainer->shaderOffset);
+ 
++    if (fetchMode && !isPixelShader)
++    {
++        // superman: Xenia's vfetch contract (dxbc_shader_translator_fetch.cc).
++        // g_VertexMemory = guest memory as the host stages it; g_VertexFetch =
++        // the draw's 96 vertex fetch constants (2 dwords each; dword0 & ~3 is
++        // the BYTE address in g_VertexMemory, dword1 & 3 the endian swap).
++        out += R"(
++ByteAddressBuffer g_VertexMemory : register(t0, space5);
++cbuffer XeVertexFetch : register(b5, space5) { uint4 g_VertexFetch[48]; };
++uint2 XeVfConst(uint slot) { uint4 v = g_VertexFetch[slot >> 1]; return (slot & 1u) ? v.zw : v.xy; }
++uint XeVfAddr(uint slot, float index, uint stride, bool rounded)
++{
++	uint base = XeVfConst(slot).x & ~3u;
++	if (stride == 0u) return base;
++	int i = int(rounded ? floor(index + 0.5) : floor(index));
++	return base + uint(i) * stride * 4u;
++}
++uint XeVfSwap(uint v, uint e)
++{
++	if (e == 1u || e == 2u) v = ((v & 0x00FF00FFu) << 8) | ((v >> 8) & 0x00FF00FFu);
++	if (e == 2u || e == 3u) v = (v << 16) | (v >> 16);
++	return v;
++}
++// Packed integer formats: widths/offsets per component (0 width = absent).
++void XeVfPacked(uint fmt, out uint4 w, out uint4 o, out uint4 wordSel)
++{
++	w = 0u; o = 0u; wordSel = 0u;
++	if (fmt == 6u) { w = uint4(8, 8, 8, 8); o = uint4(0, 8, 16, 24); }
++	else if (fmt == 7u) { w = uint4(10, 10, 10, 2); o = uint4(0, 10, 20, 30); }
++	else if (fmt == 16u) { w = uint4(11, 11, 10, 0); o = uint4(0, 11, 22, 0); }
++	else if (fmt == 17u) { w = uint4(10, 11, 11, 0); o = uint4(0, 10, 21, 0); }
++	else if (fmt == 25u) { w = uint4(16, 16, 0, 0); o = uint4(0, 16, 0, 0); }
++	else if (fmt == 26u) { w = uint4(16, 16, 16, 16); o = uint4(0, 16, 0, 16); wordSel = uint4(0, 0, 1, 1); }
++}
++float4 XeVfLoad(uint slot, uint addr, int offsetDwords, uint fmt, bool isSigned, bool isInteger,
++                bool rfNoZero, int expAdjust)
++{
++	uint2 fc = XeVfConst(slot);
++	uint e = fc.y & 3u;
++	uint a = addr + uint(offsetDwords * 4);
++	uint words = (fmt == 26u || fmt == 32u || fmt == 34u || fmt == 37u) ? 2u
++	           : (fmt == 57u) ? 3u : (fmt == 35u || fmt == 38u) ? 4u : 1u;
++	uint4 d = 0u;
++	d.x = XeVfSwap(g_VertexMemory.Load(a), e);
++	if (words > 1u) d.y = XeVfSwap(g_VertexMemory.Load(a + 4u), e);
++	if (words > 2u) d.z = XeVfSwap(g_VertexMemory.Load(a + 8u), e);
++	if (words > 3u) d.w = XeVfSwap(g_VertexMemory.Load(a + 12u), e);
++	float4 r = 0.0;
++	uint4 pw, po, ps;
++	XeVfPacked(fmt, pw, po, ps);
++	if (pw.x != 0u)
++	{
++		[unroll] for (uint c = 0u; c < 4u; c++)
++		{
++			if (pw[c] == 0u) continue;
++			uint word = ps[c] != 0u ? d.y : d.x;
++			uint bits = (word >> po[c]) & ((1u << pw[c]) - 1u);
++			if (isSigned)
++			{
++				int v = int(bits << (32u - pw[c])) >> (32u - pw[c]);
++				float f = float(v);
++				if (!isInteger)
++				{
++					if (rfNoZero) f = f * (2.0 / float((1u << pw[c]) - 1u)) + 1.0 / float((1u << pw[c]) - 1u);
++					else { if (pw[c] > 2u) f *= 1.0 / float((1u << (pw[c] - 1u)) - 1u); f = max(f, -1.0); }
++				}
++				r[c] = f;
++			}
++			else
++			{
++				float f = float(bits);
++				if (!isInteger && pw[c] > 1u) f *= 1.0 / float((1u << pw[c]) - 1u);
++				r[c] = f;
++			}
++		}
++	}
++	else if (fmt == 31u || fmt == 32u)
++	{
++		r.x = f16tof32(d.x & 0xFFFFu); r.y = f16tof32(d.x >> 16);
++		if (fmt == 32u) { r.z = f16tof32(d.y & 0xFFFFu); r.w = f16tof32(d.y >> 16); }
++	}
++	else if (fmt == 33u || fmt == 34u || fmt == 35u)
++	{
++		uint n = fmt == 33u ? 1u : fmt == 34u ? 2u : 4u;
++		[unroll] for (uint c = 0u; c < 4u; c++)
++		{
++			if (c >= n) continue;
++			float f = isSigned ? float(int(d[c])) : float(d[c]);
++			if (!isInteger)
++			{
++				if (!isSigned) f *= 1.0 / 4294967295.0;
++				else if (rfNoZero) f = f * (1.0 / 2147483647.5) + 0.5 / 2147483647.5;
++				else f *= 1.0 / 2147483647.0;
++			}
++			r[c] = f;
++		}
++	}
++	else
++	{
++		// k_32_FLOAT (36), k_32_32_FLOAT (37), k_32_32_32_FLOAT (57), k_32_32_32_32_FLOAT (38).
++		r = asfloat(d);
++		if (fmt == 36u) r.yzw = 0.0;
++		else if (fmt == 37u) r.zw = 0.0;
++		else if (fmt == 57u) r.w = 0.0;
++	}
++	if (expAdjust != 0) r *= exp2(float(expAdjust));
++	return r;
++}
++
++)";
++    }
++
+     out += "#ifndef __spirv__\n";
+ 
+     if (isPixelShader)
+@@ -1314,6 +1542,13 @@ void ShaderRecompiler::recompile(const uint8_t* shaderData, const std::string_vi
+ 
+             const char* usageType = USAGE_TYPES[uint32_t(vertexElement.usage)];
+ 
++            if (fetchMode)
++            {
++                // No input attributes: every vfetch reads guest memory itself.
++                vertexElements.emplace(uint32_t(vertexElement.address), vertexElement);
++                continue;
++            }
++
+         #ifdef UNLEASHED_RECOMP
+             if ((vertexElement.usage == DeclUsage::TexCoord && vertexElement.usageIndex == 2 && isMetaInstancer) ||
+                 (vertexElement.usage == DeclUsage::Position && vertexElement.usageIndex == 1))
+@@ -1345,6 +1580,14 @@ void ShaderRecompiler::recompile(const uint8_t* shaderData, const std::string_vi
+             out += "\tin uint iVertexId : SV_VertexID,\n";
+             out += "\tin uint iInstanceId : SV_InstanceID,\n";
+         }
++    #else
++        // superman (iter-458): Xenos initialises r0.x with the VERTEX INDEX at
++        // VS entry (Xenia: StartVertexShader_LoadVertexIndex). Superman's
++        // instanced world VS derives the instance from it
++        // (inst = trunc((r0.x + 0.5) / c4.x), a0 = 2*inst -> c[100+a0]) and has
++        // no g_IndexCount constant to key on, so the register is always wired.
++        // Unused, dxc strips it; the input layout is unaffected (system value).
++        out += "\tin uint iVertexId : SV_VertexID,\n";
+     #endif
+ 
+         out += "\tout float4 oPos : SV_Position";
+@@ -1383,6 +1626,7 @@ void ShaderRecompiler::recompile(const uint8_t* shaderData, const std::string_vi
+             {
+                 println("\tfloat4 c{} = asfloat(uint4(0x{:X}, 0x{:X}, 0x{:X}, 0x{:X}));",
+                     definition->registerIndex + i - (isPixelShader ? 256 : 0), value[0].get(), value[1].get(), value[2].get(), value[3].get());
++                literalConstants.insert(uint32_t(definition->registerIndex + i - (isPixelShader ? 256 : 0)));
+ 
+                 value += 4;
+             }
+@@ -1418,30 +1662,33 @@ void ShaderRecompiler::recompile(const uint8_t* shaderData, const std::string_vi
+         out += "\n";
+     }
+ 
+-    bool printedRegisters[32]{};
+-
++    // superman (iter-440i): Xenos shaders address up to 64 GPRs; the 32-cap
++    // left r32..r63 undeclared (4 pristine objtiv/metropol pixel shaders use
++    // up to r52 -> 'undeclared identifier rNN' dxc failures). Unused decls are
++    // stripped by dxc, so declaring all 64 costs nothing.
++    bool printedRegisters[64]{};
++
++    // superman (linkfix): by-index interpolator linkage (see the VS export
++    // default case). The VS no longer reads its container's interpolator table;
++    // the PS takes only the REGISTER numbers from its table (which GPRs are
++    // interpolators) and reads rN from TEXCOORDN. The declared VS/GS/PS
++    // signatures (INTERPOLATORS) are unchanged; COLOR0/1 and NORMAL0 go unused.
+     uint32_t interpolatorCount = (shader->interpolatorInfo >> 5) & 0x1F;
+ 
+-    for (uint32_t i = 0; i < interpolatorCount; i++)
++    if (isPixelShader)
+     {
+-        union
+-        {
+-            Interpolator interpolator;
+-            uint32_t value;
+-        };
+-    
+-        if (isPixelShader)
++        for (uint32_t i = 0; i < interpolatorCount; i++)
+         {
++            union
++            {
++                Interpolator interpolator;
++                uint32_t value;
++            };
++
+             value = reinterpret_cast<const PixelShader*>(shader)->interpolators[i];
+-            println("\tfloat4 r{} = i{}{};", uint32_t(interpolator.reg), USAGE_VARIABLES[uint32_t(interpolator.usage)], uint32_t(interpolator.usageIndex));
++            println("\tfloat4 r{0} = iTexCoord{0};", uint32_t(interpolator.reg));
+             printedRegisters[interpolator.reg] = true;
+         }
+-        else
+-        {
+-            auto vertexShader = reinterpret_cast<const VertexShader*>(shader);
+-            value = vertexShader->vertexElementsAndInterpolators[vertexShader->field18 + vertexShader->vertexElementCount + i];
+-            interpolators.emplace(i, fmt::format("o{}{}", USAGE_VARIABLES[uint32_t(interpolator.usage)], uint32_t(interpolator.usageIndex)));
+-        }
+     }
+ 
+     if (!isPixelShader)
+@@ -1457,7 +1704,7 @@ void ShaderRecompiler::recompile(const uint8_t* shaderData, const std::string_vi
+         out += "\n";
+     }
+ 
+-    for (size_t i = 0; i < 32; i++)
++    for (size_t i = 0; i < 64; i++)
+     {
+         if (!printedRegisters[i])
+         {
+@@ -1471,6 +1718,14 @@ void ShaderRecompiler::recompile(const uint8_t* shaderData, const std::string_vi
+             {
+                 out += "float4(iVertexId + g_IndexCount.x * iInstanceId, 0.0, 0.0, 0.0);\n";
+             }
++        #else
++            else if (!isPixelShader && i == 0)
++            {
++                // superman (iter-458): r0.x = vertex index (see the SV_VertexID
++                // input above). Non-indexed host draws with a producer-gathered
++                // stream give i == the console's vertex index by construction.
++                out += "float4(iVertexId, 0.0, 0.0, 0.0);\n";
++            }
+         #endif
+             else
+             {
+@@ -1479,6 +1734,8 @@ void ShaderRecompiler::recompile(const uint8_t* shaderData, const std::string_vi
+         }
+     }
+ 
++    if (fetchMode && !isPixelShader)
++        out += "\tuint vfAddr = 0;\n";
+     out += "\tint a0 = 0;\n";
+     out += "\tint aL = 0;\n";
+     out += "\tbool p0 = false;\n";
+@@ -1698,7 +1955,9 @@ void ShaderRecompiler::recompile(const uint8_t* shaderData, const std::string_vi
+                         if (findResult != boolConstants.end())
+                             println("if ((g_Booleans & {}) {}= 0)", findResult->second, cfInstr.condJmp.condition ^ simpleControlFlow ? "!" : "=");
+                         else
+-                            println("if (b{} {}= 0)", uint32_t(cfInstr.condJmp.boolAddress), cfInstr.condJmp.condition ^ simpleControlFlow ? "!" : "=");
++                            // Bool register absent from the constant table (set by register,
++                            // not by name): same g_Booleans bit layout as the named path.
++                            println("if ((g_Booleans & (1u << {})) {}= 0)", uint32_t(cfInstr.condJmp.boolAddress) + (isPixelShader ? 16 : 0), cfInstr.condJmp.condition ^ simpleControlFlow ? "!" : "=");
+                     }
+ 
+                     if (simpleControlFlow)
+@@ -1833,6 +2092,10 @@ void ShaderRecompiler::recompile(const uint8_t* shaderData, const std::string_vi
+                 #endif
+                     {
+                         out += "\toPos.xy += g_HalfPixelOffset * oPos.w;\n";
++                        // Superman Returns: host-driven NDC remap (Xenia's ndc_scale/offset
++                        // model). VTE-on draws pass identity (1,1,0,0); VTE-off (UI) draws
++                        // output PIXELS and the host passes (2/W, -2/H, -1, +1) here.
++                        out += "\toPos = float4(oPos.xy * g_NdcScaleOffset.xy + g_NdcScaleOffset.zw * oPos.w, oPos.z, oPos.w);\n";
+                     }
+                 }
+ 
+diff --git a/XenosRecomp/shader_recompiler.h b/XenosRecomp/shader_recompiler.h
+index b2e317d..d6d3b9d 100644
+--- a/XenosRecomp/shader_recompiler.h
++++ b/XenosRecomp/shader_recompiler.h
+@@ -27,13 +27,26 @@ struct ShaderRecompiler : StringBuffer
+     bool isPixelShader = false;
+     const uint8_t* constantTableData = nullptr;
+     std::unordered_map<uint32_t, VertexElement> vertexElements;
+-    std::unordered_map<uint32_t, std::string> interpolators;
+     std::unordered_map<uint32_t, const ConstantInfo*> float4Constants;
+     std::unordered_map<uint32_t, const char*> boolConstants;
+     std::unordered_map<uint32_t, const char*> samplers;
+     std::unordered_map<uint32_t, uint32_t> ifEndLabels;
++    std::unordered_set<uint32_t> literalConstants;  // regs with a definition-table literal (declared as local cN)
+     uint32_t specConstantsMask = 0;
+ 
++    // Sidecar for the host runtime (Superman Returns): one line per translated vfetch —
++    // "slot offsetDwords stride format usage usageIndex" — lets the runtime build the
++    // D3D12 input layout for this VS from its own live fetch-constant state.
++    std::string vfetchSidecar;
++    uint32_t lastFullFetchSlot = 0;
++    uint32_t lastFullFetchStride = 0;
++
++    // superman (P1 PM4 path): VERTEX-FETCH mode. vfetch reads guest memory in
++    // the shader through the fetch constants with the index the shader itself
++    // computed (Xenia's model, dxbc_shader_translator_fetch.cc) instead of a
++    // host-pre-decoded input attribute. Emitted as <hash>.vsf.dxil.
++    bool fetchMode = false;
++
+ #ifdef UNLEASHED_RECOMP
+     bool hasMtxProjection = false;
+     bool hasMtxPrevInvViewProjection = false;

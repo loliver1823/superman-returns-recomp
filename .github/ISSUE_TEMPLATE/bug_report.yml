@@ -1,0 +1,102 @@
+name: Bug report
+description: A crash, freeze, visual or audio error, or anything that behaves differently from the original game
+type: Bug
+body:
+  - type: markdown
+    attributes:
+      value: Development is paused. Reports are welcome, but they may not be read or answered.
+  - id: validation
+    type: checkboxes
+    attributes:
+      label: Before you report
+      options:
+        - label: I searched the existing issues and this is not a duplicate.
+          required: true
+        - label: I built it from this repository myself, unmodified (or I say below what I changed).
+          required: true
+        - label: My game files come from my own copy of the USA Xbox 360 disc and are unmodified.
+          required: true
+        - label: I checked that the problem does not happen in the original game (on an Xbox 360, or in Xenia Canary). If I could not check, I say so below.
+          required: false
+  - id: version
+    type: input
+    validations:
+      required: true
+    attributes:
+      label: Build version
+      description: The commit you built, and the build hash at the end of the window title ("Superman Returns — SR Recomp <hash>").
+  - id: disc-hash
+    type: input
+    validations:
+      required: true
+    attributes:
+      label: default.xex SHA-256
+      description: "In PowerShell: Get-FileHash 'Superman Returns (USA)\\default.xex' -Algorithm SHA256"
+  - id: mods
+    type: textarea
+    validations:
+      required: false
+    attributes:
+      label: Mods enabled
+      description: The contents of mods/enabled.txt, or "none". Problems caused by mods are not supported.
+  - id: describe
+    type: textarea
+    validations:
+      required: true
+    attributes:
+      label: What happened
+      description: What you saw, and where in the game (chapter, mission, menu).
+  - id: repro
+    type: textarea
+    validations:
+      required: true
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start a new game
+        2. ...
+  - id: expected
+    type: textarea
+    validations:
+      required: true
+    attributes:
+      label: Expected behaviour
+      description: What the original game does at the same point.
+  - id: log
+    type: textarea
+    validations:
+      required: true
+    attributes:
+      label: Log
+      description: Attach superman_returns.log from the game folder (drag the file in) right after the problem, before you start the game again (each start overwrites it). For a crash, also attach superman_returns_crash.log if it exists.
+  - id: footage
+    type: textarea
+    validations:
+      required: false
+    attributes:
+      label: Screenshot or video
+  - id: cpu
+    type: input
+    validations:
+      required: true
+    attributes:
+      label: CPU
+  - id: gpu
+    type: input
+    validations:
+      required: true
+    attributes:
+      label: GPU and driver version
+  - id: os
+    type: input
+    validations:
+      required: true
+    attributes:
+      label: Windows version
+  - id: settings
+    type: textarea
+    validations:
+      required: false
+    attributes:
+      label: Display settings
+      description: Resolution, resolution scale, frame-rate limit, fullscreen or windowed.

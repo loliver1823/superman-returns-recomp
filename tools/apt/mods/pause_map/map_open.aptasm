@@ -1,0 +1,9 @@
+; ScrMap.InitGui tail (r1 = this, r2 = _global): _global.SRMap.Open(this)
+    Push [reg1]
+    EA_PushOne
+    Push [reg2]
+    Push ['SRMap']
+    GetMember
+    Push ['Open']
+    CallMethod
+    Pop

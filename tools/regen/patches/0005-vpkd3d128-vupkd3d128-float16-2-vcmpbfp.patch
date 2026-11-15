@@ -1,0 +1,99 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: loliver1823 <151630620+loliver1823@users.noreply.github.com>
+Date: Fri, 9 Oct 2026 16:00:00 +1100
+Subject: [PATCH] vpkd3d128 / vupkd3d128 FLOAT16_2 and non-record vcmpbfp
+
+All three emitted __builtin_debugtrap() (Superman Returns: SurfaceClearColorPackByFormat
+k_16_16_FLOAT clear colours, one FLOAT16_2 unpack in sub_823AE868, one bounds compare in
+sub_82149FF0). The emitted code is exactly the hand bodies those three functions carried
+until release lane R1 (vpkd3d128 type 3: Xenia float_to_xenos_half semantics, L6-proven
+against Xenia in iter-467). The vcmpbfp record form still traps (no site).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+diff --git a/XenonRecomp/recompiler.cpp b/XenonRecomp/recompiler.cpp
+index cd18477..90f8843 100644
+--- a/XenonRecomp/recompiler.cpp
++++ b/XenonRecomp/recompiler.cpp
+@@ -1988,7 +1988,19 @@ bool Recompiler::Recompile(
+ 
+     case PPC_INST_VCMPBFP:
+     case PPC_INST_VCMPBFP128:
+-        println("\t__builtin_debugtrap();");
++        if (strchr(insn.opcode->name, '.'))
++        {
++            println("\t__builtin_debugtrap();");
++            break;
++        }
++        // R1 patch 0005: per lane, bit 31 = !(a <= b), bit 30 = !(a >= -b)
++        printSetFlushMode(true);
++        println("\tfor (int i = 0; i < 4; i++) {{");
++        println("\t\tfloat a = {}.f32[i];", v(insn.operands[1]));
++        println("\t\tfloat b = {}.f32[i];", v(insn.operands[2]));
++        println("\t\t{}.u32[i] = (!(a <= b) ? 0x80000000u : 0u) | (!(a >= -b) ? 0x40000000u : 0u);", vTemp());
++        println("\t}}");
++        println("\t{} = {};", v(insn.operands[0]), vTemp());
+         break;
+ 
+     case PPC_INST_VCMPEQFP:
+@@ -2178,6 +2190,30 @@ bool Recompiler::Recompile(
+             println("\t{}.u32[{}] = {}.u32;", v(insn.operands[0]), insn.operands[4], temp());
+             break;
+ 
++        case 3: // float16_2 (R1 patch 0005)
++            if (insn.operands[3] != 1)
++            {
++                fmt::println("Unexpected float16_2 pack instruction at {:X}", base);
++                println("\t__builtin_debugtrap();");
++                break;
++            }
++            println("\t{{");
++            println("\t\tauto xenosHalf = [](uint32_t v) -> uint32_t {{");
++            println("\t\t\tconst uint32_t a = v & 0x7FFFFFFFu;");
++            println("\t\t\tuint32_t r;");
++            println("\t\t\tif (a >= 0x47FFE000u) {{");
++            println("\t\t\t\tr = 0x7FFFu;");
++            println("\t\t\t}} else {{");
++            println("\t\t\t\tr = a < 0x38800000u ? 0u : a + 0xC8000000u;");
++            println("\t\t\t\tr = (r >> 13) & 0x7FFFu;");
++            println("\t\t\t}}");
++            println("\t\t\treturn r | ((v & 0x80000000u) >> 16);");
++            println("\t\t}};");
++            println("\t\t{}.u32[{}] = (xenosHalf({}.u32[3]) << 16) | xenosHalf({}.u32[2]);",
++                v(insn.operands[0]), insn.operands[4], v(insn.operands[1]), v(insn.operands[1]));
++            println("\t}}");
++            break;
++
+         case 5: // float16_4
+             if (insn.operands[3] != 2 || insn.operands[4] > 2)
+                 fmt::println("Unexpected float16_4 pack instruction at {:X}", base);
+@@ -2512,6 +2548,29 @@ bool Recompiler::Recompile(
+             println("\t{} = {};", v(insn.operands[0]), vTemp());
+             break;
+ 
++        case 3: // float16_2 (R1 patch 0005)
++            println("\t{}.u32 = {}.u32[3];", temp(), v(insn.operands[1]));
++            println("\t{{");
++            println("\t\tauto h2f = [](uint16_t h) -> float {{");
++            println("\t\t\tuint32_t s = (uint32_t)(h & 0x8000) << 16;");
++            println("\t\t\tuint32_t e = (h >> 10) & 0x1F;");
++            println("\t\t\tuint32_t m = h & 0x3FF;");
++            println("\t\t\tuint32_t bits;");
++            println("\t\t\tif (e == 0) {{");
++            println("\t\t\t\tif (m == 0) {{ bits = s; }}");
++            println("\t\t\t\telse {{ while (!(m & 0x400)) {{ m <<= 1; e--; }} e++; m &= 0x3FF; bits = s | ((e + 112) << 23) | (m << 13); }}");
++            println("\t\t\t}} else if (e == 31) {{ bits = s | 0x7F800000u | (m << 13); }}");
++            println("\t\t\telse {{ bits = s | ((e + 112) << 23) | (m << 13); }}");
++            println("\t\t\tPPCRegister r; r.u32 = bits; return r.f32;");
++            println("\t\t}};");
++            println("\t\t{}.f32[3] = h2f((uint16_t)({}.u32 >> 16));", vTemp(), temp());
++            println("\t\t{}.f32[2] = h2f((uint16_t)({}.u32 & 0xFFFF));", vTemp(), temp());
++            println("\t}}");
++            println("\t{}.f32[1] = 0.0f;", vTemp());
++            println("\t{}.f32[0] = 1.0f;", vTemp());
++            println("\t{} = {};", v(insn.operands[0]), vTemp());
++            break;
++
+         default:
+             println("\t__builtin_debugtrap();");
+             break;
